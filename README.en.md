@@ -1,54 +1,109 @@
+<div align="center">
+
+[中文](./README.md) · **English**
+
 # Schrodinger Skills
 
-> *"Skills should not observe each other — until you actively choose, they exist in superposition."*
+#### Practical AI Skills, ready to use
 
-Schrodinger Skills is an open-source collection of AI Skills by [余明宸 (sljdxde)](https://github.com/sljdxde), following the [Agent Skills](https://agentskills.io) open standard.
+[![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
+[![Skills](https://img.shields.io/badge/Skills-1-10B981?style=for-the-badge)](#-skills)
+[![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
-Each skill lives in its own folder with a `SKILL.md` file at its core. Install by asking your Agent one sentence.
+![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
+![Codex](https://img.shields.io/badge/Codex-Skill-10B981?style=flat-square&logo=openai&logoColor=white)
+![OpenCode](https://img.shields.io/badge/OpenCode-Skill-3B82F6?style=flat-square)
+![Cursor](https://img.shields.io/badge/Cursor-Skill-8B5CF6?style=flat-square)
+
+</div>
+
+Each Skill is a structured instruction set that Agents can load directly, following the [Agent Skills](https://agentskills.io) open standard. Works with Claude Code, Codex, OpenCode, and Cursor.
+
+Installation is simple — just one sentence to your Agent. No path or configuration hassle.
 
 *Note for English readers: This project originated in the Chinese AI community. Contributions and translations are welcome.*
 
 ---
 
-## Skills
+## Table of Contents
 
-### skill-governor
-
-*When your Agent has too many plugins and doesn't know which one to use — let Skill Governor be the judge.*
-
-| Property | Value |
-|----------|-------|
-| Compatible Platforms | Claude Code / Codex / OpenCode / Cursor |
-| Complexity | Medium |
-| Has Scripts | `reconcile.py`, `init_policy.py`, `report.py`, `create_ref.py` |
-| Has References | `references/` directory |
-
-**What it does**: Scans installed Agent Skills, merges conflicts via a policy file, and generates a routing registry plus conflict report. Supports single-directory save with `SKILL.REF` references to avoid duplication across directories.
-
-**Good for**: Users with multiple Agent plugins who need unified skill routing management.
-
-**Not for**: Users with only one or two skills and no conflict scenarios.
+| Name | One-liner | Link |
+|---|---|---|
+| 🛡️ [**skill-governor**](#-skill-governor) | Manage installed Agent Skills, resolve plugin conflicts, generate routing registry | [SKILL.md](./skill-governor/SKILL.md) |
 
 ---
 
 ## Install
 
-Tell your Agent:
+In any Agent that supports Skills (Claude Code, Codex, Cursor, etc.), just say:
 
 ```
-Install this skill: https://github.com/sljdxde/schrodinger-skills/tree/main/skill-governor
+Install this skill: https://github.com/sljdxde/schrodinger-skills/tree/main/<skill-name>
 ```
+
+Replace `<skill-name>` with the one you want. The Agent will clone it to the right directory automatically.
 
 ---
 
-## Registry
+## Skills
 
-| Skill | ClawHub | Tessl |
-|-------|---------|-------|
-| skill-governor | v0.1.0 | 0.1.0 |
+<table>
+<tr><td>
+
+### skill-governor
+
+> *"Installed a dozen Agent plugins, and they all overlap — time to get a referee."*
+
+When your Agent has multiple plugins competing for the same capability (like two PDF tools, three browser plugins), skill-governor scans all installed skills, decides via a policy file who's primary, who's shadow, and who should be disabled, then generates a clean routing registry and conflict report.
+
+**What it does**
+
+- Scans all installed Agent Skills, auto-categorizes into capability groups
+- Manages routing priority via `skill-policy.yaml` policy file
+- Generates `skill-registry.yaml` routing registry and conflict report
+- Supports `SKILL.REF` reference files to avoid cross-directory duplication
+- Manual overrides: force any skill's status (active / shadow / disabled)
+
+**Good for**
+
+- Users with multiple Agent plugins who need unified skill routing
+- Figuring out which skills compete for the same capability
+- Syncing skill policies across machines
+
+**Not for**
+
+- Users with only one or two skills and no conflict scenarios
+
+**How to trigger**
+
+```
+Help me manage my skills
+Are there duplicate skills?
+Skill conflict, what should I do?
+Run reconcile for me
+```
+
+**Cross-platform**: Claude Code · Codex · OpenCode · Cursor
+
+→ [SKILL.md](./skill-governor/SKILL.md) · [Architecture](./skill-governor/references/architecture.md) · [Policy Examples](./skill-governor/references/policy-examples.md)
+
+</td></tr>
+</table>
 
 ---
 
-## License
+## About
 
-[MIT](LICENSE)
+Schrodinger Skills is an actively maintained collection of AI Skills. Each skill is battle-tested in real projects before being open-sourced.
+
+Want to contribute a skill? PRs welcome. Issues and suggestions? Open an Issue.
+
+---
+
+<div align="center>
+
+[MIT License](./LICENSE) · Free to use / modify / redistribute
+
+Made by [@sljdxde](https://github.com/sljdxde)
+
+</div>
