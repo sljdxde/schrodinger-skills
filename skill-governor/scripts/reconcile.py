@@ -248,10 +248,15 @@ def scan_skills(skill_dirs: list[Path], lock_path: Path, policy: dict[str, Any] 
             name = meta["name"].strip('"')
             lock_entry = lock.get(name, {})
             description = meta.get("description", "")
+            parent = skill_file.parent
+            is_link = parent.is_symlink()
+            real = str(parent.resolve()) if is_link else str(parent)
             found[name] = {
                 "name": name,
                 "description": description,
-                "path": str(skill_file.parent),
+                "path": str(parent),
+                "real_path": real,
+                "is_symlink": is_link,
                 "capability": resolved_capability(policy or {}, name, description),
                 "source": lock_entry.get("source", "local"),
                 "sourceUrl": lock_entry.get("sourceUrl"),
@@ -275,6 +280,8 @@ def scan_skills(skill_dirs: list[Path], lock_path: Path, policy: dict[str, Any] 
                 "name": name,
                 "description": description,
                 "path": str(canonical),
+                "real_path": str(canonical),
+                "is_symlink": False,
                 "ref": str(ref_file),
                 "capability": resolved_capability(policy or {}, name, description),
                 "source": lock_entry.get("source", "local"),
@@ -437,7 +444,13 @@ def parse_args() -> argparse.Namespace:
     )
     args = parser.parse_args()
     if args.skill_dir is None:
-        args.skill_dir = [codex_home / "skills", agents_home / "skills"]
+        args.skill_dir = [
+            codex_home / "skills",
+            agents_home / "skills",
+            Path.home() / ".claude" / "skills",
+            Path.home() / ".opencode" / "skills",
+            Path.home() / ".cursor" / "skills",
+        ]
     return args
 
 

@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skill Governor — 技能检查报告</title>
+<style>
+  :root{
+    --bg:#f6f7f9;--card:#fff;--ink:#1d2129;--sub:#86909c;--line:#e5e6eb;
+    --green:#00b42a;--yellow:#ff7d00;--red:#f53f3f;--blue:#165dff;
+    --green-bg:#e8ffea;--yellow-bg:#fff7e8;--red-bg:#ffece8;--blue-bg:#e8f3ff;
+    --gray-bg:#f2f3f5;--radius:14px;
+    --shadow:0 1px 3px rgba(0,0,0,.04),0 8px 24px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,"SF Pro SC","PingFang SC",system-ui,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;padding:24px 20px 100px;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:960px;margin:0 auto}
+
+  /* hero */
+  .hero{background:linear-gradient(135deg,#1d2129,#2d3a4a);color:#fff;border-radius:var(--radius);
+    padding:28px 32px;margin-bottom:24px}
+  .hero h1{font-size:22px;font-weight:700;margin-bottom:6px}
+  .hero p{font-size:14px;color:#b0b8c4;line-height:1.7}
+  .hero .stats{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap}
+  .hero .stat .n{font-size:24px;font-weight:700}
+  .hero .stat .l{font-size:11px;color:#86909c}
+
+  /* section */
+  .section{margin-bottom:24px}
+  .section-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+  .section-head h2{font-size:17px;font-weight:700}
+  .section-head .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px}
+  .section-desc{font-size:13px;color:var(--sub);margin-bottom:12px;line-height:1.7}
+
+  /* dir table */
+  .dir-table{width:100%;border-collapse:collapse;background:var(--card);
+    border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);margin-bottom:12px}
+  .dir-table th,.dir-table td{padding:10px 14px;font-size:13px;text-align:left;
+    border-bottom:1px solid var(--line)}
+  .dir-table th{background:#fafbfc;color:var(--sub);font-weight:600;font-size:12px}
+  .dir-table tr:last-child td{border-bottom:none}
+  .dir-path{font-family:"SF Mono",ui-monospace,monospace;font-size:12px;color:var(--sub);word-break:break-all}
+  .skill-list{display:flex;flex-wrap:wrap;gap:4px}
+  .skill-chip{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--gray-bg);color:var(--ink)}
+  .skill-chip.plugin{background:var(--blue-bg);color:var(--blue)}
+
+  /* plugin card */
+  .plugin-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    margin-bottom:12px;border-left:4px solid var(--blue);overflow:hidden}
+  .plugin-header{padding:14px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line)}
+  .plugin-name{font-weight:700;font-size:15px;flex:1}
+  .plugin-badge{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-bg);
+    padding:2px 10px;border-radius:20px}
+  .plugin-body{padding:12px 18px}
+  .plugin-skill{padding:6px 0;font-size:13px;display:flex;align-items:center;gap:8px}
+  .plugin-skill .ps-name{font-weight:600;min-width:160px}
+  .plugin-skill .ps-cap{color:var(--sub);font-size:12px}
+
+  /* capability card */
+  .cap-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    margin-bottom:12px;overflow:hidden}
+  .cap-header{padding:14px 18px;border-bottom:1px solid var(--line);display:flex;
+    align-items:center;gap:10px}
+  .cap-name{font-weight:700;font-size:15px;flex:1}
+  .cap-id{font-size:12px;color:var(--sub);font-family:"SF Mono",ui-monospace,monospace}
+  .cap-body{padding:12px 18px}
+
+  /* recommendation box */
+  .rec-box{background:var(--blue-bg);border:1px solid #c0d8ff;border-radius:10px;
+    padding:12px 14px;margin-bottom:12px;font-size:13px;line-height:1.7}
+  .rec-box.warn{background:var(--yellow-bg);border-color:#ffd591}
+  .rec-box .rec-title{font-weight:700;font-size:13px;margin-bottom:4px;color:var(--blue)}
+  .rec-box.warn .rec-title{color:var(--yellow)}
+  .rec-box .rec-actions{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+  .rec-box .rec-btn{border:none;border-radius:6px;padding:5px 14px;font-size:12px;
+    font-weight:600;cursor:pointer}
+  .rec-box .rec-btn.primary{background:var(--blue);color:#fff}
+  .rec-box .rec-btn.primary:hover{background:#0e4bdb}
+  .rec-box .rec-btn.secondary{background:var(--gray-bg);color:var(--ink)}
+  .rec-box .rec-btn.secondary:hover{background:#e5e6eb}
+
+  /* skill rows */
+  .sk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f5f5f5}
+  .sk:last-child{border-bottom:none}
+  .sk input[type=radio]{width:18px;height:18px;accent-color:var(--blue);cursor:pointer;flex-shrink:0}
+  .sk-info{flex:1;min-width:0}
+  .sk-name{font-weight:600;font-size:14px;display:flex;align-items:center;gap:6px}
+  .sk-desc{font-size:12px;color:var(--sub);margin-top:1px}
+  .sk-path{font-size:11px;color:#b0b8c4;font-family:"SF Mono",ui-monospace,monospace;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .badge{font-size:11px;font-weight:600;padding:1px 8px;border-radius:20px;white-space:nowrap}
+  .badge.active{color:var(--green);background:var(--green-bg)}
+  .badge.shadow{color:var(--sub);background:var(--gray-bg)}
+  .badge.dependency-only{color:var(--blue);background:var(--blue-bg)}
+  .badge.disabled{color:var(--red);background:var(--red-bg)}
+  .badge.recommended{color:var(--blue);background:var(--blue-bg);border:1px solid var(--blue)}
+  .sk-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+  .sk-dis{font-size:11px;color:var(--sub);cursor:pointer;display:flex;align-items:center;gap:2px}
+  .sk-dis input{width:14px;height:14px;accent-color:var(--red);cursor:pointer}
+  .sk.selected{background:#f0f5ff;margin:0 -18px;padding:8px 18px;border-radius:8px}
+  .sk.dimmed{opacity:.4}
+
+  /* uncategorized */
+  .uncat-table{width:100%;border-collapse:collapse;background:var(--card);
+    border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  .uncat-table th,.uncat-table td{padding:10px 14px;font-size:13px;text-align:left;
+    border-bottom:1px solid var(--line)}
+  .uncat-table th{background:#fafbfc;color:var(--sub);font-weight:600;font-size:12px}
+  .uncat-table tr:last-child td{border-bottom:none}
+  .cap-select{font-size:12px;padding:3px 6px;border:1px solid var(--line);border-radius:6px}
+  .skip-btn{font-size:11px;color:var(--sub);background:none;border:1px solid var(--line);
+    border-radius:6px;padding:2px 8px;cursor:pointer}
+  .skip-btn.active{background:var(--gray-bg);color:var(--ink);font-weight:600}
+
+  /* cleanup plan */
+  .plan-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);
+    margin-bottom:10px;padding:14px 18px;border-left:4px solid var(--green)}
+  .plan-card.plugin-del{border-left-color:var(--blue)}
+  .plan-card.standalone-del{border-left-color:var(--yellow)}
+  .plan-title{font-weight:600;font-size:14px;margin-bottom:4px}
+  .plan-desc{font-size:12px;color:var(--sub);margin-bottom:8px}
+  .plan-cmd{background:#1d2129;color:#e5e6eb;border-radius:8px;padding:10px 12px;
+    font-family:"SF Mono",ui-monospace,monospace;font-size:12px;line-height:1.6;
+    overflow-x:auto;white-space:pre;position:relative}
+  .plan-cmd .copy{position:absolute;top:6px;right:6px;background:#2d3138;color:#c9cdd4;
+    border:none;border-radius:4px;padding:3px 8px;font-size:10px;cursor:pointer}
+  .plan-cmd .copy:hover{background:#3d424a;color:#fff}
+  .plan-cmd .copy.done{background:var(--green);color:#fff}
+
+  /* action bar */
+  .act-bar{position:fixed;bottom:0;left:0;right:0;background:#1d2129;color:#fff;
+    padding:12px 24px;display:flex;align-items:center;gap:14px;z-index:100;
+    box-shadow:0 -4px 20px rgba(0,0,0,.15);transform:translateY(100%);
+    transition:transform .25s ease;font-size:13px}
+  .act-bar.show{transform:translateY(0)}
+  .act-bar .act-info{flex:1}
+  .act-bar .act-count{font-weight:700;font-size:15px}
+  .act-bar button{border:none;border-radius:8px;padding:8px 18px;font-size:13px;
+    font-weight:600;cursor:pointer}
+  .act-bar .btn-copy{background:var(--blue);color:#fff}
+  .act-bar .btn-yaml{background:#37a354;color:#fff}
+  .act-bar .btn-reset{background:#3d424a;color:#c9cdd4}
+
+  .toast{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);
+    background:#1d2129;color:#fff;padding:8px 18px;border-radius:8px;font-size:13px;
+    opacity:0;transition:opacity .2s;z-index:101;pointer-events:none}
+  .toast.show{opacity:1}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;
+    display:none;align-items:center;justify-content:center}
+  .modal-bg.show{display:flex}
+  .modal{background:#fff;border-radius:16px;max-width:700px;width:90%;max-height:80vh;
+    overflow:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.2);position:relative}
+  .modal h3{font-size:17px;margin-bottom:14px}
+  .modal pre{background:#1d2129;color:#e5e6eb;border-radius:10px;padding:14px;
+    font-family:"SF Mono",ui-monospace,monospace;font-size:12px;line-height:1.7;
+    overflow-x:auto;white-space:pre;max-height:50vh;overflow-y:auto}
+  .modal .close{position:absolute;top:14px;right:14px;background:none;border:none;
+    font-size:18px;cursor:pointer;color:var(--sub)}
+
+  footer{text-align:center;color:var(--sub);font-size:12px;margin-top:40px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <h1>Skill Governor — 技能检查报告</h1>
+    <p id="heroDesc"></p>
+    <div class="stats">
+      <div class="stat"><div class="n" id="hSkills">0</div><div class="l">已安装技能</div></div>
+      <div class="stat"><div class="n" id="hPlugin">0</div><div class="l">插件引入</div></div>
+      <div class="stat"><div class="n" id="hStandalone">0</div><div class="l">独立安装</div></div>
+      <div class="stat"><div class="n" id="hCaps">0</div><div class="l">Capability 组</div></div>
+      <div class="stat"><div class="n" id="hConflicts">0</div><div class="l">冲突</div></div>
+      <div class="stat"><div class="n" id="hUncat">0</div><div class="l">待分类</div></div>
+    </div>
+  </div>
+  <div id="app"></div>
+  <footer>schrodinger-skills · skill-governor</footer>
+</div>
+
+<div class="act-bar" id="actBar">
+  <div class="act-info">已调整 <span class="act-count" id="actCount">0</span> 项</div>
+  <button class="btn-copy" onclick="copyJSON()">复制 JSON</button>
+  <button class="btn-yaml" onclick="showYAML()">生成 Policy 补丁</button>
+  <button class="btn-reset" onclick="resetAll()">重置</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<div class="modal-bg" id="modalBg">
+  <div class="modal" style="position:relative">
+    <button class="close" onclick="closeModal()">&times;</button>
+    <h3 id="modalTitle">Policy 补丁</h3>
+    <pre id="modalPre"></pre>
+    <div style="margin-top:10px"><button style="background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer" onclick="copyModal()">复制到剪贴板</button></div>
+  </div>
+</div>
+
+<script>
+const D = __REPORT_DATA__;
+const CAP_OPTIONS = [
+  'document.pdf','document.presentation','document.spreadsheet','document.word',
+  'web.browsing','git.workflow','development.workflow','meta.skill-governance',
+  'communication.email','news.ai'
+];
+const STATUS_L = {active:'active',shadow:'shadow','dependency-only':'dep-only',disabled:'disabled',missing:'missing'};
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+// State
+const primaryMap = {};
+const disabledMap = {};
+const uncatAssign = {};
+D.capabilities.forEach(cap => {
+  primaryMap[cap.id] = cap.suggested_primary || cap.primary || '';
+  disabledMap[cap.id] = [];
+  // Auto-demote if recommendation says so
+  if(cap.recommendation && cap.recommendation.demote){
+    disabledMap[cap.id] = [...cap.recommendation.demote];
+  }
+});
+D.uncategorized.forEach(u => {
+  uncatAssign[u.name] = u.suggested_cap || '';
+});
+
+// ── Copy button handler ───────────────────────────────────────────────
+document.addEventListener('click', e => {
+  const b = e.target.closest('.copy');
+  if(!b) return;
+  e.stopPropagation();
+  const text = b.dataset.cmd;
+  navigator.clipboard.writeText(text).then(() => {
+    b.textContent = '已复制'; b.classList.add('done');
+    setTimeout(() => { b.textContent = '复制'; b.classList.remove('done'); }, 1500);
+  });
+});
+
+function countChanges(){
+  let n = 0;
+  for(const cap of D.capabilities){
+    const orig = cap.suggested_primary || cap.primary || '';
+    if(primaryMap[cap.id] !== orig) n++;
+    const autoDis = cap.recommendation?.demote || [];
+    if((disabledMap[cap.id]||[]).sort().join(',') !== autoDis.sort().join(',')) n++;
+  }
+  for(const u of D.uncategorized){
+    const orig = u.suggested_cap || '';
+    if(uncatAssign[u.name] !== orig) n++;
+  }
+  return n;
+}
+
+function updateUI(){
+  const n = countChanges();
+  document.getElementById('actCount').textContent = n;
+  document.getElementById('actBar').classList.toggle('show', n > 0);
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+function renderAll(){
+  // Hero
+  document.getElementById('hSkills').textContent = D.total_skills;
+  document.getElementById('hPlugin').textContent = D.plugin_count;
+  document.getElementById('hStandalone').textContent = D.standalone_count;
+  document.getElementById('hCaps').textContent = D.total_capabilities;
+  document.getElementById('hConflicts').textContent = D.conflict_count;
+  document.getElementById('hUncat').textContent = D.uncategorized_count;
+  document.getElementById('heroDesc').innerHTML =
+    `扫描了 <strong>${D.scan_dirs.length}</strong> 个目录，发现 <strong>${D.total_skills}</strong> 个技能。`+
+    `其中有 <strong>${D.plugins.length}</strong> 个插件共引入 <strong>${D.plugin_count}</strong> 个技能，`+
+    `<strong>${D.conflict_count}</strong> 个能力组存在冲突需要处理。`;
+
+  let html = '';
+
+  // ── 1. Scan directories ─────────────────────────────────────────────
+  html += `<div class="section">
+    <div class="section-head"><h2>扫描了哪些目录</h2></div>
+    <div class="section-desc">系统在以下目录中查找已安装的技能。<strong>快捷方式</strong>是指向其他位置的链接（类似 Windows 的快捷方式），<strong>实际文件</strong>是真实存在的文件夹。清理时，快捷方式只需删除链接本身，实际文件需要删除整个文件夹。</div>
+    <table class="dir-table"><thead><tr><th>目录</th><th>技能数</th><th>实际文件</th><th>快捷方式</th><th>来源插件</th><th>包含的技能</th></tr></thead><tbody>`;
+  for(const dir of D.scan_dirs){
+    const chips = dir.skills.map(s => {
+      const icon = s.is_symlink ? '🔗' : '📁';
+      const cls = s.plugin ? 'plugin' : '';
+      return `<span class="skill-chip ${cls}" title="${s.is_symlink ? '快捷方式 → '+esc(s.real_path) : '实际文件'}">${icon} ${esc(s.name)}</span>`;
+    }).join('');
+    const pluginTags = dir.plugins.length ? dir.plugins.map(p=>`<span class="badge dependency-only">${esc(p)}</span>`).join(' ') : '<span style="color:var(--sub);font-size:12px">无</span>';
+    html += `<tr>
+      <td class="dir-path">${esc(dir.label)}</td>
+      <td style="text-align:center">${dir.count}</td>
+      <td style="text-align:center">${dir.real_count} 个</td>
+      <td style="text-align:center">${dir.link_count} 个</td>
+      <td>${pluginTags}</td>
+      <td><div class="skill-list">${chips}</div></td>
+    </tr>`;
+  }
+  html += '</tbody></table></div>';
+
+  // ── 2. Plugin groups ────────────────────────────────────────────────
+  if(D.plugins.length){
+    html += `<div class="section">
+      <div class="section-head"><h2>插件技能</h2>
+        <span class="tag" style="color:var(--blue);background:var(--blue-bg)">${D.plugins.length} 个插件</span>
+      </div>
+      <div class="section-desc">插件引入的技能。如需清理，应卸载整个插件而非单独删除技能文件。</div>`;
+    for(const p of D.plugins){
+      const rows = p.skills.map(s =>
+        `<div class="plugin-skill"><span class="ps-name">${esc(s.name)}</span><span class="ps-cap">${esc(s.capability)}</span></div>`
+      ).join('');
+      const caps = p.capabilities.map(c=>`<span class="badge shadow">${esc(c)}</span>`).join(' ');
+      html += `<div class="plugin-card">
+        <div class="plugin-header">
+          <span class="plugin-name">${esc(p.name)}</span>
+          <span class="plugin-badge">${p.skill_count} 个技能</span>
+          ${caps}
+        </div>
+        <div class="plugin-body">${rows}</div>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
+  // ── 3. Capability conflicts ─────────────────────────────────────────
+  html += `<div class="section">
+    <div class="section-head"><h2>能力组检查</h2>
+      ${D.conflict_count ? `<span class="tag" style="color:var(--red);background:var(--red-bg)">${D.conflict_count} 个冲突</span>` : '<span class="tag" style="color:var(--green);background:var(--green-bg)">无冲突</span>'}
+    </div>
+    <div class="section-desc">每个能力组选择一个主技能（被默认调用的）。有冲突时系统已给出建议，点「采纳建议」即可。</div>`;
+
+  for(const cap of D.capabilities){
+    const rows = cap.candidates.map(c => {
+      const isPrimary = primaryMap[cap.id] === c.name;
+      const isDis = (disabledMap[cap.id]||[]).includes(c.name);
+      const cls = isPrimary ? 'selected' : (isDis ? 'dimmed' : '');
+      const badge = isDis ? 'disabled' : (isPrimary ? 'active' : c.status);
+      const pluginTag = c.pluginName ? `<span class="badge dependency-only" style="font-size:10px">${esc(c.pluginName)}</span>` : '';
+      const linkIcon = c.is_symlink ? ' <span title="快捷方式，实际位置：'+esc(c.real_path)+'" style="cursor:help">🔗</span>' : '';
+      return `<div class="sk ${cls}">
+        <input type="radio" name="p-${esc(cap.id)}" ${isPrimary?'checked':''} ${isDis?'disabled':''}
+          onchange="pickPrimary('${esc(cap.id)}','${esc(c.name)}')">
+        <div class="sk-info">
+          <div class="sk-name">${esc(c.name)}${linkIcon} <span class="badge ${badge}">${esc(STATUS_L[badge]||badge)}</span> ${pluginTag}</div>
+          ${c.description ? `<div class="sk-desc">${esc(c.description)}</div>` : ''}
+        </div>
+        <div class="sk-right">
+          <label class="sk-dis"><input type="checkbox" ${isDis?'checked':''}
+            onchange="toggleDisable('${esc(cap.id)}','${esc(c.name)}',this.checked)">禁用</label>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Recommendation box
+    let recHTML = '';
+    const rec = cap.recommendation;
+    if(rec){
+      const isApplied = primaryMap[cap.id] === rec.primary &&
+        (rec.demote||[]).every(d => (disabledMap[cap.id]||[]).includes(d));
+      if(rec.action === 'prefer-plugin'){
+        recHTML = `<div class="rec-box">
+          <div class="rec-title">建议：保留插件技能</div>
+          <div>${esc(rec.reason)}</div>
+          <div class="rec-actions">
+            <button class="rec-btn primary" onclick="applyRec('${esc(cap.id)}','${esc(rec.primary)}',${JSON.stringify(rec.demote||[])})">
+              ${isApplied ? '已采纳' : '采纳建议'}</button>
+            <button class="rec-btn secondary" onclick="dismissRec(this)">忽略</button>
+          </div>
+        </div>`;
+      } else if(rec.action === 'resolve-conflict'){
+        recHTML = `<div class="rec-box warn">
+          <div class="rec-title">建议：解决冲突</div>
+          <div>${esc(rec.reason)}</div>
+          <div class="rec-actions">
+            <button class="rec-btn primary" onclick="applyRec('${esc(cap.id)}','${esc(rec.primary)}',${JSON.stringify(rec.demote||[])})">
+              ${isApplied ? '已采纳' : '采纳建议'}</button>
+            <button class="rec-btn secondary" onclick="dismissRec(this)">忽略</button>
+          </div>
+        </div>`;
+      } else if(rec.action === 'cleanup-shadows'){
+        recHTML = `<div class="rec-box">
+          <div class="rec-title">建议：清理多余技能</div>
+          <div>${esc(rec.reason)}</div>
+          <div class="rec-actions">
+            <button class="rec-btn primary" onclick="applyRec('${esc(cap.id)}','${esc(rec.keep)}',${JSON.stringify(rec.remove||[])})">
+              ${isApplied ? '已采纳' : '采纳建议'}</button>
+            <button class="rec-btn secondary" onclick="dismissRec(this)">忽略</button>
+          </div>
+        </div>`;
+      }
+    }
+
+    html += `<div class="cap-card">
+      <div class="cap-header">
+        <span class="cap-name">${esc(cap.label)}</span>
+        <span class="cap-id">${esc(cap.id)}</span>
+        ${cap.has_conflict ? '<span class="badge" style="color:var(--red);background:var(--red-bg)">冲突</span>' : ''}
+      </div>
+      <div class="cap-body">${recHTML}${rows}</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  // ── 4. Uncategorized ────────────────────────────────────────────────
+  if(D.uncategorized.length){
+    html += `<div class="section">
+      <div class="section-head"><h2>待分类技能</h2>
+        <span class="tag" style="color:var(--yellow);background:var(--yellow-bg)">${D.uncategorized.length} 个</span>
+      </div>
+      <div class="section-desc">系统已根据描述自动建议分类，你也可以手动选择或跳过。</div>`;
+    const rows = D.uncategorized.map(u => {
+      const assigned = uncatAssign[u.name];
+      const isSkip = assigned === '__skip__';
+      const opts = CAP_OPTIONS.map(c =>
+        `<option value="${esc(c)}" ${assigned===c?'selected':''}>${esc(c)}</option>`
+      ).join('');
+      return `<tr>
+        <td><div style="font-weight:600;font-size:13px">${esc(u.name)}</div>
+          ${u.description ? `<div style="font-size:12px;color:var(--sub);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(u.description)}</div>` : ''}</td>
+        <td><select class="cap-select" onchange="assignUncat('${esc(u.name)}',this.value)" ${isSkip?'disabled':''}>
+          <option value="">-- 选一个 --</option>${opts}</select></td>
+        <td><button class="skip-btn ${isSkip?'active':''}" onclick="skipUncat('${esc(u.name)}')">${isSkip?'已跳过':'跳过'}</button></td>
+      </tr>`;
+    }).join('');
+    html += `<table class="uncat-table">
+      <thead><tr><th>技能</th><th>分配到</th><th>操作</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+  }
+
+  // ── 5. Cleanup plan ─────────────────────────────────────────────────
+  if(D.cleanup_plan && D.cleanup_plan.actions.length){
+    html += `<div class="section">
+      <div class="section-head"><h2>清理建议</h2></div>
+      <div class="section-desc">以下是根据分析结果生成的清理操作。独立技能可单独删除，插件技能应卸载整个插件。</div>`;
+    for(const act of D.cleanup_plan.actions){
+      if(act.type === 'remove-standalone'){
+        html += `<div class="plan-card standalone-del">
+          <div class="plan-title">删除独立技能：${esc(act.skill)}</div>
+          <div class="plan-desc">${esc(act.reason)} · 路径：${esc(act.path)}</div>
+          <div class="plan-cmd"><button class="copy" data-cmd="${esc(act.command)}">复制</button>${esc(act.command)}</div>
+        </div>`;
+      } else if(act.type === 'classify'){
+        html += `<div class="plan-card">
+          <div class="plan-title">分类：${esc(act.skill)} → ${esc(act.capability)}</div>
+          <div class="plan-desc">${esc(act.reason)}</div>
+        </div>`;
+      }
+    }
+    // Plugin cleanup info
+    if(D.cleanup_plan.plugin_dirs && D.cleanup_plan.plugin_dirs.length){
+      html += `<div class="plan-card plugin-del">
+        <div class="plan-title">插件技能清理说明</div>
+        <div class="plan-desc">以下插件引入了技能文件。如需清理，应通过插件管理器卸载整个插件，而非手动删除单个技能文件夹。</div>`;
+      for(const pd of D.cleanup_plan.plugin_dirs){
+        html += `<div style="font-size:12px;color:var(--sub);margin:4px 0">插件 <strong>${esc(pd.plugin)}</strong>：${esc(pd.path)}</div>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('app').innerHTML = html;
+  updateUI();
+}
+
+// ── Interactions ──────────────────────────────────────────────────────
+function pickPrimary(capId, name){
+  primaryMap[capId] = name;
+  renderAll();
+}
+
+function toggleDisable(capId, name, checked){
+  const arr = disabledMap[capId] || [];
+  if(checked && !arr.includes(name)) arr.push(name);
+  if(!checked) disabledMap[capId] = arr.filter(n=>n!==name);
+  else disabledMap[capId] = arr;
+  if(checked && primaryMap[capId] === name) primaryMap[capId] = '';
+  renderAll();
+}
+
+function applyRec(capId, primary, demote){
+  primaryMap[capId] = primary;
+  disabledMap[capId] = [...(demote||[])];
+  renderAll();
+  showToast('已采纳建议');
+}
+
+function dismissRec(btn){
+  btn.closest('.rec-box').style.display = 'none';
+}
+
+function assignUncat(name, capId){
+  uncatAssign[name] = capId || '';
+  updateUI();
+}
+
+function skipUncat(name){
+  uncatAssign[name] = uncatAssign[name] === '__skip__' ? (D.uncategorized.find(u=>u.name===name)?.suggested_cap||'') : '__skip__';
+  renderAll();
+}
+
+// ── Export ────────────────────────────────────────────────────────────
+function buildPatch(){
+  const result = {capabilities:{}, skills:{}};
+  for(const cap of D.capabilities){
+    const primary = primaryMap[cap.id];
+    const disabled = (disabledMap[cap.id]||[]).filter(d =>
+      cap.candidates.some(c => c.name === d)
+    );
+    result.capabilities[cap.id] = {};
+    if(primary) result.capabilities[cap.id].primary = primary;
+    if(disabled.length) result.capabilities[cap.id].disabled = disabled;
+  }
+  for(const [name, capId] of Object.entries(uncatAssign)){
+    if(capId && capId !== '__skip__') result.skills[name] = {capability: capId};
+  }
+  if(!Object.keys(result.capabilities).length) delete result.capabilities;
+  if(!Object.keys(result.skills).length) delete result.skills;
+  return result;
+}
+
+function toYAML(obj){
+  const lines = ['# Skill Governor — Policy Patch','# 按需合并到 skill-policy.yaml',''];
+  if(obj.capabilities){
+    lines.push('capabilities:');
+    for(const [capId, info] of Object.entries(obj.capabilities)){
+      lines.push('  '+capId+':');
+      if(info.primary) lines.push('    primary: '+info.primary);
+      if(info.disabled && info.disabled.length){
+        lines.push('    candidates:');
+        for(const name of info.disabled){
+          lines.push('      '+name+':');
+          lines.push('        status: disabled');
+        }
+      }
+    }
+    lines.push('');
+  }
+  if(obj.skills){
+    lines.push('skills:');
+    for(const [name, info] of Object.entries(obj.skills)){
+      lines.push('  '+name+':');
+      lines.push('    capability: '+info.capability);
+    }
+    lines.push('');
+  }
+  return lines.join('\n');
+}
+
+function copyJSON(){
+  const patch = buildPatch();
+  if(!Object.keys(patch).length){showToast('没有变更');return}
+  navigator.clipboard.writeText(JSON.stringify(patch,null,2)).then(()=>showToast('已复制 JSON'));
+}
+
+function showYAML(){
+  const patch = buildPatch();
+  if(!Object.keys(patch).length){showToast('没有变更');return}
+  document.getElementById('modalTitle').textContent = 'Policy 补丁';
+  document.getElementById('modalPre').textContent = toYAML(patch);
+  document.getElementById('modalBg').classList.add('show');
+}
+
+function closeModal(){document.getElementById('modalBg').classList.remove('show')}
+function copyModal(){
+  navigator.clipboard.writeText(document.getElementById('modalPre').textContent).then(()=>showToast('已复制'));
+}
+
+function resetAll(){
+  D.capabilities.forEach(cap => {
+    primaryMap[cap.id] = cap.suggested_primary || cap.primary || '';
+    disabledMap[cap.id] = cap.recommendation?.demote ? [...cap.recommendation.demote] : [];
+  });
+  D.uncategorized.forEach(u => { uncatAssign[u.name] = u.suggested_cap || ''; });
+  renderAll();
+  showToast('已重置为建议值');
+}
+
+document.getElementById('modalBg').addEventListener('click',function(e){if(e.target===this)closeModal()});
+
+renderAll();
+</script>
+</body>
+</html>
