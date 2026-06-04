@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Skill Governor Registry",
+  "type": "object",
+  "required": ["version", "capabilities"],
+  "properties": {
+    "version": { "type": "integer" },
+    "capabilities": { "type": "object" },
+    "uncategorized": { "type": "object" }
+  },
+  "additionalProperties": true
+}

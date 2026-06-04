@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Skill Governor Policy",
+  "type": "object",
+  "required": ["version"],
+  "properties": {
+    "version": { "type": "integer" },
+    "policies": { "type": "object" },
+    "capabilities": { "type": "object" },
+    "skills": { "type": "object" }
+  },
+  "additionalProperties": true
+}
