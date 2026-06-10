@@ -29,7 +29,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 | Name | One-liner | Link |
 |---|---|---|
-| 🛡️ [**skill-governor**](#-skill-governor) | Manage installed Agent Skills, resolve plugin conflicts, generate routing registry | [SKILL.md](./skill-governor/SKILL.md) |
+| 🛡️ [**no-bash-windows**](#-no-bash-windows) | Forbid bash commands on native Windows, auto-use PowerShell-compatible alternatives | [SKILL.md](./no-bash-windows/SKILL.md) |
 
 ---
 
@@ -50,42 +50,43 @@ Replace `<skill-name>` with the one you want. The Agent will clone it to the rig
 <table>
 <tr><td>
 
-### skill-governor
+### no-bash-windows
 
-> *"Installed a dozen Agent plugins, and they all overlap — time to get a referee."*
+> *"Running agent on Windows, half the commands fail — because they're all bash syntax."*
 
-When your Agent has multiple plugins competing for the same capability (like two PDF tools, three browser plugins), skill-governor scans all installed skills, decides via a policy file who's primary, who's shadow, and who should be disabled, then generates a clean routing registry and conflict report.
+When using AI agents (Claude Code, Codex, Cursor, etc.) on native Windows, agents often generate bash-only commands like `grep`, `rm -rf`, `export`, `source` that fail in PowerShell. no-bash-windows makes agents default to PowerShell-compatible syntax.
 
 **What it does**
 
-- Scans all installed Agent Skills, auto-categorizes into capability groups
-- Manages routing priority via `skill-policy.yaml` policy file
-- Generates `skill-registry.yaml` routing registry and conflict report
-- Supports `SKILL.REF` reference files to avoid cross-directory duplication
-- Manual overrides: force any skill's status (active / shadow / disabled)
+- Makes agents automatically use PowerShell commands on Windows
+- Provides complete bash -> PowerShell command mapping
+- Includes environment check script (preflight)
+- Covers Node.js, Python, Java, Go, Rust ecosystems
+- Failure diagnosis: auto-detects shell compatibility issues and converts
 
 **Good for**
 
-- Users with multiple Agent plugins who need unified skill routing
-- Figuring out which skills compete for the same capability
-- Syncing skill policies across machines
+- Native Windows users (no WSL)
+- Users who frequently hit bash command errors from agents
+- Users who want agent output to run directly in PowerShell
 
 **Not for**
 
-- Users with only one or two skills and no conflict scenarios
+- Linux / macOS users
+- Users who already use WSL comfortably
 
 **How to trigger**
 
 ```
-Help me manage my skills
-Are there duplicate skills?
-Skill conflict, what should I do?
-Run reconcile for me
+Search for keywords in the src directory
+Delete the dist directory
+Set environment variables and run build
+Activate Python virtual environment
 ```
 
-**Cross-platform**: Claude Code · Codex · OpenCode · Cursor
+**Cross-platform Agents**: Claude Code · Codex · OpenCode · Cursor · VS Code Copilot · Gemini CLI
 
-→ [SKILL.md](./skill-governor/SKILL.md) · [Architecture](./skill-governor/references/architecture.md) · [Policy Examples](./skill-governor/references/policy-examples.md)
+→ [SKILL.md](./no-bash-windows/SKILL.md) · [Command Map](./no-bash-windows/references/command-map.md) · [Failure Recovery](./no-bash-windows/references/failure-recovery.md) · [Test Results](./no-bash-windows/test-results.md)
 
 </td></tr>
 </table>
@@ -100,7 +101,7 @@ Want to contribute a skill? PRs welcome. Issues and suggestions? Open an Issue.
 
 ---
 
-<div align="center>
+<div align="center">
 
 [MIT License](./LICENSE) · Free to use / modify / redistribute
 

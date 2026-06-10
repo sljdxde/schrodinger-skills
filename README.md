@@ -27,7 +27,7 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
-| 🛡️ [**skill-governor**](#-skill-governor) | 管理已安装的 Agent Skills，解决插件冲突，生成路由注册表 | [SKILL.md](./skill-governor/SKILL.md) |
+| 🛡️ [**no-bash-windows**](#-no-bash-windows) | Windows 原生环境禁止 bash 命令，自动使用 PowerShell 兼容方案 | [SKILL.md](./no-bash-windows/SKILL.md) |
 
 ---
 
@@ -48,42 +48,43 @@
 <table>
 <tr><td>
 
-### skill-governor
+### no-bash-windows
 
-> *"装了十几个 Agent 插件，打开全是重复功能——是时候找个裁判了。"*
+> *"在 Windows 上跑 agent，一半命令报错——因为全是 bash 语法。"*
 
-当你的 Agent 装了多个插件，不同 skill 互相抢同一个能力（比如两个 PDF 工具、三个浏览器插件），skill-governor 会扫描所有已安装的 skill，通过策略文件决定谁是主用、谁是备用、谁该禁用，生成一份清晰的路由注册表和冲突报告。
+当你在 Windows 原生环境下使用 AI agent（Claude Code、Codex、Cursor 等），agent 经常生成 `grep`、`rm -rf`、`export`、`source` 等 bash-only 命令，在 PowerShell 中无法执行。no-bash-windows 让 agent 默认使用 PowerShell 兼容语法，避免这类问题。
 
 **它能做什么**
 
-- 扫描所有已安装的 Agent Skills，自动归类到对应能力组
-- 通过 `skill-policy.yaml` 策略文件管理路由优先级
-- 生成 `skill-registry.yaml` 路由注册表和冲突报告
-- 支持 `SKILL.REF` 引用文件，避免跨目录重复安装
-- 手动覆盖：强制指定某个 skill 的状态（active / shadow / disabled）
+- 让 agent 在 Windows 环境下自动使用 PowerShell 命令
+- 提供 bash -> PowerShell 完整命令映射表
+- 内置环境检查脚本（preflight）
+- 覆盖 Node.js、Python、Java、Go、Rust 等主流生态
+- 失败诊断：自动识别 shell 兼容问题并转换
 
 **适合**
 
-- 装了多个 Agent 插件，需要统一管理 skill 路由
-- 想搞清楚哪些 skill 在抢同一个能力
-- 需要跨机器同步 skill 策略
+- Windows 原生用户（不装 WSL）
+- 经常遇到 agent 生成 bash 命令报错
+- 希望 agent 输出可直接在 PowerShell 中执行
 
 **不适合**
 
-- 只装了一两个 skill，没有冲突场景
+- Linux / macOS 用户
+- 已有 WSL 且习惯使用 WSL 的用户
 
 **怎么触发**
 
 ```
-帮我管理一下 skills
-有没有重复的 skill
-skill 冲突了怎么办
-帮我 reconcile 一下
+帮我搜索 src 目录下的关键字
+删除 dist 目录
+设置环境变量并运行 build
+激活 Python 虚拟环境
 ```
 
-**跨平台**：Claude Code · Codex · OpenCode · Cursor
+**跨平台 Agent**：Claude Code · Codex · OpenCode · Cursor · VS Code Copilot · Gemini CLI
 
-→ [SKILL.md](./skill-governor/SKILL.md) · [架构说明](./skill-governor/references/architecture.md) · [策略示例](./skill-governor/references/policy-examples.md)
+→ [SKILL.md](./no-bash-windows/SKILL.md) · [命令映射](./no-bash-windows/references/command-map.md) · [失败诊断](./no-bash-windows/references/failure-recovery.md) · [测试结果](./no-bash-windows/test-results.md)
 
 </td></tr>
 </table>
