@@ -27,7 +27,7 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
-| [Skill Scanner](./skill-scanner) | 自动发现和扫描多 Agent 生态的 skills，支持 plugins/cache 递归检测 | [SKILL.md](./skill-scanner/SKILL.md) |
+| [Skills Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
 
 ---
 
@@ -45,20 +45,27 @@
 
 ## Skills
 
-### [Skill Scanner](./skill-scanner)
+### [Skills Doctor](./skills-doctor)
 
-自动发现和扫描 AI Agent 技能的通用模块。支持 Claude Code、Codex、Cursor、OpenCode 等 12 种 Agent 生态，能递归发现 `plugins/cache`、`plugins/marketplaces` 等嵌套目录下的 skills。
+诊断和治理本地 AI Agent Skills 的工具。支持 Claude Code、Codex、Cursor、OpenCode 等多种生态，检测风险、冲突、重复、僵尸等问题并生成修复建议。
 
 **核心能力：**
-- 自动递归发现 Agent 目录下的 skills
-- 智能跳过 sessions、backups 等无关目录
-- 解析 SKILL.md 元数据（name、description、source 等）
-- 支持 7 种诊断：风险、冲突、重复、版本漂移、僵尸、描述质量、结构警告
+- 7 种诊断：风险、冲突、重复、版本漂移、僵尸、描述质量、结构警告
+- 生成修复提示（fix 命令）
+- 支持 Markdown/HTML/JSON 报告导出
+- CI 集成（--ci --fail-on）
 
 **使用方式：**
 ```bash
-npm install -g agent-skill-doctor
-agent-skill-doctor scan
+# 完整诊断
+agent-skill-doctor diagnose --lang zh
+
+# 定向查询
+agent-skill-doctor risks --json
+agent-skill-doctor duplicates --json
+
+# 生成修复提示
+agent-skill-doctor fix --lang zh
 ```
 
 ---

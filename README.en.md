@@ -29,7 +29,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 | Name | One-liner | Link |
 |---|---|---|
-| [Skill Scanner](./skill-scanner) | Auto-discover and scan skills across multiple agent ecosystems, with recursive plugins/cache detection | [SKILL.md](./skill-scanner/SKILL.md) |
+| [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 
 ---
 
@@ -47,20 +47,27 @@ Replace `<skill-name>` with the one you want. The Agent will clone it to the rig
 
 ## Skills
 
-### [Skill Scanner](./skill-scanner)
+### [Skills Doctor](./skills-doctor)
 
-A universal module for auto-discovering and scanning AI agent skills. Supports 12 agent ecosystems including Claude Code, Codex, Cursor, and OpenCode. Recursively discovers skills in nested directories like `plugins/cache` and `plugins/marketplaces`.
+Diagnose and govern local AI Agent Skills. Supports Claude Code, Codex, Cursor, OpenCode and more. Detects risks, conflicts, duplicates, zombies and generates fix suggestions.
 
 **Key Features:**
-- Automatic recursive discovery of skills in agent directories
-- Smart skipping of irrelevant directories (sessions, backups, etc.)
-- Parse SKILL.md metadata (name, description, source, etc.)
 - 7 diagnostic types: risk, conflict, duplicate, version drift, zombie, description quality, scan warnings
+- Generate fix prompts (fix command)
+- Export reports in Markdown/HTML/JSON
+- CI integration (--ci --fail-on)
 
 **Usage:**
 ```bash
-npm install -g agent-skill-doctor
-agent-skill-doctor scan
+# Full diagnosis
+agent-skill-doctor diagnose --lang zh
+
+# Targeted queries
+agent-skill-doctor risks --json
+agent-skill-doctor duplicates --json
+
+# Generate fix prompts
+agent-skill-doctor fix --lang zh
 ```
 
 ---
