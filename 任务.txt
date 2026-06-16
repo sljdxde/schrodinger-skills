@@ -1,0 +1,483 @@
+# AI Image Generation Service 设计文档
+
+## 一、项目概述
+
+### 1.1 项目背景
+利用 ChatGPT Plus 账号中闲置的 DALL-E 生图额度，通过 Codex CLI 将生图能力以 Web 服务形式提供，部署在 2C2G 轻量服务器上。
+
+### 1.2 核心目标
+- 将 Plus 生图额度通过 Web 端共享使用
+- 极低资源开销，适配 2C2G 服务器
+- 支持简单的用户认证保护
+- 稳定可靠，自动处理 Token 刷新
+
+### 1.3 技术选型理由
+
+| 选型 | 理由 |
+|------|------|
+| Codex CLI | OpenAI 官方工具，自动处理 OAuth 认证，零逆向工程风险 |
+| Flask | 轻量级 Web 框架，资源占用低 |
+| 内存队列 | 无需 Redis，减少服务依赖和内存开销 |
+| Nginx | 已在服务器运行，提供反向代理和密码认证 |
+| 单线程处理 | 匹配服务器性能，避免 OOM |
+
+---
+
+## 二、系统架构
+
+### 2.1 架构图
+
+```
+┌─────────────────────────────────────────────────────┐
+│                      客户端                          │
+│                  (浏览器/API调用)                    │
+└────────────────────┬────────────────────────────────┘
+                     │ HTTPS (443)
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                     Nginx                           │
+│  - 反向代理 :8080                                   │
+│  - Basic Auth 密码保护                              │
+│  - 静态文件缓存                                     │
+│  - 请求限流                                         │
+└────────────────────┬────────────────────────────────┘
+                     │ HTTP (内网)
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                 Flask Web 服务                      │
+│                  (Port 8080)                         │
+│                                                     │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐         │
+│  │ API 路由 │  │ 内存队列 │  │ 状态管理 │         │
+│  └──────────┘  └──────────┘  └──────────┘         │
+│                                                     │
+│  ┌──────────────────────────────────────────┐     │
+│  │            Image Worker                  │     │
+│  │    - 调用 Codex CLI (subprocess)         │     │
+│  │    - 单线程串行处理                       │     │
+│  │    - 超时控制 (120s)                     │     │
+│  └──────────────────────────────────────────┘     │
+└────────────────────┬────────────────────────────────┘
+                     │ subprocess
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                  Codex CLI                          │
+│  - 自动 OAuth 认证                                  │
+│  - 调用 DALL-E API                                  │
+│  - Token 自动刷新                                  │
+└─────────────────────────────────────────────────────┘
+```
+
+### 2.2 请求处理流程
+
+```
+用户提交 Prompt
+      │
+      ▼
+Nginx 验证 Basic Auth ──失败──▶ 401 Unauthorized
+      │
+      ▼ (通过)
+Flask 接收请求
+      │
+      ▼
+创建 Job，加入内存队列
+      │
+      ▼
+返回 job_id + 队列状态
+      │
+      ▼
+Worker 从队列取任务 (单线程串行)
+      │
+      ▼
+调用 codex CLI 子进程
+      │
+      ▼
+CLI 内部: OAuth鉴权 → DALL-E生成 → 返回图片
+      │
+      ▼
+Worker 保存图片到磁盘
+      │
+      ▼
+更新 Job 状态为 DONE
+      │
+      ▼
+客户端轮询获取结果
+```
+
+---
+
+## 三、资源开销分析
+
+### 3.1 内存占用预估
+
+| 组件 | 内存占用 | 备注 |
+|------|---------|------|
+| Nginx | ~50MB | 已在运行，不额外增加 |
+| Python Flask 主进程 | ~40-60MB | 常驻内存 |
+| Codex CLI (调用时) | ~80-120MB | 仅生成时存在，用完即释放 |
+| 系统其他开销 | ~300MB | 操作系统、基础服务 |
+| **总计** | **~450-530MB** | 在 2GB 范围内安全运行 |
+
+### 3.2 CPU 占用分析
+
+| 场景 | CPU 占用 | 持续时间 |
+|------|---------|---------|
+| 空闲时 | <1% | 持续 |
+| 接收请求 | 2-5% | 瞬时 |
+| 调用 Codex CLI | 10-20% | 30-90秒 |
+| 图片保存/传输 | 5-10% | 1-3秒 |
+
+### 3.3 磁盘占用
+
+- 每张图片约 1-5MB
+- 24小时自动清理
+- 预估日常占用 <500MB
+
+### 3.4 并发能力
+
+基于 2C2G 服务器，采用单线程处理：
+
+- **最大并发任务**: 1个
+- **队列容量**: 无限制（内存限制，建议100个）
+- **单任务耗时**: 30-90秒
+- **日处理能力**: 约 960-2880 张图片（理论值）
+
+---
+
+## 四、安全设计
+
+### 4.1 Nginx Basic Auth
+
+生成密码文件：
+```bash
+# 安装 htpasswd 工具
+sudo apt install apache2-utils
+
+# 创建密码文件（首次）
+sudo htpasswd -c /etc/nginx/.htpasswd username
+
+# 添加更多用户
+sudo htpasswd /etc/nginx/.htpasswd another_user
+```
+
+### 4.2 Nginx 配置
+
+```nginx
+# /etc/nginx/sites-available/image-service
+
+# 请求限流区域定义（在 http 块中）
+# limit_req_zone $binary_remote_addr zone=image_gen:10m rate=10r/m;
+
+server {
+    listen 80;
+    server_name your-domain.com;  # 替换为你的域名或IP
+
+    # 请求限流
+    # limit_req zone=image_gen burst=5 nodelay;
+
+    # 客户端请求体大小限制
+    client_max_body_size 2m;
+
+    location / {
+        # Basic Auth 密码保护
+        auth_basic "AI Image Generator - Restricted Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        # 反向代理到 Flask 服务
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # 超时设置（生图需要较长时间）
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 60s;
+        
+        # 缓冲设置
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+    
+    # API 路由同样需要认证
+    location /api/ {
+        auth_basic "AI Image Generator - Restricted Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 180s;
+        proxy_send_timeout 60s;
+    }
+    
+    # 生成的图片文件缓存
+    location /api/image/ {
+        auth_basic "AI Image Generator - Restricted Access";
+        auth_basic_user_file /etc/nginx/.htpasswd;
+        
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        
+        # 图片缓存1小时
+        proxy_cache_valid 200 1h;
+        expires 1h;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+### 4.3 安全措施总结
+
+| 措施 | 说明 |
+|------|------|
+| Nginx Basic Auth | 用户名密码保护，防止未授权访问 |
+| 请求限流 | 防止滥用（10请求/分钟） |
+| 内网绑定 | Flask 仅监听 127.0.0.1，不暴露到公网 |
+| Prompt 长度限制 | 最大1000字符，防止注入攻击 |
+| 超时控制 | CLI 调用120秒超时，防止僵尸进程 |
+| 图片自动清理 | 24小时后自动删除，节省磁盘 |
+
+---
+
+## 五、项目文件结构
+
+```
+~/image-service/
+├── app.py                 # Flask 主应用（含前端HTML）
+├── config.py              # 配置文件
+├── queue_manager.py       # 内存队列管理
+├── image_worker.py        # Codex CLI 调用封装
+├── requirements.txt       # Python 依赖
+├── deploy.sh              # 部署脚本
+├── scripts/               # 运维脚本
+│   ├── status.sh          # 服务状态检查
+│   ├── restart.sh         # 重启服务
+│   └── cleanup.sh         # 手动清理图片
+├── nginx/                 # Nginx 配置
+│   └── image-service.conf # 站点配置
+├── data/                  # 数据目录
+│   └── images/            # 生成的图片
+└── logs/                  # 日志目录
+    └── service.log        # 服务日志
+```
+
+---
+
+## 六、API 接口设计
+
+### 6.1 生成图片
+
+```
+POST /api/generate
+Content-Type: application/json
+
+Request:
+{
+    "prompt": "a beautiful sunset over mountains"
+}
+
+Response:
+{
+    "job_id": "uuid-v4-string",
+    "status": "pending",
+    "queue_status": {
+        "pending": 2,
+        "processing": 1
+    }
+}
+```
+
+### 6.2 查询状态
+
+```
+GET /api/status/{job_id}
+
+Response (processing):
+{
+    "job_id": "uuid-v4",
+    "status": "processing",
+    "created_at": "2024-01-15T10:30:00"
+}
+
+Response (done):
+{
+    "job_id": "uuid-v4",
+    "status": "done",
+    "image_url": "/api/image/uuid-v4",
+    "created_at": "2024-01-15T10:30:00"
+}
+```
+
+### 6.3 获取图片
+
+```
+GET /api/image/{job_id}
+
+Response: image/png binary
+```
+
+### 6.4 队列状态
+
+```
+GET /api/queue
+
+Response:
+{
+    "pending": 5,
+    "processing": 1,
+    "total_jobs": 6
+}
+```
+
+---
+
+## 七、部署流程
+
+### 7.1 前置条件
+- Python 3.8+
+- Codex CLI 已安装并登录
+- Nginx 已运行
+- 2C2G 以上服务器
+
+### 7.2 部署步骤
+
+```bash
+# 1. 创建项目目录
+mkdir -p ~/image-service/{data/images,logs,scripts,nginx}
+
+# 2. 上传所有代码文件到 ~/image-service/
+
+# 3. 安装 Python 依赖
+cd ~/image-service
+pip install -r requirements.txt
+
+# 4. 确保 Codex CLI 已登录
+codex login
+
+# 5. 配置 Nginx
+sudo cp nginx/image-service.conf /etc/nginx/sites-available/
+sudo ln -s /etc/nginx/sites-available/image-service.conf /etc/nginx/sites-enabled/
+
+# 6. 创建密码文件
+sudo htpasswd -c /etc/nginx/.htpasswd your_username
+
+# 7. 测试 Nginx 配置
+sudo nginx -t
+
+# 8. 重载 Nginx
+sudo systemctl reload nginx
+
+# 9. 启动 Flask 服务
+python app.py &
+
+# 10. 验证服务
+curl -u your_username:password http://localhost:8080/api/queue
+```
+
+### 7.3 生产环境运行
+
+推荐使用 systemd 管理服务：
+
+```bash
+# 使用 screen 或 tmux（简单方案）
+screen -S image-service
+cd ~/image-service && python app.py
+# Ctrl+A, D 分离会话
+
+# 或使用 systemd（推荐）
+sudo cp scripts/image-service.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable image-service
+sudo systemctl start image-service
+```
+
+---
+
+## 八、监控与维护
+
+### 8.1 日常检查
+
+```bash
+# 服务状态
+sudo systemctl status image-service
+
+# 队列情况
+curl -u user:pass http://localhost:8080/api/queue
+
+# 磁盘使用
+du -sh ~/image-service/data/images/
+
+# 实时日志
+tail -f ~/image-service/logs/service.log
+```
+
+### 8.2 故障处理
+
+| 问题 | 排查方法 | 解决方案 |
+|------|---------|---------|
+| 服务无响应 | `sudo systemctl status image-service` | 重启服务 |
+| Codex CLI 认证失效 | `codex status` | 重新执行 `codex login` |
+| 磁盘空间不足 | `df -h` | 手动清理旧图片 |
+| 内存占用过高 | `htop` 查看 | 重启服务释放内存 |
+
+### 8.3 性能优化建议
+
+- **当前配置**：适合 1-5 个用户偶尔使用
+- **如需扩容**：考虑升级服务器（4C4G），增加并发处理
+- **图片存储**：可接入对象存储（S3/OSS）减轻磁盘压力
+- **队列持久化**：引入 Redis 防止重启丢失队列任务
+
+---
+
+## 九、限制与注意事项
+
+1. **Plus 额度限制**：受 OpenAI Plus 每日生图额度限制（通常40张/3小时）
+2. **生成速度**：单张图片需 30-90 秒，无法加速
+3. **并发限制**：当前设计为单线程，同时只能处理一个请求
+4. **Token 刷新**：Codex CLI 自动维护，无需手动干预
+5. **网络依赖**：服务器需能访问 OpenAI API（可能需要代理）
+
+---
+
+## 十、后续扩展方向
+
+1. **图片画廊**：展示历史生成的所有图片
+2. **Prompt 模板**：预设常用 Prompt 快速生成
+3. **多模型支持**：接入 Stable Diffusion 等本地模型
+4. **费用统计**：统计生成数量和额度使用情况
+5. **用户管理**：多用户隔离，分别计数
+6. **Webhook 通知**：生成完成后主动推送结果
+
+---
+
+## 附录
+
+### A. 依赖清单
+
+```
+flask==3.0.0          # Web 框架
+gunicorn==21.2.0     # WSGI 服务器（可选，生产使用）
+openai-codex         # Codex CLI（需单独安装）
+```
+
+### B. 服务器端口规划
+
+| 端口 | 用途 | 对外暴露 |
+|------|------|---------|
+| 80/443 | Nginx | 是 |
+| 8080 | Flask (内部) | 否，仅127.0.0.1 |
+
+### C. 环境变量
+
+| 变量 | 默认值 | 说明 |
+|------|-------|------|
+| HOST | 127.0.0.1 | Flask 监听地址 |
+| PORT | 8080 | Flask 监听端口 |
+| MAX_CONCURRENT | 1 | 最大并发生成数 |
+| GENERATION_TIMEOUT | 120 | 单次生成超时(秒) |
+| IMAGE_RETENTION_HOURS | 24 | 图片保留时间(小时) |

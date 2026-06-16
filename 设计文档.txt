@@ -1,0 +1,1045 @@
+可以。下面这个方案可以直接丢给你的本地 agent，让它按目录生成一个 **Windows 原生 Codex Compatibility Skill**。设计目标不是模拟 Linux，而是让 Codex 在 Windows/PowerShell 下**主动避免 bash-only 命令**，并在失败后自动转成 Windows 兼容写法。
+
+Codex 官方支持用 skill 扩展可复用工作流；skill 本质是一个带 `SKILL.md` 的目录，可附带脚本、参考文档、资源。Codex 也会读取 `AGENTS.md` 作为全局或项目级指令，所以这个方案建议 **Skill 管具体执行策略，AGENTS.md 管全局约束**。([OpenAI 开发者][1])
+
+---
+
+# 设计方案：windows-native-codex-compat
+
+## 1. 目标
+
+开发一个 Codex Skill：
+
+```text
+windows-native-codex-compat
+```
+
+核心目标：
+
+> 当 Codex 在 Windows 环境中执行任务时，优先使用 PowerShell、Python、Node.js、npm/pnpm scripts 等跨平台方式，避免 bash-only 命令，并在遇到 shell 兼容错误时自动进行 Windows 化修正。
+
+它解决的是这些问题：
+
+```bash
+grep / sed / awk / xargs / rm -rf / cp -r / mv / export / source / chmod / touch / find / cat / head / tail
+```
+
+在 PowerShell 里不兼容或语义不同的问题。
+
+---
+
+# 2. 总体架构
+
+建议做成四层：
+
+```text
+用户请求
+  ↓
+Codex / local agent
+  ↓
+AGENTS.md 全局约束
+  ↓
+windows-native-codex-compat Skill
+  ↓
+PowerShell helper scripts / references
+  ↓
+项目代码执行
+```
+
+职责划分：
+
+| 模块                           | 作用                                |
+| ---------------------------- | --------------------------------- |
+| `AGENTS.md`                  | 强制 Codex 默认 Windows/PowerShell 思维 |
+| `SKILL.md`                   | 具体规定什么时候触发、怎么转换命令、怎么恢复失败          |
+| `references/command-map.md`  | bash 到 PowerShell/Python 的映射表     |
+| `references/policy.md`       | Windows 执行策略、路径策略、依赖策略            |
+| `scripts/preflight.ps1`      | 检查当前环境                            |
+| `scripts/run-safe.ps1`       | 统一执行命令，记录失败原因                     |
+| `scripts/convert-common.ps1` | 可选，做常见命令转换提示                      |
+| `scripts/path-check.ps1`     | 检查路径、大小写、非法字符等问题                  |
+
+---
+
+# 3. 推荐目录结构
+
+让本地 agent 生成这个结构：
+
+```text
+windows-native-codex-compat/
+  SKILL.md
+  references/
+    command-map.md
+    windows-shell-policy.md
+    failure-recovery.md
+    project-patterns.md
+  scripts/
+    preflight.ps1
+    run-safe.ps1
+    path-check.ps1
+  assets/
+    AGENTS.global.template.md
+    AGENTS.project.template.md
+```
+
+如果你想做成全局 skill，可以放到：
+
+```text
+%USERPROFILE%\.codex\skills\windows-native-codex-compat
+```
+
+官方文档里提到，全局 skill 可以放在用户目录，项目内 skill 可以放在 `.agents/skills`。Codex 会根据 skill 的 `name`、`description` 决定是否加载，且 `SKILL.md` 需要包含 `name` 和 `description`。([OpenAI 开发者][1])
+
+---
+
+# 4. SKILL.md 设计
+
+让本地 agent 创建：
+
+````markdown
+---
+name: windows-native-codex-compat
+description: Use this skill whenever working in a native Windows environment, PowerShell, cmd.exe, Git Bash compatibility issues, path issues, npm scripts on Windows, Python virtualenv on Windows, or when a command fails because it assumes bash/Linux/WSL. Do not use this skill for Linux, macOS, WSL, or container-only environments unless the user explicitly asks to translate commands to Windows.
+---
+
+# Windows Native Codex Compatibility Skill
+
+## Purpose
+
+You are operating in a native Windows environment unless there is explicit evidence otherwise.
+
+Your job is to avoid bash-only assumptions and prefer Windows-compatible commands.
+
+This skill must be used when:
+- The shell is PowerShell or cmd.exe.
+- The OS is Windows.
+- The user mentions Windows, PowerShell, bash compatibility, WSL avoidance, path problems, or command execution issues.
+- A command fails because it uses Linux/bash syntax.
+- You need to run project setup, tests, build, lint, or scripts on Windows.
+
+Do not assume WSL is available.
+Do not ask the user to install WSL unless the project is truly Linux-only and no reasonable Windows-native workaround exists.
+
+## Core Rules
+
+1. Prefer PowerShell syntax over bash syntax.
+2. Prefer project scripts over ad-hoc shell pipelines.
+3. Prefer cross-platform Node.js or Python scripts for complex file/text operations.
+4. Never use bash-only commands unless a bash shell is explicitly available and appropriate.
+5. Do not use `rm -rf`, `grep`, `sed`, `awk`, `xargs`, `export`, `source`, `chmod`, `/tmp`, `/dev/null`, or `VAR=value command` in PowerShell.
+6. Use Windows-compatible path handling.
+7. If a command fails, diagnose whether it is a shell compatibility issue before retrying.
+8. For destructive operations, use safer PowerShell commands and explain what will be removed.
+9. When editing package scripts, prefer cross-platform packages or Node/Python scripts.
+10. When unsure, run `scripts/preflight.ps1` first.
+
+## Execution Preference Order
+
+When choosing how to run something, prefer this order:
+
+1. Existing project command:
+   - npm scripts
+   - pnpm scripts
+   - yarn scripts
+   - package manager commands
+   - documented README command
+
+2. Native PowerShell command.
+
+3. Cross-platform Python script.
+
+4. Cross-platform Node.js script.
+
+5. cmd.exe only when needed.
+
+6. Git Bash only if explicitly installed and the user accepts using it.
+
+7. WSL only if explicitly allowed by the user.
+
+## Common Replacements
+
+Use the mappings in `references/command-map.md`.
+
+Examples:
+
+- `grep -R "foo" .` → `Select-String -Path .\* -Pattern "foo" -Recurse`
+- `rm -rf dist` → `Remove-Item -Recurse -Force .\dist`
+- `export NODE_ENV=production` → `$env:NODE_ENV = "production"`
+- `source .venv/bin/activate` → `.\.venv\Scripts\Activate.ps1`
+- `cat file.txt` → `Get-Content .\file.txt`
+- `touch file.txt` → `New-Item -ItemType File -Path .\file.txt -Force`
+- `/tmp/foo` → `$env:TEMP\foo`
+
+## Path Rules
+
+- Prefer relative paths like `.\src\main.ts`.
+- In code, prefer `pathlib` in Python and `path.join` / `path.resolve` in Node.js.
+- Do not hardcode `/home`, `/tmp`, `/var`, `/dev/null`.
+- Quote paths that may contain spaces.
+- Do not assume path case sensitivity.
+- For PowerShell, use `Join-Path` for constructed paths.
+
+## Environment Variable Rules
+
+PowerShell:
+
+```powershell
+$env:NODE_ENV = "production"
+npm run build
+````
+
+Do not use:
+
+```bash
+NODE_ENV=production npm run build
+export NODE_ENV=production
+```
+
+For npm scripts, prefer:
+
+```json
+{
+  "scripts": {
+    "build": "cross-env NODE_ENV=production vite build"
+  }
+}
+```
+
+or move logic into a Node.js script.
+
+## Python Virtual Environment Rules
+
+Prefer direct interpreter path:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe script.py
+```
+
+Activation is optional. If activation is needed:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+If script execution policy blocks activation, avoid changing global policy first. Prefer direct interpreter invocation.
+
+## Failure Recovery
+
+When a command fails:
+
+1. Read the error.
+
+2. Determine if the failure is caused by:
+
+   * bash syntax in PowerShell
+   * missing command
+   * path separator issue
+   * environment variable syntax
+   * script execution policy
+   * dependency not installed
+   * native compilation issue
+
+3. If it is a shell compatibility issue:
+
+   * Convert the command.
+   * Explain the conversion briefly.
+   * Retry once with Windows-compatible syntax.
+
+4. If it is a project dependency issue:
+
+   * Check package manager files.
+   * Use the project’s documented package manager.
+   * Avoid random global installs.
+
+5. If it is truly Linux-only:
+
+   * Say so clearly.
+   * Suggest Docker, remote Linux, CI, or optional WSL only as fallback.
+
+## Required First Step for Unknown Repositories
+
+Before running setup/build/test in an unknown repo, inspect:
+
+* `package.json`
+* `pnpm-lock.yaml`
+* `yarn.lock`
+* `package-lock.json`
+* `pyproject.toml`
+* `requirements.txt`
+* `README.md`
+* `Makefile`
+* `.github/workflows`
+* existing `.ps1` scripts
+
+Then choose the most native Windows-compatible command.
+
+## Do Not
+
+* Do not blindly run bash snippets copied from README.
+* Do not use `chmod +x`.
+* Do not use `sudo`.
+* Do not use `apt`, `yum`, `brew`, or Linux package managers.
+* Do not assume `make` exists.
+* Do not create `.sh` scripts as the primary solution.
+* Do not recommend WSL unless the user explicitly allows it or the project is Linux-only.
+
+````
+
+---
+
+# 5. command-map.md 设计
+
+创建：
+
+```markdown
+# Bash to PowerShell / Cross-platform Command Map
+
+## File operations
+
+| Bash | PowerShell |
+|---|---|
+| `ls -la` | `Get-ChildItem -Force` |
+| `pwd` | `Get-Location` |
+| `cat file` | `Get-Content .\file` |
+| `head -n 20 file` | `Get-Content .\file -TotalCount 20` |
+| `tail -n 20 file` | `Get-Content .\file -Tail 20` |
+| `touch file` | `New-Item -ItemType File -Path .\file -Force` |
+| `mkdir -p dir` | `New-Item -ItemType Directory -Path .\dir -Force` |
+| `rm file` | `Remove-Item .\file` |
+| `rm -rf dir` | `Remove-Item -Recurse -Force .\dir` |
+| `cp a b` | `Copy-Item .\a .\b` |
+| `cp -r a b` | `Copy-Item -Recurse .\a .\b` |
+| `mv a b` | `Move-Item .\a .\b` |
+
+## Search
+
+| Bash | PowerShell |
+|---|---|
+| `grep "foo" file` | `Select-String -Path .\file -Pattern "foo"` |
+| `grep -R "foo" .` | `Select-String -Path .\* -Pattern "foo" -Recurse` |
+| `find . -name "*.ts"` | `Get-ChildItem -Recurse -Filter *.ts` |
+| `find . -type f` | `Get-ChildItem -Recurse -File` |
+| `find . -type d` | `Get-ChildItem -Recurse -Directory` |
+
+## Environment variables
+
+| Bash | PowerShell |
+|---|---|
+| `export A=B` | `$env:A = "B"` |
+| `A=B npm test` | `$env:A = "B"; npm test` |
+| `echo $A` | `$env:A` |
+
+## Python venv
+
+| Bash | PowerShell |
+|---|---|
+| `source venv/bin/activate` | `.\venv\Scripts\Activate.ps1` |
+| `python3 -m venv .venv` | `py -m venv .venv` or `python -m venv .venv` |
+| `venv/bin/python script.py` | `.\venv\Scripts\python.exe script.py` |
+
+## Redirection
+
+| Bash | PowerShell |
+|---|---|
+| `command > /dev/null` | `command *> $null` |
+| `command 2>/dev/null` | `command 2>$null` |
+| `command && next` | `command; if ($LASTEXITCODE -eq 0) { next }` |
+
+## Prefer cross-platform scripts for complex cases
+
+Avoid translating long pipelines directly.
+
+Instead of:
+
+```bash
+find src -name "*.ts" | xargs sed -i 's/foo/bar/g'
+````
+
+Prefer a Python or Node.js script using `pathlib`, `fs`, or a project codemod.
+
+````
+
+---
+
+# 6. windows-shell-policy.md 设计
+
+```markdown
+# Windows Shell Policy
+
+## Default shell
+
+Assume PowerShell 7+ or Windows PowerShell unless explicitly told otherwise.
+
+## Safe command style
+
+Use:
+
+```powershell
+$ErrorActionPreference = "Stop"
+````
+
+for scripts.
+
+Quote paths:
+
+```powershell
+Get-Content ".\path with spaces\file.txt"
+```
+
+Use explicit executables where possible:
+
+```powershell
+python -m pytest
+node .\scripts\build.js
+npm run test
+```
+
+## Avoid shell-specific tricks
+
+Avoid:
+
+* bash brace expansion
+* process substitution
+* here-doc syntax
+* `$(...)` unless writing PowerShell-specific syntax
+* single-line env var assignment before command
+* Unix path assumptions
+
+## Package managers
+
+Detect lockfile:
+
+1. `pnpm-lock.yaml` → use `pnpm`
+2. `yarn.lock` → use `yarn`
+3. `package-lock.json` → use `npm`
+4. no lockfile → inspect README/package.json
+
+Do not switch package managers without reason.
+
+## Makefile handling
+
+Do not assume `make` is installed on Windows.
+
+If a project only documents `make test`, inspect the Makefile and translate the target into native commands where practical.
+
+## Script creation policy
+
+For helper scripts:
+
+* Prefer `.ps1` for shell tasks.
+* Prefer `.js` or `.mjs` for Node projects.
+* Prefer `.py` for Python-heavy text/file operations.
+* Avoid `.sh` unless project already uses Git Bash and user accepts it.
+
+````
+
+---
+
+# 7. failure-recovery.md 设计
+
+```markdown
+# Failure Recovery Guide
+
+## Error: command not found
+
+Examples:
+- `grep: The term 'grep' is not recognized`
+- `sed: The term 'sed' is not recognized`
+- `rm: cannot find...`
+- `source: The term 'source' is not recognized`
+
+Action:
+1. Identify bash-only command.
+2. Convert using `command-map.md`.
+3. Retry with PowerShell-compatible command.
+
+## Error: env var syntax
+
+Example:
+
+```powershell
+NODE_ENV=production : The term 'NODE_ENV=production' is not recognized
+````
+
+Action:
+
+```powershell
+$env:NODE_ENV = "production"
+npm run build
+```
+
+or use `cross-env` inside npm scripts.
+
+## Error: script execution policy
+
+Example:
+
+```text
+running scripts is disabled on this system
+```
+
+Action:
+Prefer direct interpreter execution:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Only suggest this if user wants activation:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Do not change machine-wide policy automatically.
+
+## Error: path not found
+
+Action:
+
+1. Check current directory with `Get-Location`.
+2. List files with `Get-ChildItem`.
+3. Use quoted relative paths.
+4. Avoid Linux paths.
+
+## Error: native dependency compilation
+
+Action:
+
+1. Identify package.
+2. Check if prebuilt binary exists.
+3. Use documented Windows install steps.
+4. Do not assume Linux package managers.
+5. If Windows unsupported, state that clearly.
+
+````
+
+---
+
+# 8. project-patterns.md 设计
+
+```markdown
+# Project Patterns
+
+## Node.js project
+
+Check:
+
+```powershell
+Get-Content .\package.json
+````
+
+Prefer:
+
+```powershell
+npm run test
+npm run build
+npm run lint
+```
+
+If env vars are needed, use `cross-env` or PowerShell `$env:` syntax.
+
+Avoid editing npm scripts into bash-only commands.
+
+## Python project
+
+Check:
+
+```powershell
+Test-Path .\pyproject.toml
+Test-Path .\requirements.txt
+Test-Path .\.venv
+```
+
+Prefer:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pytest
+```
+
+## Java / Maven / Gradle
+
+Prefer:
+
+```powershell
+.\mvnw.cmd test
+.\gradlew.bat test
+```
+
+If wrappers exist, use Windows wrapper files.
+
+## Go
+
+Prefer:
+
+```powershell
+go test ./...
+go run .
+```
+
+## Rust
+
+Prefer:
+
+```powershell
+cargo test
+cargo run
+```
+
+## Docker
+
+Only use Docker if:
+
+* project already documents it,
+* dependencies are Linux-only,
+* or Windows-native execution is impractical.
+
+Do not suggest WSL first.
+
+````
+
+---
+
+# 9. preflight.ps1
+
+```powershell
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== Windows Native Codex Preflight ==="
+
+Write-Host "`n[System]"
+Write-Host "OS: $([System.Environment]::OSVersion.VersionString)"
+Write-Host "PowerShell: $($PSVersionTable.PSVersion)"
+Write-Host "PSEdition: $($PSVersionTable.PSEdition)"
+Write-Host "Current Directory: $(Get-Location)"
+
+Write-Host "`n[Execution Policy]"
+try {
+    Get-ExecutionPolicy -List
+} catch {
+    Write-Host "Unable to read execution policy: $($_.Exception.Message)"
+}
+
+Write-Host "`n[Commands]"
+$commands = @(
+    "git",
+    "node",
+    "npm",
+    "pnpm",
+    "yarn",
+    "python",
+    "py",
+    "pip",
+    "java",
+    "mvn",
+    "gradle",
+    "go",
+    "rustc",
+    "cargo",
+    "docker"
+)
+
+foreach ($cmd in $commands) {
+    $found = Get-Command $cmd -ErrorAction SilentlyContinue
+    if ($found) {
+        Write-Host "$cmd => $($found.Source)"
+    } else {
+        Write-Host "$cmd => NOT FOUND"
+    }
+}
+
+Write-Host "`n[Project Files]"
+$files = @(
+    "package.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+    "package-lock.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "pom.xml",
+    "build.gradle",
+    "go.mod",
+    "Cargo.toml",
+    "Makefile",
+    "README.md"
+)
+
+foreach ($file in $files) {
+    if (Test-Path $file) {
+        Write-Host "FOUND: $file"
+    }
+}
+
+Write-Host "`nPreflight complete."
+````
+
+---
+
+# 10. run-safe.ps1
+
+```powershell
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Command
+)
+
+$ErrorActionPreference = "Continue"
+
+Write-Host "=== Running Command ==="
+Write-Host $Command
+Write-Host ""
+
+$start = Get-Date
+
+try {
+    Invoke-Expression $Command
+    $exitCode = $LASTEXITCODE
+
+    if ($null -eq $exitCode) {
+        $exitCode = 0
+    }
+} catch {
+    Write-Host ""
+    Write-Host "=== PowerShell Exception ==="
+    Write-Host $_.Exception.Message
+    $exitCode = 1
+}
+
+$end = Get-Date
+$duration = $end - $start
+
+Write-Host ""
+Write-Host "=== Result ==="
+Write-Host "ExitCode: $exitCode"
+Write-Host "Duration: $($duration.TotalSeconds)s"
+
+if ($exitCode -ne 0) {
+    Write-Host ""
+    Write-Host "Command failed. Check whether this was caused by:"
+    Write-Host "- Bash-only syntax"
+    Write-Host "- Missing command"
+    Write-Host "- Wrong path separator"
+    Write-Host "- Environment variable syntax"
+    Write-Host "- Execution policy"
+    Write-Host "- Missing dependency"
+}
+
+exit $exitCode
+```
+
+---
+
+# 11. path-check.ps1
+
+```powershell
+param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path
+)
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "=== Path Check ==="
+Write-Host "Input: $Path"
+
+try {
+    $resolved = Resolve-Path $Path -ErrorAction Stop
+    Write-Host "Resolved: $resolved"
+    Write-Host "Exists: true"
+
+    $item = Get-Item $resolved
+    Write-Host "Type: $($item.GetType().Name)"
+    Write-Host "FullName: $($item.FullName)"
+} catch {
+    Write-Host "Exists: false"
+    Write-Host "Error: $($_.Exception.Message)"
+
+    $parent = Split-Path $Path -Parent
+    if ($parent -and (Test-Path $parent)) {
+        Write-Host ""
+        Write-Host "Parent exists. Nearby files:"
+        Get-ChildItem $parent | Select-Object -First 30 | ForEach-Object {
+            Write-Host $_.Name
+        }
+    }
+}
+```
+
+---
+
+# 12. 全局 AGENTS.md 模板
+
+让本地 agent 生成：
+
+```markdown
+# Global Codex Instructions for Windows
+
+## Environment
+
+I am working on native Windows, usually in PowerShell.
+
+Do not assume WSL, Linux, macOS, or bash.
+
+## Shell Rules
+
+- Prefer PowerShell-compatible commands.
+- Avoid bash-only commands.
+- Do not use `rm -rf`, `grep`, `sed`, `awk`, `xargs`, `export`, `source`, `chmod`, `sudo`, `/tmp`, `/dev/null`.
+- Use Windows-compatible path handling.
+- Prefer Python/Node scripts for complex file operations.
+- Prefer existing project scripts over ad-hoc shell commands.
+- If a command fails, check for shell compatibility before retrying.
+
+## Path Rules
+
+- Use relative paths where practical.
+- Quote paths with spaces.
+- Use `.\` for local paths in PowerShell.
+- In generated code, use cross-platform path APIs.
+
+## Project Rules
+
+- Before running setup/build/test, inspect project files.
+- Use lockfile to infer package manager.
+- Do not globally install dependencies unless explicitly requested.
+- Do not recommend WSL unless Windows-native execution is impractical.
+```
+
+Codex 官方说明 `AGENTS.md` 可以放在 Codex home 目录作为全局指令，也可以放在项目里作为 repo 指令；越靠近当前目录的指令优先级越高。([OpenAI 开发者][2])
+
+---
+
+# 13. 触发策略
+
+这个 skill 的 `description` 要写得很直白，因为 Codex 会先看到 skill 的名称、描述和路径，再决定是否加载完整 `SKILL.md`；描述写得越清楚，隐式触发越可靠。([OpenAI 开发者][1])
+
+推荐触发关键词：
+
+```text
+Windows
+PowerShell
+cmd.exe
+bash compatibility
+WSL avoidance
+grep
+sed
+awk
+rm -rf
+export
+source
+chmod
+path separator
+script execution policy
+npm scripts on Windows
+Python venv on Windows
+```
+
+---
+
+# 14. MVP 验收标准
+
+让本地 agent 按下面这些 case 测试：
+
+## Case 1：文件搜索
+
+输入：
+
+```text
+搜索 src 目录下所有包含 keyword 的文件
+```
+
+不应该生成：
+
+```bash
+grep -R "keyword" src
+```
+
+应该生成：
+
+```powershell
+Select-String -Path .\src\* -Pattern "keyword" -Recurse
+```
+
+---
+
+## Case 2：删除目录
+
+不应该生成：
+
+```bash
+rm -rf dist
+```
+
+应该生成：
+
+```powershell
+Remove-Item -Recurse -Force .\dist
+```
+
+---
+
+## Case 3：Node 环境变量
+
+不应该生成：
+
+```bash
+NODE_ENV=production npm run build
+```
+
+应该生成：
+
+```powershell
+$env:NODE_ENV = "production"
+npm run build
+```
+
+或者建议：
+
+```bash
+npm install -D cross-env
+```
+
+然后：
+
+```json
+{
+  "scripts": {
+    "build": "cross-env NODE_ENV=production vite build"
+  }
+}
+```
+
+---
+
+## Case 4：Python venv
+
+不应该生成：
+
+```bash
+source .venv/bin/activate
+```
+
+应该生成：
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+或者：
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+---
+
+## Case 5：Makefile
+
+如果 README 写：
+
+```bash
+make test
+```
+
+Codex 不应该直接假设 Windows 有 `make`。
+
+它应该先打开 `Makefile`，找到 `test` target，然后转成 PowerShell 或项目原生命令。
+
+---
+
+# 15. 给本地 agent 的执行 Prompt
+
+你可以直接把下面这段丢给你的本地 agent：
+
+```text
+请在当前目录创建一个 Codex skill：windows-native-codex-compat。
+
+目标：
+让我在 Windows 原生 PowerShell 环境中使用 Codex 时，尽量避免 bash/Linux-only 命令导致的兼容问题。不要依赖 WSL。这个 skill 要让 Codex 默认使用 PowerShell、Python、Node.js、npm/pnpm scripts 等 Windows 兼容方案，并在命令失败后优先判断是否是 shell 兼容问题。
+
+请生成以下结构：
+
+windows-native-codex-compat/
+  SKILL.md
+  references/
+    command-map.md
+    windows-shell-policy.md
+    failure-recovery.md
+    project-patterns.md
+  scripts/
+    preflight.ps1
+    run-safe.ps1
+    path-check.ps1
+  assets/
+    AGENTS.global.template.md
+    AGENTS.project.template.md
+
+要求：
+1. SKILL.md 必须包含 YAML frontmatter：name 和 description。
+2. description 要覆盖 Windows、PowerShell、bash compatibility、WSL avoidance、grep、sed、rm -rf、export、source、chmod、path separator、npm scripts on Windows、Python venv on Windows 等触发词。
+3. SKILL.md 中明确禁止默认使用 bash-only 命令。
+4. command-map.md 里提供 bash 到 PowerShell 的常见映射。
+5. windows-shell-policy.md 里定义 PowerShell 优先、跨平台脚本优先、不要默认 WSL。
+6. failure-recovery.md 里定义失败诊断流程。
+7. project-patterns.md 里覆盖 Node.js、Python、Java、Go、Rust、Docker。
+8. scripts/preflight.ps1 检查 OS、PowerShell 版本、ExecutionPolicy、git/node/npm/pnpm/yarn/python/java/go/rust/docker 等命令，以及常见项目文件。
+9. scripts/run-safe.ps1 接收一个命令字符串，执行并打印 exit code、耗时、失败诊断提示。
+10. scripts/path-check.ps1 检查路径是否存在、解析路径、父目录文件。
+11. assets/AGENTS.global.template.md 生成适合放进 ~/.codex/AGENTS.md 的全局 Windows 规则。
+12. assets/AGENTS.project.template.md 生成适合放进项目根目录 AGENTS.md 的项目级 Windows 规则。
+13. 最后输出安装说明和 5 个测试用例。
+```
+
+---
+
+# 16. 我建议的落地顺序
+
+第一版先做 **纯规则 + 映射表 + preflight**，不要一上来做复杂自动转换器。
+
+优先级：
+
+1. `SKILL.md`
+2. `AGENTS.global.template.md`
+3. `command-map.md`
+4. `failure-recovery.md`
+5. `preflight.ps1`
+6. `run-safe.ps1`
+7. `path-check.ps1`
+
+这样收益最大，因为 Codex/agent 大部分错误来自“生成命令前的习惯问题”，不是执行器本身的问题。
+
+---
+
+# 17. 最终建议
+
+这个 skill 应该定位为：
+
+```text
+Windows Native Guardrail for Codex
+```
+
+不是：
+
+```text
+Linux Compatibility Layer
+```
+
+也就是说，它的正确方向是：
+
+```text
+让 Codex 少写 bash
+```
+
+而不是：
+
+```text
+让 Windows 跑所有 bash
+```
+
+这样最稳，也最符合你“不装 WSL”的要求。
+
+[1]: https://developers.openai.com/codex/skills "Agent Skills – Codex | OpenAI Developers"
+[2]: https://developers.openai.com/codex/guides/agents-md "Custom instructions with AGENTS.md – Codex | OpenAI Developers"
