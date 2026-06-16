@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-0-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-1-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -27,7 +27,7 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
-| _暂无_ | 欢迎贡献 | - |
+| [Skill Scanner](./skill-scanner) | 自动发现和扫描多 Agent 生态的 skills，支持 plugins/cache 递归检测 | [SKILL.md](./skill-scanner/SKILL.md) |
 
 ---
 
@@ -45,7 +45,21 @@
 
 ## Skills
 
-_暂无 skill，欢迎贡献。_
+### [Skill Scanner](./skill-scanner)
+
+自动发现和扫描 AI Agent 技能的通用模块。支持 Claude Code、Codex、Cursor、OpenCode 等 12 种 Agent 生态，能递归发现 `plugins/cache`、`plugins/marketplaces` 等嵌套目录下的 skills。
+
+**核心能力：**
+- 自动递归发现 Agent 目录下的 skills
+- 智能跳过 sessions、backups 等无关目录
+- 解析 SKILL.md 元数据（name、description、source 等）
+- 支持 7 种诊断：风险、冲突、重复、版本漂移、僵尸、描述质量、结构警告
+
+**使用方式：**
+```bash
+npm install -g agent-skill-doctor
+agent-skill-doctor scan
+```
 
 ---
 

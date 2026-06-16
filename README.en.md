@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-0-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-1-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -29,7 +29,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 | Name | One-liner | Link |
 |---|---|---|
-| _None yet_ | Contributions welcome | - |
+| [Skill Scanner](./skill-scanner) | Auto-discover and scan skills across multiple agent ecosystems, with recursive plugins/cache detection | [SKILL.md](./skill-scanner/SKILL.md) |
 
 ---
 
@@ -47,7 +47,21 @@ Replace `<skill-name>` with the one you want. The Agent will clone it to the rig
 
 ## Skills
 
-_No skills yet. Contributions welcome._
+### [Skill Scanner](./skill-scanner)
+
+A universal module for auto-discovering and scanning AI agent skills. Supports 12 agent ecosystems including Claude Code, Codex, Cursor, and OpenCode. Recursively discovers skills in nested directories like `plugins/cache` and `plugins/marketplaces`.
+
+**Key Features:**
+- Automatic recursive discovery of skills in agent directories
+- Smart skipping of irrelevant directories (sessions, backups, etc.)
+- Parse SKILL.md metadata (name, description, source, etc.)
+- 7 diagnostic types: risk, conflict, duplicate, version drift, zombie, description quality, scan warnings
+
+**Usage:**
+```bash
+npm install -g agent-skill-doctor
+agent-skill-doctor scan
+```
 
 ---
 
