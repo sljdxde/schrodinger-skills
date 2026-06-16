@@ -58,16 +58,16 @@ Diagnose and govern local AI Agent Skills. Supports Claude Code, Codex, Cursor, 
 - CI integration (--ci --fail-on)
 
 **Usage:**
-```bash
-# Full diagnosis
-agent-skill-doctor diagnose --lang zh
 
-# Targeted queries
-agent-skill-doctor risks --json
-agent-skill-doctor duplicates --json
+Just tell your Agent:
+```
+Please use agent-skill-doctor to diagnose my local Agent Skills
+```
 
-# Generate fix prompts
-agent-skill-doctor fix --lang zh
+The Agent will run diagnostics, generate reports, and output a fix plan. You can also ask for specifics:
+```
+Check for duplicate skills
+Detect zombie skills
 ```
 
 ---

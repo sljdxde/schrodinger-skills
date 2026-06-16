@@ -56,16 +56,16 @@
 - CI 集成（--ci --fail-on）
 
 **使用方式：**
-```bash
-# 完整诊断
-agent-skill-doctor diagnose --lang zh
 
-# 定向查询
-agent-skill-doctor risks --json
-agent-skill-doctor duplicates --json
+对 Agent 说：
+```
+请使用 agent-skill-doctor 诊断我的本地 Agent Skills
+```
 
-# 生成修复提示
-agent-skill-doctor fix --lang zh
+Agent 会自动运行诊断、生成报告、输出修复计划。也可以指定具体需求：
+```
+帮我检查有没有重复的 skills
+检测一下有没有僵尸 skill
 ```
 
 ---
