@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-1-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-2-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -27,6 +27,7 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
+| [House Buying](./house-buying) | 中国住宅购房尽调与决策分析，覆盖成交、学区、升学、生源、小区人口和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
 
 ---
@@ -44,6 +45,26 @@
 ---
 
 ## Skills
+
+### [House Buying](./house-buying)
+
+中国住宅购房尽调和决策分析工具。适合评估具体楼盘、学区房、片区对比和买入时机，要求联网核验成交、挂牌、学校、政策、升学、生源、小区人口与城市基本面数据。
+
+**核心能力：**
+- 成交/挂牌/库存/议价空间多源核验
+- 学校升学、招生政策、学位预警和生源结构分析
+- 小区人口与居住画像，区分“买学位入口”和“可长期自住社区”
+- 基准/乐观/悲观三情景价格预测
+- 明确给出买入、谨慎可买、观望或不建议买入
+
+**使用方式：**
+
+对 Agent 说：
+```
+请使用 house-buying 分析杭州耀江文鼎苑是否值得买，自住+学区，预算400万以内
+```
+
+Agent 会先核验公开数据，再输出证据台账、风险评估、横向对比和购买建议。
 
 ### [Skills Doctor](./skills-doctor)
 

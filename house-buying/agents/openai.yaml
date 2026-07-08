@@ -1,0 +1,4 @@
+interface:
+  display_name: "House Buying"
+  short_description: "面向中国住宅购房决策的成交学区生源社区尽调分析与价格预测"
+  default_prompt: "Use $house-buying to evaluate a target Chinese residential property with transaction, school, community, and risk evidence."

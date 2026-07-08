@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-1-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-2-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -29,6 +29,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 | Name | One-liner | Link |
 |---|---|---|
+| [House Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, schools, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 
 ---
@@ -46,6 +47,26 @@ Replace `<skill-name>` with the one you want. The Agent will clone it to the rig
 ---
 
 ## Skills
+
+### [House Buying](./house-buying)
+
+Due diligence and decision support for Chinese residential property purchases. It is designed for target communities, school-district homes, area comparisons, and buy/watch decisions, with explicit evidence tracking for transaction prices, listings, schools, admissions policy, student sources, community demographics, and city fundamentals.
+
+**Key Features:**
+- Cross-check transaction prices, listing prices, inventory, and negotiation room
+- Analyze school outcomes, admission rules, seat warnings, and student-source quality
+- Build a community demographic profile instead of relying only on price
+- Produce base/optimistic/pessimistic housing-price forecast scenarios
+- Give a clear buy / cautious buy / watch / do-not-buy recommendation
+
+**Usage:**
+
+Tell your Agent:
+```
+Use house-buying to analyze whether Hangzhou Yaojiang Wendingyuan is worth buying for self-use plus school access under a 4M RMB budget
+```
+
+The Agent will verify public data first, then produce an evidence-backed report with risks, comparisons, and an actionable recommendation.
 
 ### [Skills Doctor](./skills-doctor)
 
