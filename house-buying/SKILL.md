@@ -13,12 +13,20 @@ description: Use when evaluating Chinese residential property purchases, school-
 
 ## 工作流
 
-1. 解析需求：提取城市、楼盘/小区/片区、购房目的、预算、户型面积、入学年份、持有周期和备选项。城市或目标楼盘缺失时先问；其他缺失项可默认并标注假设。
+1. 交互式需求采集：先按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
 2. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
 3. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。
 4. 补齐教育与社区：涉及学区房或用户提到孩子入学时，必须按 `references/school-and-community-analysis.md` 采集学校升学情况、学校生源、小区人口与居住画像。
 5. 做价格预测：使用 `references/forecasting-framework.md`，输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
 6. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
+
+## 交互式启动规则
+
+- 用户信息不足时，先问一轮精简问题，最多 8 个，不要用“我先分析一下”绕过需求采集。
+- 城市和目标对象缺失时停止追问；目标对象可以是小区、楼盘、学校或片区。
+- 预算、购房目的、孩子入学年份缺失时优先追问；如果用户明确“不涉及学区”，入学年份可记为“无”。
+- 户型面积、贷款约束、通勤、决策时间和备选小区缺失时，可以继续分析，但必须在报告“用户输入摘要/关键假设”中标注。
+- 如果用户一次性给足城市、目标对象、购房目的、预算和入学年份，直接进入证据采集，只把其他缺口列为假设。
 
 ## 必查清单
 
@@ -53,6 +61,7 @@ description: Use when evaluating Chinese residential property purchases, school-
 ## 参考文件
 
 - `references/data-source-playbook.md`：数据源、搜索关键词、证据台账和质量分级。
+- `references/intake-questionnaire.md`：交互式需求采集、必填字段和追问策略。
 - `references/school-and-community-analysis.md`：学校升学、学校生源、小区人口与隐私边界。
 - `references/forecasting-framework.md`：价格预测模型、情景假设和置信度规则。
 - `references/report-template.md`：最终报告结构和评分表。
