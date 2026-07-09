@@ -16,9 +16,10 @@ description: Use when evaluating Chinese residential property purchases, school-
 1. 交互式需求采集：先按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
 2. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
 3. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。
-4. 补齐教育与社区：涉及学区房或用户提到孩子入学时，必须按 `references/school-and-community-analysis.md` 采集学校升学情况、学校生源、小区人口与居住画像。
-5. 做价格预测：使用 `references/forecasting-framework.md`，输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
-6. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
+4. 计算学区溢价：涉及学区房时，按 `references/school-premium-comparison.md` 对比目标学区房与周边非学区房，量化教育溢价。
+5. 补齐教育与社区：涉及学区房或用户提到孩子入学时，必须按 `references/school-and-community-analysis.md` 采集学校升学情况、学校生源、小区人口与居住画像。
+6. 做价格预测：使用 `references/forecasting-framework.md`，输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
+7. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
 
 ## 交互式启动规则
 
@@ -38,6 +39,7 @@ description: Use when evaluating Chinese residential property purchases, school-
 - 学校质量：官方办学信息、集团化/校区关系、师资与班级规模、可公开核验的升学去向或中考表现。
 - 学校生源：对口小区构成、房价门槛、租售结构、片区家庭画像、流动性与新增适龄儿童压力。
 - 小区人口：户数、常住/租住 proxy、年龄结构 proxy、儿童入学需求 proxy、业主稳定性和换手率。
+- 学区溢价：同板块、同年代、同产品力的非学区房价格对比，拆分教育溢价、居住价值和流动性差异。
 - 横向比较：选择 2-3 个同城、同价位或同教育诉求的可比片区/楼盘，说明为什么可比。
 
 ## 数据可信度
@@ -62,6 +64,7 @@ description: Use when evaluating Chinese residential property purchases, school-
 
 - `references/data-source-playbook.md`：数据源、搜索关键词、证据台账和质量分级。
 - `references/intake-questionnaire.md`：交互式需求采集、必填字段和追问策略。
+- `references/school-premium-comparison.md`：学区房与周边非学区房价格对比、溢价计算和解释规则。
 - `references/school-and-community-analysis.md`：学校升学、学校生源、小区人口与隐私边界。
 - `references/forecasting-framework.md`：价格预测模型、情景假设和置信度规则。
 - `references/report-template.md`：最终报告结构和评分表。
