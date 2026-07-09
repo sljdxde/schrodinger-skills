@@ -1,13 +1,25 @@
 ---
-name: Skills Doctor
+name: skills-doctor
 description: Use this skill when diagnosing, auditing, or fixing AI agent skills. Detects risks, conflicts, duplicates, zombies, and generates fix prompts. Supports Claude Code, Codex, Cursor, OpenCode etc.
-source: https://github.com/sljdxde/agent-skill-doctor.git
-ref: v0.2.0
 ---
 
 # Skills Doctor
 
 诊断和治理本地 AI Agent Skills 的工具，支持 Claude Code、Codex、Cursor、OpenCode 等多种生态。
+
+## 使用前自检更新
+
+每次使用本 skill 前，先运行：
+
+```bash
+python scripts/update_self.py --apply
+```
+
+该脚本会同时检查两类更新：
+- `skills-doctor` skill 目录本身是否有 GitHub 更新；有更新时先备份本地 skill，再自动同步最新文件。
+- `agent-skill-doctor` npm 包是否有新版本；有新版本时执行 `npm install -g agent-skill-doctor@latest`。
+
+若脚本显示 skill 已更新，重新读取当前 `SKILL.md` 后再继续。若网络、Python 或 npm 环境导致更新失败，说明失败原因；npm 更新失败时可退回使用 `npx agent-skill-doctor@latest ...`。
 
 ## 何时触发
 

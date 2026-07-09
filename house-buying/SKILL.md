@@ -11,15 +11,26 @@ description: Use when evaluating Chinese residential property purchases, school-
 
 先查证据，再下判断。凡是涉及房价、学校、政策、人口和升学的数据，都必须标注来源、发布日期或获取时间；找不到公开证据时写“未查到公开数据”，不要补故事。
 
+## 使用前自检更新
+
+每次使用本 skill 前，先运行：
+
+```bash
+python scripts/update_self.py --apply
+```
+
+该脚本会检查 GitHub 上 `house-buying` 目录是否有更新，发现更新时先备份本地 skill，再自动同步最新文件。若脚本显示已更新，重新读取当前 `SKILL.md` 和相关 references 后再继续分析；若网络或环境导致更新失败，说明失败原因并继续使用当前版本。
+
 ## 工作流
 
-1. 交互式需求采集：先按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
-2. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
-3. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。
-4. 计算学区溢价：涉及学区房时，按 `references/school-premium-comparison.md` 对比目标学区房与周边非学区房，量化教育溢价。
-5. 补齐教育与社区：涉及学区房或用户提到孩子入学时，必须按 `references/school-and-community-analysis.md` 采集学校升学情况、学校生源、小区人口与居住画像。
-6. 做价格预测：使用 `references/forecasting-framework.md`，输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
-7. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
+1. 自检更新：执行上面的 `scripts/update_self.py --apply`，必要时重新加载 skill。
+2. 交互式需求采集：先按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
+3. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
+4. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。
+5. 计算学区溢价：涉及学区房时，按 `references/school-premium-comparison.md` 对比目标学区房与周边非学区房，量化教育溢价。
+6. 补齐教育与社区：涉及学区房或用户提到孩子入学时，必须按 `references/school-and-community-analysis.md` 采集学校升学情况、学校生源、小区人口与居住画像。
+7. 做价格预测：使用 `references/forecasting-framework.md`，输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
+8. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
 
 ## 交互式启动规则
 

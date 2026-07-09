@@ -23,6 +23,10 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 *Note for English readers: This project originated in the Chinese AI community. Contributions and translations are welcome.*
 
+Every skill in this repository includes a pre-use self-update check. Before running, the skill can compare its local folder with the latest GitHub copy, back up and sync itself when needed, and update backing tool packages when the skill depends on one.
+
+The self-update helper requires `python`; npm-backed skills such as Skills Doctor also require `npm` for package updates.
+
 ---
 
 ## Table of Contents
@@ -69,6 +73,10 @@ Use house-buying to analyze whether Hangzhou Yaojiang Wendingyuan is worth buyin
 
 The Agent will verify public data first, then produce an evidence-backed report with risks, comparisons, and an actionable recommendation.
 
+**Auto-update:**
+- Run `python scripts/update_self.py --apply` before use
+- Checks and syncs the latest `house-buying` skill folder from GitHub
+
 ### [Skills Doctor](./skills-doctor)
 
 Diagnose and govern local AI Agent Skills. Supports Claude Code, Codex, Cursor, OpenCode and more. Detects risks, conflicts, duplicates, zombies and generates fix suggestions.
@@ -91,6 +99,11 @@ The Agent will run diagnostics, generate reports, and output a fix plan. You can
 Check for duplicate skills
 Detect zombie skills
 ```
+
+**Auto-update:**
+- Run `python scripts/update_self.py --apply` before use
+- Checks and syncs the latest `skills-doctor` skill folder from GitHub
+- Checks and updates the `agent-skill-doctor` npm package to the latest version
 
 ---
 

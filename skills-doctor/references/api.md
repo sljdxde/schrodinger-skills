@@ -6,6 +6,20 @@
 npm install agent-skill-doctor
 ```
 
+## 更新
+
+本仓库中的 `skills-doctor` skill 使用前应先运行：
+
+```bash
+python scripts/update_self.py --apply
+```
+
+该命令会检查 skill 本身是否有 GitHub 更新，并检查 `agent-skill-doctor` npm 包是否有新版本。若只想手动更新 npm 包，可运行：
+
+```bash
+npm install -g agent-skill-doctor@latest
+```
+
 ## 导入
 
 ```javascript
