@@ -29,7 +29,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 | Name | One-liner | Link |
 |---|---|---|
-| [House Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, schools, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
+| [House Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 
 ---
@@ -50,10 +50,11 @@ Replace `<skill-name>` with the one you want. The Agent will clone it to the rig
 
 ### [House Buying](./house-buying)
 
-Due diligence and decision support for Chinese residential property purchases. It is designed for target communities, school-district homes, area comparisons, and buy/watch decisions, with explicit evidence tracking for transaction prices, listings, schools, admissions policy, student sources, community demographics, and city fundamentals.
+Due diligence and decision support for Chinese residential property purchases. It is designed for target communities, school-district homes, area comparisons, and buy/watch decisions, with explicit evidence tracking for transaction prices, listings, school-premium comparisons, admissions policy, student sources, community demographics, and city fundamentals.
 
 **Key Features:**
 - Cross-check transaction prices, listing prices, inventory, and negotiation room
+- Compare school-district homes with nearby non-school-district or weaker-school alternatives to quantify the education premium
 - Analyze school outcomes, admission rules, seat warnings, and student-source quality
 - Build a community demographic profile instead of relying only on price
 - Produce base/optimistic/pessimistic housing-price forecast scenarios
