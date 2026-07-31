@@ -139,7 +139,11 @@ def render_cards(concepts: list[dict]) -> str:
             f'<div class="websource">🔗 {web_source}</div>' if web_source else ""
         )
         feynman_block = (
-            f'<div class="feynman"><span class="tag">费曼</span>{feynman}</div>'
+            f'<div class="feynman"><span class="tag">费曼</span>{feynman}'
+            f'<span class="feynman-check" role="button" tabindex="0" '
+            f'onkeydown="if(event.key===\'Enter\'||event.key===\' \')this.click()">'
+            f'<span class="fchk-box">☐</span>'
+            f'<span class="fchk-label">我用大白话讲了一遍</span></span></div>'
             if feynman else ""
         )
         visual_block = f'<div class="visual">{svg}</div>' if svg else ""
@@ -236,6 +240,140 @@ def render_review(concepts: list[dict], review: list[dict]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Gamification: levels / XP / badges / streak (offline, localStorage)
+# ---------------------------------------------------------------------------
+def default_gamification() -> dict:
+    return {
+        "levels": [
+            {"level": 1, "title": "初心学徒", "min_xp": 0},
+            {"level": 2, "title": "识字书生", "min_xp": 50},
+            {"level": 3, "title": "博闻少年", "min_xp": 130},
+            {"level": 4, "title": "通晓学子", "min_xp": 260},
+            {"level": 5, "title": "满腹经纶", "min_xp": 450},
+            {"level": 6, "title": "博学鸿儒", "min_xp": 700},
+            {"level": 7, "title": "融会宗师", "min_xp": 1000},
+        ],
+        "xp_rules": {
+            "flip_card": 3,
+            "quiz_correct": 12,
+            "quiz_wrong": 3,
+            "review_rate": 10,
+            "feynman_done": 8,
+        },
+        "badges": [
+            {"id": "first_pack", "name": "启程", "icon": "🌱",
+             "desc": "打开学习包即得", "trigger": "on_generate"},
+            {"id": "first_quiz", "name": "破冰", "icon": "❄️",
+             "desc": "首次答对自测", "trigger": "quiz_correct_first"},
+            {"id": "all_quiz", "name": "火眼金睛", "icon": "🎯",
+             "desc": "本包自测全对", "trigger": "quiz_all_correct"},
+            {"id": "first_review", "name": "温故知新", "icon": "🌅",
+             "desc": "首次复习自评", "trigger": "review_rate_first"},
+            {"id": "iron_will", "name": "百炼成钢", "icon": "🛡️",
+             "desc": "复习自评累计 10 次", "trigger": "review_count>=10"},
+            {"id": "master_all", "name": "融会贯通", "icon": "🏆",
+             "desc": "所有概念自评 ≥4", "trigger": "all_review_ge4"},
+            {"id": "feynman_master", "name": "费曼小能手", "icon": "✍️",
+             "desc": "完成全部费曼自述", "trigger": "feynman_all"},
+            {"id": "streak3", "name": "三日之约", "icon": "🔥",
+             "desc": "连续 3 天学习", "trigger": "streak>=3"},
+            {"id": "streak7", "name": "一周不辍", "icon": "🌟",
+             "desc": "连续 7 天学习", "trigger": "streak>=7"},
+            {"id": "level5", "name": "满腹经纶", "icon": "📜",
+             "desc": "等级达到「满腹经纶」", "trigger": "level>=5"},
+            {"id": "knowledge_hunter", "name": "知识猎人", "icon": "🧭",
+             "desc": "包内含联网深潜讲解", "trigger": "web_deepdive>=1"},
+        ],
+    }
+
+
+def compute_gamification(data: dict) -> dict:
+    """Merge user payload with defaults, drop unobtainable badges, count totals."""
+    user = data.get("gamification") or {}
+    gam = default_gamification()
+    if user.get("levels"):
+        gam["levels"] = user["levels"]
+    if user.get("xp_rules"):
+        gam["xp_rules"] = user["xp_rules"]
+    if user.get("badges"):
+        # 追加式合并：默认勋章保留，用户提供同 id 覆盖、新 id 追加
+        by_id = {b["id"]: b for b in gam["badges"]}
+        for b in user["badges"]:
+            by_id[b["id"]] = b
+        gam["badges"] = list(by_id.values())
+
+    concepts = data.get("concepts", [])
+    quiz_total = sum(1 for c in concepts if c.get("quiz"))
+    feynman_total = sum(1 for c in concepts if c.get("feynman"))
+    review_total = len(data.get("review_schedule", []))
+    has_web = any(str(c.get("web_source", "")).strip() for c in concepts)
+
+    filtered = []
+    for b in gam["badges"]:
+        t = b.get("trigger", "")
+        if t == "web_deepdive>=1" and not has_web:
+            continue
+        if t == "feynman_all" and feynman_total == 0:
+            continue
+        if t == "quiz_all_correct" and quiz_total == 0:
+            continue
+        filtered.append(b)
+    gam["badges"] = filtered
+    gam["_totals"] = {
+        "quiz_total": quiz_total,
+        "feynman_total": feynman_total,
+        "review_total": review_total,
+        "has_web": has_web,
+    }
+    return gam
+
+
+def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
+    """Return (honor_bar_html, hall_of_fame_html, pkg_json_string)."""
+    totals = gam.get("_totals", {})
+    first_level = gam["levels"][0]["title"] if gam["levels"] else "初心学徒"
+    honor_bar = f"""
+<div class="honor-bar" id="honorBar">
+  <div class="hb-level"><span class="hb-badge">🎖️</span><span id="hbLevelName">{html.escape(first_level)}</span>
+    <span class="hb-lv" id="hbLevelNo">Lv.1</span></div>
+  <div class="hb-xp"><div class="hb-xp-track"><div class="hb-xp-fill" id="hbXpFill"></div></div>
+    <span class="hb-xp-text" id="hbXpText">0 XP</span></div>
+  <div class="hb-streak"><span id="hbStreakIcon">💤</span><span id="hbStreak">0</span> 天连续</div>
+</div>"""
+
+    cards = []
+    for b in gam["badges"]:
+        icon = html.escape(str(b.get("icon", "🏅")))
+        name = html.escape(str(b.get("name", "")))
+        desc = html.escape(str(b.get("desc", "")))
+        bid = html.escape(str(b.get("id", "")))
+        cards.append(
+            f'<div class="badge-card locked" id="bg-{bid}" data-badge="{bid}" '
+            f'title="{desc}"><div class="bc-icon">{icon}</div>'
+            f'<div class="bc-name">{name}</div><div class="bc-desc">{desc}</div></div>'
+        )
+    hall = (
+        '<div class="hall"><div class="hall-head">🏅 荣誉殿堂</div>'
+        '<div class="badge-grid">' + "".join(cards) + "</div>"
+        '<div class="hall-hint">悬停每枚勋章看「如何获得」；进度自动存在本学习包（浏览器本地）。</div>'
+        "</div>"
+    )
+    pkg = {
+        "levels": gam["levels"],
+        "xp_rules": gam["xp_rules"],
+        "badges": [
+            {"id": b["id"], "name": b["name"], "icon": b["icon"],
+             "desc": b["desc"], "trigger": b["trigger"]}
+            for b in gam["badges"]
+        ],
+        "totals": totals,
+        "storageKey": "pk_" + str(abs(hash(data.get("title", "pkg"))) % 100000),
+    }
+    pkg_json = json.dumps(pkg, ensure_ascii=False)
+    return honor_bar, hall, pkg_json
+
+
+# ---------------------------------------------------------------------------
 # HTML document
 # ---------------------------------------------------------------------------
 CSS = """
@@ -316,10 +454,43 @@ section h2 .badge{font-size:12px;background:var(--brand-soft);color:var(--brand)
 .rate:hover{background:var(--brand-soft);border-color:var(--brand)}
 .rv-next{font-weight:700;color:var(--brand)}
 footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
+
+/* ---- gamification: honor bar / badges / streak / toast ---- */
+.honor-bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+  background:rgba(255,255,255,.16);border-radius:12px;padding:12px 16px;margin-top:14px;color:#fff}
+.hb-level{display:flex;align-items:center;gap:8px;font-weight:700}
+.hb-badge{font-size:18px}
+.hb-lv{background:rgba(255,255,255,.25);padding:1px 8px;border-radius:999px;font-size:12px}
+.hb-xp{flex:1;min-width:160px;display:flex;align-items:center;gap:8px}
+.hb-xp-track{flex:1;height:10px;background:rgba(255,255,255,.25);border-radius:999px;overflow:hidden}
+.hb-xp-fill{height:100%;width:0;background:linear-gradient(90deg,#fde047,#f59e0b);transition:width .4s}
+.hb-xp-text{font-size:12px;white-space:nowrap}
+.hb-streak{font-weight:700;font-size:14px}
+.hall-head{font-size:17px;font-weight:700;margin-bottom:12px}
+.badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+.badge-card{border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center;
+  background:#fff;transition:transform .2s,box-shadow .2s;position:relative;cursor:default}
+.badge-card .bc-icon{font-size:30px;line-height:1.2}
+.badge-card .bc-name{font-weight:700;font-size:14px;margin-top:4px}
+.badge-card .bc-desc{font-size:11px;color:var(--muted);margin-top:3px}
+.badge-card.locked{filter:grayscale(1);opacity:.45}
+.badge-card.unlocked{border-color:var(--brand);box-shadow:0 4px 14px rgba(79,70,229,.18)}
+.badge-card.unlocked:after{content:"✓";position:absolute;top:6px;right:8px;color:var(--good);font-weight:800}
+.badge-card.just-unlocked{animation:pop .5s}
+@keyframes pop{0%{transform:scale(.8)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.hall-hint{font-size:12px;color:var(--muted);margin-top:12px}
+.feynman-check{margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:13px;
+  background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:4px 10px;cursor:pointer;user-select:none}
+.feynman-check.done{background:#16a34a;color:#fff;border-color:#16a34a}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+  background:#1f2430;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;
+  opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .t-icon{margin-right:8px}
 """
 
 
-JS = """
+JS = r"""
 function checkQuiz(btn){
   var q=btn.closest('.quiz');
   var fb=q.querySelector('.quiz-feedback');
@@ -337,6 +508,11 @@ function checkQuiz(btn){
   fb.textContent = ok?'✓ 答对了！':'✗ 再想想';
   fb.className = 'quiz-feedback '+(ok?'ok':'no');
   fb.hidden=false; ex.hidden=false;
+  if(q.dataset.answered!=='1'){ q.dataset.answered='1';
+    S.quizAnswered++; if(ok) S.quizCorrect++;
+    grantXP(ok?PKG.xp_rules.quiz_correct:PKG.xp_rules.quiz_wrong);
+    bumpStreak(); afterAction();
+  }
 }
 function sm2(ef,n,q,last){
   ef = ef + (0.1 - (5-q)*(0.08 + (5-q)*0.02));
@@ -358,11 +534,102 @@ function rate(btn){
   var r=sm2(ef,n,q,last);
   row.dataset.ef=r.ef; row.dataset.n=r.n; row.dataset.last=r.interval;
   row.querySelector('.rv-next').textContent='+'+r.interval+' 天';
+  if(row.dataset.rated!=='1'){ row.dataset.rated='1';
+    if(q>=4) row.dataset.ge4='1';
+    S.reviewCount++; grantXP(PKG.xp_rules.review_rate); bumpStreak(); afterAction();
+  }
+}
+
+/* ===== Gamification engine ===== */
+const PKG = __PKG__;
+var LS_KEY = 'mf_' + (PKG.storageKey||'default');
+function lsGet(){ try{return JSON.parse(localStorage.getItem(LS_KEY))||{};}catch(e){return {};} }
+function lsSet(s){ try{localStorage.setItem(LS_KEY,JSON.stringify(s));}catch(e){} }
+var S = Object.assign({xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,feynmanDone:0,streak:0,lastDay:null,flips:{}}, lsGet());
+
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function ydayStr(){var d=new Date(Date.now()-86400000);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function bumpStreak(){var t=todayStr(); if(S.lastDay===t)return; if(S.lastDay===ydayStr())S.streak+=1; else S.streak=1; S.lastDay=t;}
+
+function levelFor(xp){var lv=PKG.levels[0];for(var i=0;i<PKG.levels.length;i++){if(xp>=PKG.levels[i].min_xp)lv=PKG.levels[i];}return lv;}
+function nextLevel(xp){for(var i=0;i<PKG.levels.length;i++){if(xp<PKG.levels[i].min_xp)return PKG.levels[i];}return null;}
+function allReviewedGe4(){ if(!PKG.totals.review_total)return false;
+  var rows=document.querySelectorAll('.review tr[data-ef]'); if(!rows.length)return false;
+  for(var i=0;i<rows.length;i++){ if(rows[i].dataset.ge4!=='1')return false; } return true; }
+
+function evaluateBadges(){
+  var newly=[];
+  PKG.badges.forEach(function(b){
+    if(S.badges.indexOf(b.id)>=0)return;
+    var t=b.trigger, ok=false;
+    if(t==='on_generate') ok=true;
+    else if(t==='quiz_correct_first') ok=S.quizCorrect>=1;
+    else if(t==='quiz_all_correct') ok=(PKG.totals.quiz_total>0 && S.quizAnswered>=PKG.totals.quiz_total && S.quizCorrect===PKG.totals.quiz_total);
+    else if(t==='review_rate_first') ok=S.reviewCount>=1;
+    else if(t==='all_review_ge4') ok=allReviewedGe4();
+    else if(t==='feynman_all') ok=(PKG.totals.feynman_total>0 && S.feynmanDone>=PKG.totals.feynman_total);
+    else if(t.indexOf('>=')>=0){var m=t.match(/^(\w+)>=(\d+)$/); if(m){var key=m[1],val=+m[2];var map={review_count:S.reviewCount,streak:S.streak,level:levelFor(S.xp).level};ok=(map[key]||0)>=val;}}
+    if(ok){S.badges.push(b.id);newly.push(b);}
+  });
+  return newly;
+}
+function renderHonor(){
+  var lv=levelFor(S.xp), nxt=nextLevel(S.xp);
+  var n=document.getElementById('hbLevelName'); if(n)n.textContent=lv.title;
+  var no=document.getElementById('hbLevelNo'); if(no)no.textContent='Lv.'+lv.level;
+  var pct=100; if(nxt){var span=nxt.min_xp-lv.min_xp; pct=Math.max(0,Math.min(100,Math.round((S.xp-lv.min_xp)/span*100)));}
+  var f=document.getElementById('hbXpFill'); if(f)f.style.width=pct+'%';
+  var xt=document.getElementById('hbXpText'); if(xt)xt.textContent=S.xp+' XP'+(nxt?(' / '+nxt.min_xp):' · 满级');
+  var st=document.getElementById('hbStreak'); if(st)st.textContent=S.streak;
+  var si=document.getElementById('hbStreakIcon'); if(si)si.textContent=S.streak>0?'🔥':'💤';
+}
+function renderHall(){
+  PKG.badges.forEach(function(b){
+    var el=document.getElementById('bg-'+b.id); if(!el)return;
+    if(S.badges.indexOf(b.id)>=0){el.classList.add('unlocked');el.classList.remove('locked');}
+    else{el.classList.add('locked');el.classList.remove('unlocked');}
+  });
+}
+function toast(msg,icon){
+  var t=document.getElementById('mfToast');
+  if(!t){t=document.createElement('div');t.id='mfToast';t.className='toast';document.body.appendChild(t);}
+  t.innerHTML='<span class="t-icon">'+(icon||'🏅')+'</span>'+msg;
+  t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove('show');},2600);
+}
+function grantXP(n){ S.xp+=n; }
+function afterAction(){
+  var beforeLv=levelFor(S.xp).level;
+  var newly=evaluateBadges();
+  lsSet(S); renderHonor(); renderHall();
+  var afterLv=levelFor(S.xp).level;
+  if(afterLv>beforeLv) toast('升级！'+levelFor(S.xp).title+' 🎉','🎉');
+  newly.forEach(function(b){
+    var el=document.getElementById('bg-'+b.id);
+    if(el){el.classList.add('just-unlocked');setTimeout(function(){el.classList.remove('just-unlocked');},600);}
+    toast('解锁勋章：'+b.name+' '+b.icon, b.icon);
+  });
+}
+function onFlip(flipEl){
+  var card=flipEl.closest('.card'); if(!card)return;
+  var idx=card.id; if(S.flips[idx])return; S.flips[idx]=1;
+  grantXP(PKG.xp_rules.flip_card); bumpStreak(); afterAction();
+}
+function onFeynman(fc){
+  if(fc.classList.contains('done'))return;
+  fc.classList.add('done');
+  var box=fc.querySelector('.fchk-box'); if(box)box.textContent='☑';
+  var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='已复述 ✓';
+  S.feynmanDone++; grantXP(PKG.xp_rules.feynman_done); bumpStreak(); afterAction();
 }
 document.addEventListener('click',function(e){
   if(e.target.classList.contains('quiz-check')) checkQuiz(e.target);
   if(e.target.classList.contains('rate')) rate(e.target);
+  var flip=e.target.closest('.flip'); if(flip) onFlip(flip);
+  var fc=e.target.closest('.feynman-check'); if(fc) onFeynman(fc);
 });
+(function init(){
+  evaluateBadges(); lsSet(S); renderHonor(); renderHall();
+})();
 """
 
 PAGE = """<!DOCTYPE html>
@@ -379,7 +646,13 @@ PAGE = """<!DOCTYPE html>
   <h1>{title}</h1>
   <div class="meta">来源：{source} ｜ 受众：{audience} ｜ 生成：{generated_at}</div>
   <div class="offline">📦 离线自包含 · 无需联网</div>
+  {honor_bar}
 </header>
+
+<section>
+  <h2><span class="badge">养成</span> 荣誉殿堂</h2>
+  {hall_of_fame}
+</section>
 
 <section>
   <h2><span class="badge">总览</span> 一句话故事</h2>
@@ -428,6 +701,8 @@ def build_html(data: dict) -> str:
     cards_html = render_cards(concepts)
     mindmap_html = render_mindmap(data.get("mindmap", {}) or {})
     review_html = render_review(concepts, data.get("review_schedule", []))
+    gam = compute_gamification(data)
+    honor_bar, hall_of_fame, pkg_json = render_gamification(data, gam)
     # quizzes section: re-render quiz blocks collected (already inside cards);
     # provide a lightweight note that quizzes live on each card.
     quizzes_intro = (
@@ -444,7 +719,9 @@ def build_html(data: dict) -> str:
         cards=cards_html or "<p class='muted'>（无概念数据）</p>",
         quizzes_intro=quizzes_intro,
         review=review_html or "<p class='muted'>（无复习计划）</p>",
-        js=JS,
+        honor_bar=honor_bar,
+        hall_of_fame=hall_of_fame,
+        js=JS.replace("__PKG__", pkg_json),
         css=CSS,
     )
 
@@ -509,6 +786,23 @@ def build_md(data: dict) -> str:
             iv = r.get("intervals") or [1]
             lines.append(f"| {r.get('term', r.get('concept_id'))} | +{iv[0]} 天 |")
         lines.append("")
+
+    # 荣誉体系（养成）
+    gam = compute_gamification(data)
+    if gam.get("levels"):
+        lines.append("## 荣誉体系（养成）")
+        lines.append("**等级（累计 XP）：**")
+        for lv in gam["levels"]:
+            lines.append(f"- Lv.{lv['level']} {lv['title']}（{lv['min_xp']} XP 起）")
+        lines.append("")
+        if gam.get("badges"):
+            lines.append("**勋章（可解锁）：**")
+            for b in gam["badges"]:
+                lines.append(f"- {b['icon']} {b['name']}：{b['desc']}")
+            lines.append("")
+        lines.append("> 进度自动存在导出的 HTML 学习包（浏览器本地），翻卡 / 自测 / 复习 / 费曼复述都会攒经验、点亮勋章。")
+        lines.append("")
+
     return "\n".join(lines)
 
 

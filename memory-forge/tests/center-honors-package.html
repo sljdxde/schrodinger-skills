@@ -82,6 +82,39 @@ section h2 .badge{font-size:12px;background:var(--brand-soft);color:var(--brand)
 .rate:hover{background:var(--brand-soft);border-color:var(--brand)}
 .rv-next{font-weight:700;color:var(--brand)}
 footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
+
+/* ---- gamification: honor bar / badges / streak / toast ---- */
+.honor-bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+  background:rgba(255,255,255,.16);border-radius:12px;padding:12px 16px;margin-top:14px;color:#fff}
+.hb-level{display:flex;align-items:center;gap:8px;font-weight:700}
+.hb-badge{font-size:18px}
+.hb-lv{background:rgba(255,255,255,.25);padding:1px 8px;border-radius:999px;font-size:12px}
+.hb-xp{flex:1;min-width:160px;display:flex;align-items:center;gap:8px}
+.hb-xp-track{flex:1;height:10px;background:rgba(255,255,255,.25);border-radius:999px;overflow:hidden}
+.hb-xp-fill{height:100%;width:0;background:linear-gradient(90deg,#fde047,#f59e0b);transition:width .4s}
+.hb-xp-text{font-size:12px;white-space:nowrap}
+.hb-streak{font-weight:700;font-size:14px}
+.hall-head{font-size:17px;font-weight:700;margin-bottom:12px}
+.badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+.badge-card{border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center;
+  background:#fff;transition:transform .2s,box-shadow .2s;position:relative;cursor:default}
+.badge-card .bc-icon{font-size:30px;line-height:1.2}
+.badge-card .bc-name{font-weight:700;font-size:14px;margin-top:4px}
+.badge-card .bc-desc{font-size:11px;color:var(--muted);margin-top:3px}
+.badge-card.locked{filter:grayscale(1);opacity:.45}
+.badge-card.unlocked{border-color:var(--brand);box-shadow:0 4px 14px rgba(79,70,229,.18)}
+.badge-card.unlocked:after{content:"✓";position:absolute;top:6px;right:8px;color:var(--good);font-weight:800}
+.badge-card.just-unlocked{animation:pop .5s}
+@keyframes pop{0%{transform:scale(.8)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
+.hall-hint{font-size:12px;color:var(--muted);margin-top:12px}
+.feynman-check{margin-top:8px;display:inline-flex;align-items:center;gap:6px;font-size:13px;
+  background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:4px 10px;cursor:pointer;user-select:none}
+.feynman-check.done{background:#16a34a;color:#fff;border-color:#16a34a}
+.toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+  background:#1f2430;color:#fff;padding:12px 18px;border-radius:12px;font-size:14px;
+  opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .t-icon{margin-right:8px}
 </style>
 </head>
 <body>
@@ -90,7 +123,20 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <h1>中心荣誉与资质 · 记忆学习包</h1>
   <div class="meta">来源：用户粘贴文本：中心先后获国务院表彰、省部级奖项、各类集体荣誉及成果清单 ｜ 受众：通用（用于汇报/科普快速记忆） ｜ 生成：2026-08-01</div>
   <div class="offline">📦 离线自包含 · 无需联网</div>
+  
+<div class="honor-bar" id="honorBar">
+  <div class="hb-level"><span class="hb-badge">🎖️</span><span id="hbLevelName">初心学徒</span>
+    <span class="hb-lv" id="hbLevelNo">Lv.1</span></div>
+  <div class="hb-xp"><div class="hb-xp-track"><div class="hb-xp-fill" id="hbXpFill"></div></div>
+    <span class="hb-xp-text" id="hbXpText">0 XP</span></div>
+  <div class="hb-streak"><span id="hbStreakIcon">💤</span><span id="hbStreak">0</span> 天连续</div>
+</div>
 </header>
+
+<section>
+  <h2><span class="badge">养成</span> 荣誉殿堂</h2>
+  <div class="hall"><div class="hall-head">🏅 荣誉殿堂</div><div class="badge-grid"><div class="badge-card locked" id="bg-first_pack" data-badge="first_pack" title="打开学习包即得"><div class="bc-icon">🌱</div><div class="bc-name">启程</div><div class="bc-desc">打开学习包即得</div></div><div class="badge-card locked" id="bg-first_quiz" data-badge="first_quiz" title="首次答对自测"><div class="bc-icon">❄️</div><div class="bc-name">破冰</div><div class="bc-desc">首次答对自测</div></div><div class="badge-card locked" id="bg-all_quiz" data-badge="all_quiz" title="本包自测全对"><div class="bc-icon">🎯</div><div class="bc-name">火眼金睛</div><div class="bc-desc">本包自测全对</div></div><div class="badge-card locked" id="bg-first_review" data-badge="first_review" title="首次复习自评"><div class="bc-icon">🌅</div><div class="bc-name">温故知新</div><div class="bc-desc">首次复习自评</div></div><div class="badge-card locked" id="bg-iron_will" data-badge="iron_will" title="复习自评累计 10 次"><div class="bc-icon">🛡️</div><div class="bc-name">百炼成钢</div><div class="bc-desc">复习自评累计 10 次</div></div><div class="badge-card locked" id="bg-master_all" data-badge="master_all" title="所有概念自评 ≥4"><div class="bc-icon">🏆</div><div class="bc-name">融会贯通</div><div class="bc-desc">所有概念自评 ≥4</div></div><div class="badge-card locked" id="bg-feynman_master" data-badge="feynman_master" title="完成全部费曼自述"><div class="bc-icon">✍️</div><div class="bc-name">费曼小能手</div><div class="bc-desc">完成全部费曼自述</div></div><div class="badge-card locked" id="bg-streak3" data-badge="streak3" title="连续 3 天学习"><div class="bc-icon">🔥</div><div class="bc-name">三日之约</div><div class="bc-desc">连续 3 天学习</div></div><div class="badge-card locked" id="bg-streak7" data-badge="streak7" title="连续 7 天学习"><div class="bc-icon">🌟</div><div class="bc-name">一周不辍</div><div class="bc-desc">连续 7 天学习</div></div><div class="badge-card locked" id="bg-level5" data-badge="level5" title="等级达到「满腹经纶」"><div class="bc-icon">📜</div><div class="bc-name">满腹经纶</div><div class="bc-desc">等级达到「满腹经纶」</div></div><div class="badge-card locked" id="bg-honor_wall" data-badge="honor_wall" title="通览了中心的荣誉与资质全貌"><div class="bc-icon">🏅</div><div class="bc-name">荣誉满墙</div><div class="bc-desc">通览了中心的荣誉与资质全貌</div></div><div class="badge-card locked" id="bg-paper_harvester" data-badge="paper_harvester" title="答对「学术与刊物」相关自测"><div class="bc-icon">📚</div><div class="bc-name">论文收割机</div><div class="bc-desc">答对「学术与刊物」相关自测</div></div></div><div class="hall-hint">悬停每枚勋章看「如何获得」；进度自动存在本学习包（浏览器本地）。</div></div>
+</section>
 
 <section>
   <h2><span class="badge">总览</span> 一句话故事</h2>
@@ -134,8 +180,8 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <div class="story"><span class="tag">类比/故事</span>把中心想成球队的荣誉室：国家级奖杯放最上层玻璃柜，省级锦旗挂满整面墙，而「抗疫先进集体」是特殊年份那枚集体勋章——它不属于个人，属于整个团队。</div>
   <div class="mnemonic"><span class="tag">口诀</span>口诀「国二省廿，信青抗疫基」：国(务院)2次、省部20+、信息化(信)、青年文明号(青)、抗疫集体、先进基层(基)。</div>
   <div class="visual"><svg viewBox='0 0 420 150' xmlns='http://www.w3.org/2000/svg'><rect x='10' y='10' width='120' height='130' rx='10' fill='#eef2ff' stroke='#4f46e5'/><text x='70' y='80' text-anchor='middle' font-size='13' fill='#1f2430'>国家级</text><text x='70' y='102' text-anchor='middle' font-size='12' fill='#4f46e5'>国务院×2</text><rect x='150' y='10' width='120' height='130' rx='10' fill='#ecfeff' stroke='#06b6d4'/><text x='210' y='70' text-anchor='middle' font-size='13' fill='#1f2430'>省级综合</text><text x='210' y='92' text-anchor='middle' font-size='11' fill='#06b6d4'>信息化先进</text><text x='210' y='110' text-anchor='middle' font-size='11' fill='#06b6d4'>先进基层</text><rect x='290' y='10' width='120' height='130' rx='10' fill='#fffbeb' stroke='#f59e0b'/><text x='350' y='70' text-anchor='middle' font-size='13' fill='#1f2430'>专项集体</text><text x='350' y='92' text-anchor='middle' font-size='11' fill='#b45309'>青年文明号</text><text x='350' y='110' text-anchor='middle' font-size='11' fill='#b45309'>抗疫先进</text></svg></div>
-  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：如果向朋友介绍这个中心的荣誉，你会怎么分层说？</div>
-  <div class="quiz" data-qid="4807"><div class="quiz-q"><span class="tag quiz-tag">自测</span>中心的「国家级」荣誉是指什么？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q4807" value="0"/><span>浙江省信息化建设先进单位</span></label><label class="opt"><input type="radio" name="q4807" value="1"/><span>国务院表彰 2 次</span></label><label class="opt"><input type="radio" name="q4807" value="2"/><span>全国青年文明号</span></label><label class="opt"><input type="radio" name="q4807" value="3"/><span>省科技进步奖</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：只有「国务院表彰 2 次」属于国家级；其余是省级或专项集体荣誉。</div></div>
+  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：如果向朋友介绍这个中心的荣誉，你会怎么分层说？<span class="feynman-check" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"><span class="fchk-box">☐</span><span class="fchk-label">我用大白话讲了一遍</span></span></div>
+  <div class="quiz" data-qid="35276"><div class="quiz-q"><span class="tag quiz-tag">自测</span>中心的「国家级」荣誉是指什么？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q35276" value="0"/><span>浙江省信息化建设先进单位</span></label><label class="opt"><input type="radio" name="q35276" value="1"/><span>国务院表彰 2 次</span></label><label class="opt"><input type="radio" name="q35276" value="2"/><span>全国青年文明号</span></label><label class="opt"><input type="radio" name="q35276" value="3"/><span>省科技进步奖</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：只有「国务院表彰 2 次」属于国家级；其余是省级或专项集体荣誉。</div></div>
   
 </div>
 
@@ -154,8 +200,8 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <div class="story"><span class="tag">类比/故事</span>把批示想成「上级在方案上画圈」：国家领导画了 6 个圈，省领导每年画约 30 个圈——圈越多，说明这个中心的方案越被当成「准决策」。</div>
   <div class="mnemonic"><span class="tag">口诀</span>国家「6批示2成果10课题2国标」；省级「30批示、3科技1调研1创新」。</div>
   
-  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：国家线和省级线分别有什么关键数字？</div>
-  <div class="quiz" data-qid="50532"><div class="quiz-q"><span class="tag quiz-tag">自测</span>2020年以来，国家领导对中心相关成果的批示约有几次？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q50532" value="0"/><span>约 2 次</span></label><label class="opt"><input type="radio" name="q50532" value="1"/><span>约 6 次</span></label><label class="opt"><input type="radio" name="q50532" value="2"/><span>约 30 次</span></label><label class="opt"><input type="radio" name="q50532" value="3"/><span>约 20 次</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：国家领导批示约 6 次；约 30 次是省领导每年的批示量。</div></div>
+  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：国家线和省级线分别有什么关键数字？<span class="feynman-check" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"><span class="fchk-box">☐</span><span class="fchk-label">我用大白话讲了一遍</span></span></div>
+  <div class="quiz" data-qid="78552"><div class="quiz-q"><span class="tag quiz-tag">自测</span>2020年以来，国家领导对中心相关成果的批示约有几次？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q78552" value="0"/><span>约 2 次</span></label><label class="opt"><input type="radio" name="q78552" value="1"/><span>约 6 次</span></label><label class="opt"><input type="radio" name="q78552" value="2"/><span>约 30 次</span></label><label class="opt"><input type="radio" name="q78552" value="3"/><span>约 20 次</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：国家领导批示约 6 次；约 30 次是省领导每年的批示量。</div></div>
   
 </div>
 
@@ -174,8 +220,8 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <div class="story"><span class="tag">类比/故事</span>把发改大脑想成「作战指挥部」：它左手连着经济运行监测、右手连着投资管理，前台还摆着无感监测、碳金融、e 本帐三块大屏；「关键小事智能速办」是它对外喊得最响的一句口号。</div>
   <div class="mnemonic"><span class="tag">口诀</span>口诀「脑平台，三应用，一话语，金奖来」：大脑+2平台，3个最佳应用，1个最响话语，改革突破奖金奖。</div>
   <div class="visual"><svg viewBox='0 0 460 220' xmlns='http://www.w3.org/2000/svg'><circle cx='230' cy='110' r='46' fill='#4f46e5'/><text x='230' y='106' text-anchor='middle' font-size='13' fill='#fff'>发改大脑</text><text x='230' y='124' text-anchor='middle' font-size='10' fill='#fff'>最佳大脑</text><line x1='184' y1='110' x2='70' y2='60' stroke='#94a3b8'/><line x1='184' y1='110' x2='70' y2='160' stroke='#94a3b8'/><line x1='276' y1='110' x2='390' y2='60' stroke='#94a3b8'/><line x1='276' y1='110' x2='390' y2='110' stroke='#94a3b8'/><line x1='276' y1='110' x2='390' y2='160' stroke='#94a3b8'/><rect x='20' y='44' width='100' height='32' rx='8' fill='#eef2ff'/><text x='70' y='64' text-anchor='middle' font-size='11' fill='#1f2430'>经济运行监测</text><rect x='20' y='144' width='100' height='32' rx='8' fill='#eef2ff'/><text x='70' y='164' text-anchor='middle' font-size='11' fill='#1f2430'>投资管理平台</text><rect x='340' y='44' width='110' height='32' rx='8' fill='#ecfeff'/><text x='395' y='64' text-anchor='middle' font-size='10' fill='#1f2430'>无感监测</text><rect x='340' y='94' width='110' height='32' rx='8' fill='#ecfeff'/><text x='395' y='114' text-anchor='middle' font-size='10' fill='#1f2430'>碳账户碳金融</text><rect x='340' y='144' width='110' height='32' rx='8' fill='#ecfeff'/><text x='395' y='164' text-anchor='middle' font-size='10' fill='#1f2430'>有效投资e本帐</text></svg></div>
-  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：发改大脑和那三个最佳应用是什么关系？</div>
-  <div class="quiz" data-qid="20358"><div class="quiz-q"><span class="tag quiz-tag">自测</span>以下哪个应用入选了数字化改革「最响话语」？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q20358" value="0"/><span>碳账户碳金融</span></label><label class="opt"><input type="radio" name="q20358" value="1"/><span>关键小事智能速办</span></label><label class="opt"><input type="radio" name="q20358" value="2"/><span>无感监测</span></label><label class="opt"><input type="radio" name="q20358" value="3"/><span>经济运行监测平台</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：《关键小事智能速办》入选「最响话语」；其余是「最佳应用」或支撑平台。</div></div>
+  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：发改大脑和那三个最佳应用是什么关系？<span class="feynman-check" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"><span class="fchk-box">☐</span><span class="fchk-label">我用大白话讲了一遍</span></span></div>
+  <div class="quiz" data-qid="44498"><div class="quiz-q"><span class="tag quiz-tag">自测</span>以下哪个应用入选了数字化改革「最响话语」？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q44498" value="0"/><span>碳账户碳金融</span></label><label class="opt"><input type="radio" name="q44498" value="1"/><span>关键小事智能速办</span></label><label class="opt"><input type="radio" name="q44498" value="2"/><span>无感监测</span></label><label class="opt"><input type="radio" name="q44498" value="3"/><span>经济运行监测平台</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：《关键小事智能速办》入选「最响话语」；其余是「最佳应用」或支撑平台。</div></div>
   
 </div>
 
@@ -194,8 +240,8 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <div class="story"><span class="tag">类比/故事</span>把标准想成「把胜仗写成教科书」：2 本国标是国家级教材，7 本省标是省内教材；50 多本软著则是日常练兵的手册。</div>
   <div class="mnemonic"><span class="tag">口诀</span>口诀「2国7省，1发1实，软著50+」：国标2、省标7、发明1、实用1、软著50余。</div>
   <div class="visual"><svg viewBox='0 0 420 130' xmlns='http://www.w3.org/2000/svg'><rect x='20' y='30' width='110' height='70' rx='8' fill='#f0fdf4' stroke='#22c55e'/><text x='75' y='62' text-anchor='middle' font-size='12' fill='#1f2430'>国家标准</text><text x='75' y='82' text-anchor='middle' font-size='14' fill='#16a34a'>×2</text><rect x='155' y='30' width='110' height='70' rx='8' fill='#f0fdf4' stroke='#22c55e'/><text x='210' y='62' text-anchor='middle' font-size='12' fill='#1f2430'>省级标准</text><text x='210' y='82' text-anchor='middle' font-size='14' fill='#16a34a'>×7</text><rect x='290' y='30' width='110' height='70' rx='8' fill='#fff7ed' stroke='#f59e0b'/><text x='345' y='58' text-anchor='middle' font-size='11' fill='#1f2430'>专利+软著</text><text x='345' y='80' text-anchor='middle' font-size='11' fill='#b45309'>发1实1软著50+</text></svg></div>
-  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：标准和专利，哪一类的「含金量」通常更高？</div>
-  <div class="quiz" data-qid="25344"><div class="quiz-q"><span class="tag quiz-tag">自测</span>中心的省级标准约有几项？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q25344" value="0"/><span>2 项</span></label><label class="opt"><input type="radio" name="q25344" value="1"/><span>7 项</span></label><label class="opt"><input type="radio" name="q25344" value="2"/><span>50 余项</span></label><label class="opt"><input type="radio" name="q25344" value="3"/><span>1 项</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：省级标准 7 项；2 项是国家标准，50 余项是软件著作权。</div></div>
+  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：标准和专利，哪一类的「含金量」通常更高？<span class="feynman-check" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"><span class="fchk-box">☐</span><span class="fchk-label">我用大白话讲了一遍</span></span></div>
+  <div class="quiz" data-qid="11518"><div class="quiz-q"><span class="tag quiz-tag">自测</span>中心的省级标准约有几项？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q11518" value="0"/><span>2 项</span></label><label class="opt"><input type="radio" name="q11518" value="1"/><span>7 项</span></label><label class="opt"><input type="radio" name="q11518" value="2"/><span>50 余项</span></label><label class="opt"><input type="radio" name="q11518" value="3"/><span>1 项</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：省级标准 7 项；2 项是国家标准，50 余项是软件著作权。</div></div>
   
 </div>
 
@@ -214,8 +260,8 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <div class="story"><span class="tag">类比/故事</span>把资质想成「执业许可证」：乙级资信让它能在工程咨询圈接单，涉密集成资质（系统咨询+软件开发）则允许它碰涉密项目——这两块是接政府单的门票。</div>
   <div class="mnemonic"><span class="tag">口诀</span>口诀「乙级资信 + 涉密集成（咨询/开发）」：两块牌照，后者含两类。</div>
   
-  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：为什么资质对承接政府项目很重要？</div>
-  <div class="quiz" data-qid="48604"><div class="quiz-q"><span class="tag quiz-tag">自测</span>涉密信息系统集成资质覆盖以下哪两类？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q48604" value="0"/><span>系统咨询、软件开发</span></label><label class="opt"><input type="radio" name="q48604" value="1"/><span>硬件制造、运维</span></label><label class="opt"><input type="radio" name="q48604" value="2"/><span>数据分析、审计</span></label><label class="opt"><input type="radio" name="q48604" value="3"/><span>培训、销售</span></label><span class="correct-hide" data-ans="0"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：涉密集成资质包含系统咨询与软件开发两类。</div></div>
+  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：为什么资质对承接政府项目很重要？<span class="feynman-check" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"><span class="fchk-box">☐</span><span class="fchk-label">我用大白话讲了一遍</span></span></div>
+  <div class="quiz" data-qid="80260"><div class="quiz-q"><span class="tag quiz-tag">自测</span>涉密信息系统集成资质覆盖以下哪两类？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q80260" value="0"/><span>系统咨询、软件开发</span></label><label class="opt"><input type="radio" name="q80260" value="1"/><span>硬件制造、运维</span></label><label class="opt"><input type="radio" name="q80260" value="2"/><span>数据分析、审计</span></label><label class="opt"><input type="radio" name="q80260" value="3"/><span>培训、销售</span></label><span class="correct-hide" data-ans="0"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：涉密集成资质包含系统咨询与软件开发两类。</div></div>
   
 </div>
 
@@ -234,8 +280,8 @@ footer.pkg{text-align:center;color:var(--muted);font-size:12px;margin-top:10px}
   <div class="story"><span class="tag">类比/故事</span>把论文和奖项想成「战后写回忆录 + 拿国际勋章」：50 多篇论文是它把打法写成书，世行副行长奖是国际社会给的勋章，《浙江经济》则是它自家办的、还拿了中宣部精品的刊物。</div>
   <div class="mnemonic"><span class="tag">口诀</span>口诀「50论文，世行奖，浙江经济双荣誉」：论文50+、世行副行长奖、期刊双入选。</div>
   
-  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：论文、世行奖、期刊，分别属于什么性质的输出？</div>
-  <div class="quiz" data-qid="28965"><div class="quiz-q"><span class="tag quiz-tag">自测</span>中心指导实施的外债项目获得了哪个奖项？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q28965" value="0"/><span>国家科技进步奖</span></label><label class="opt"><input type="radio" name="q28965" value="1"/><span>世界银行「副行长奖」</span></label><label class="opt"><input type="radio" name="q28965" value="2"/><span>省改革突破奖金奖</span></label><label class="opt"><input type="radio" name="q28965" value="3"/><span>中宣部精品期刊</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：外债项目荣获世界银行「副行长奖」；改革突破奖金奖属于平台应用类项目。</div></div>
+  <div class="feynman"><span class="tag">费曼</span>用自己的话讲：论文、世行奖、期刊，分别属于什么性质的输出？<span class="feynman-check" role="button" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' ')this.click()"><span class="fchk-box">☐</span><span class="fchk-label">我用大白话讲了一遍</span></span></div>
+  <div class="quiz" data-qid="38050"><div class="quiz-q"><span class="tag quiz-tag">自测</span>中心指导实施的外债项目获得了哪个奖项？</div><div class="quiz-body"><label class="opt"><input type="radio" name="q38050" value="0"/><span>国家科技进步奖</span></label><label class="opt"><input type="radio" name="q38050" value="1"/><span>世界银行「副行长奖」</span></label><label class="opt"><input type="radio" name="q38050" value="2"/><span>省改革突破奖金奖</span></label><label class="opt"><input type="radio" name="q38050" value="3"/><span>中宣部精品期刊</span></label><span class="correct-hide" data-ans="1"></span></div><button class="quiz-check" type="button">检查</button><div class="quiz-feedback" hidden></div><div class="quiz-explain" hidden>解析：外债项目荣获世界银行「副行长奖」；改革突破奖金奖属于平台应用类项目。</div></div>
   
 </div>
 </section>
@@ -296,6 +342,11 @@ function checkQuiz(btn){
   fb.textContent = ok?'✓ 答对了！':'✗ 再想想';
   fb.className = 'quiz-feedback '+(ok?'ok':'no');
   fb.hidden=false; ex.hidden=false;
+  if(q.dataset.answered!=='1'){ q.dataset.answered='1';
+    S.quizAnswered++; if(ok) S.quizCorrect++;
+    grantXP(ok?PKG.xp_rules.quiz_correct:PKG.xp_rules.quiz_wrong);
+    bumpStreak(); afterAction();
+  }
 }
 function sm2(ef,n,q,last){
   ef = ef + (0.1 - (5-q)*(0.08 + (5-q)*0.02));
@@ -317,11 +368,102 @@ function rate(btn){
   var r=sm2(ef,n,q,last);
   row.dataset.ef=r.ef; row.dataset.n=r.n; row.dataset.last=r.interval;
   row.querySelector('.rv-next').textContent='+'+r.interval+' 天';
+  if(row.dataset.rated!=='1'){ row.dataset.rated='1';
+    if(q>=4) row.dataset.ge4='1';
+    S.reviewCount++; grantXP(PKG.xp_rules.review_rate); bumpStreak(); afterAction();
+  }
+}
+
+/* ===== Gamification engine ===== */
+const PKG = {"levels": [{"level": 1, "title": "初心学徒", "min_xp": 0}, {"level": 2, "title": "识字书生", "min_xp": 50}, {"level": 3, "title": "博闻少年", "min_xp": 130}, {"level": 4, "title": "通晓学子", "min_xp": 260}, {"level": 5, "title": "满腹经纶", "min_xp": 450}, {"level": 6, "title": "博学鸿儒", "min_xp": 700}, {"level": 7, "title": "融会宗师", "min_xp": 1000}], "xp_rules": {"flip_card": 3, "quiz_correct": 12, "quiz_wrong": 3, "review_rate": 10, "feynman_done": 8}, "badges": [{"id": "first_pack", "name": "启程", "icon": "🌱", "desc": "打开学习包即得", "trigger": "on_generate"}, {"id": "first_quiz", "name": "破冰", "icon": "❄️", "desc": "首次答对自测", "trigger": "quiz_correct_first"}, {"id": "all_quiz", "name": "火眼金睛", "icon": "🎯", "desc": "本包自测全对", "trigger": "quiz_all_correct"}, {"id": "first_review", "name": "温故知新", "icon": "🌅", "desc": "首次复习自评", "trigger": "review_rate_first"}, {"id": "iron_will", "name": "百炼成钢", "icon": "🛡️", "desc": "复习自评累计 10 次", "trigger": "review_count>=10"}, {"id": "master_all", "name": "融会贯通", "icon": "🏆", "desc": "所有概念自评 ≥4", "trigger": "all_review_ge4"}, {"id": "feynman_master", "name": "费曼小能手", "icon": "✍️", "desc": "完成全部费曼自述", "trigger": "feynman_all"}, {"id": "streak3", "name": "三日之约", "icon": "🔥", "desc": "连续 3 天学习", "trigger": "streak>=3"}, {"id": "streak7", "name": "一周不辍", "icon": "🌟", "desc": "连续 7 天学习", "trigger": "streak>=7"}, {"id": "level5", "name": "满腹经纶", "icon": "📜", "desc": "等级达到「满腹经纶」", "trigger": "level>=5"}, {"id": "honor_wall", "name": "荣誉满墙", "icon": "🏅", "desc": "通览了中心的荣誉与资质全貌", "trigger": "on_generate"}, {"id": "paper_harvester", "name": "论文收割机", "icon": "📚", "desc": "答对「学术与刊物」相关自测", "trigger": "quiz_correct_first"}], "totals": {"quiz_total": 6, "feynman_total": 6, "review_total": 6, "has_web": false}, "storageKey": "pk_46907"};
+var LS_KEY = 'mf_' + (PKG.storageKey||'default');
+function lsGet(){ try{return JSON.parse(localStorage.getItem(LS_KEY))||{};}catch(e){return {};} }
+function lsSet(s){ try{localStorage.setItem(LS_KEY,JSON.stringify(s));}catch(e){} }
+var S = Object.assign({xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,feynmanDone:0,streak:0,lastDay:null,flips:{}}, lsGet());
+
+function todayStr(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function ydayStr(){var d=new Date(Date.now()-86400000);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function bumpStreak(){var t=todayStr(); if(S.lastDay===t)return; if(S.lastDay===ydayStr())S.streak+=1; else S.streak=1; S.lastDay=t;}
+
+function levelFor(xp){var lv=PKG.levels[0];for(var i=0;i<PKG.levels.length;i++){if(xp>=PKG.levels[i].min_xp)lv=PKG.levels[i];}return lv;}
+function nextLevel(xp){for(var i=0;i<PKG.levels.length;i++){if(xp<PKG.levels[i].min_xp)return PKG.levels[i];}return null;}
+function allReviewedGe4(){ if(!PKG.totals.review_total)return false;
+  var rows=document.querySelectorAll('.review tr[data-ef]'); if(!rows.length)return false;
+  for(var i=0;i<rows.length;i++){ if(rows[i].dataset.ge4!=='1')return false; } return true; }
+
+function evaluateBadges(){
+  var newly=[];
+  PKG.badges.forEach(function(b){
+    if(S.badges.indexOf(b.id)>=0)return;
+    var t=b.trigger, ok=false;
+    if(t==='on_generate') ok=true;
+    else if(t==='quiz_correct_first') ok=S.quizCorrect>=1;
+    else if(t==='quiz_all_correct') ok=(PKG.totals.quiz_total>0 && S.quizAnswered>=PKG.totals.quiz_total && S.quizCorrect===PKG.totals.quiz_total);
+    else if(t==='review_rate_first') ok=S.reviewCount>=1;
+    else if(t==='all_review_ge4') ok=allReviewedGe4();
+    else if(t==='feynman_all') ok=(PKG.totals.feynman_total>0 && S.feynmanDone>=PKG.totals.feynman_total);
+    else if(t.indexOf('>=')>=0){var m=t.match(/^(\w+)>=(\d+)$/); if(m){var key=m[1],val=+m[2];var map={review_count:S.reviewCount,streak:S.streak,level:levelFor(S.xp).level};ok=(map[key]||0)>=val;}}
+    if(ok){S.badges.push(b.id);newly.push(b);}
+  });
+  return newly;
+}
+function renderHonor(){
+  var lv=levelFor(S.xp), nxt=nextLevel(S.xp);
+  var n=document.getElementById('hbLevelName'); if(n)n.textContent=lv.title;
+  var no=document.getElementById('hbLevelNo'); if(no)no.textContent='Lv.'+lv.level;
+  var pct=100; if(nxt){var span=nxt.min_xp-lv.min_xp; pct=Math.max(0,Math.min(100,Math.round((S.xp-lv.min_xp)/span*100)));}
+  var f=document.getElementById('hbXpFill'); if(f)f.style.width=pct+'%';
+  var xt=document.getElementById('hbXpText'); if(xt)xt.textContent=S.xp+' XP'+(nxt?(' / '+nxt.min_xp):' · 满级');
+  var st=document.getElementById('hbStreak'); if(st)st.textContent=S.streak;
+  var si=document.getElementById('hbStreakIcon'); if(si)si.textContent=S.streak>0?'🔥':'💤';
+}
+function renderHall(){
+  PKG.badges.forEach(function(b){
+    var el=document.getElementById('bg-'+b.id); if(!el)return;
+    if(S.badges.indexOf(b.id)>=0){el.classList.add('unlocked');el.classList.remove('locked');}
+    else{el.classList.add('locked');el.classList.remove('unlocked');}
+  });
+}
+function toast(msg,icon){
+  var t=document.getElementById('mfToast');
+  if(!t){t=document.createElement('div');t.id='mfToast';t.className='toast';document.body.appendChild(t);}
+  t.innerHTML='<span class="t-icon">'+(icon||'🏅')+'</span>'+msg;
+  t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove('show');},2600);
+}
+function grantXP(n){ S.xp+=n; }
+function afterAction(){
+  var beforeLv=levelFor(S.xp).level;
+  var newly=evaluateBadges();
+  lsSet(S); renderHonor(); renderHall();
+  var afterLv=levelFor(S.xp).level;
+  if(afterLv>beforeLv) toast('升级！'+levelFor(S.xp).title+' 🎉','🎉');
+  newly.forEach(function(b){
+    var el=document.getElementById('bg-'+b.id);
+    if(el){el.classList.add('just-unlocked');setTimeout(function(){el.classList.remove('just-unlocked');},600);}
+    toast('解锁勋章：'+b.name+' '+b.icon, b.icon);
+  });
+}
+function onFlip(flipEl){
+  var card=flipEl.closest('.card'); if(!card)return;
+  var idx=card.id; if(S.flips[idx])return; S.flips[idx]=1;
+  grantXP(PKG.xp_rules.flip_card); bumpStreak(); afterAction();
+}
+function onFeynman(fc){
+  if(fc.classList.contains('done'))return;
+  fc.classList.add('done');
+  var box=fc.querySelector('.fchk-box'); if(box)box.textContent='☑';
+  var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='已复述 ✓';
+  S.feynmanDone++; grantXP(PKG.xp_rules.feynman_done); bumpStreak(); afterAction();
 }
 document.addEventListener('click',function(e){
   if(e.target.classList.contains('quiz-check')) checkQuiz(e.target);
   if(e.target.classList.contains('rate')) rate(e.target);
+  var flip=e.target.closest('.flip'); if(flip) onFlip(flip);
+  var fc=e.target.closest('.feynman-check'); if(fc) onFeynman(fc);
 });
+(function init(){
+  evaluateBadges(); lsSet(S); renderHonor(); renderHall();
+})();
 </script>
 </body>
 </html>
