@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-2-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-3-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -33,6 +33,7 @@
 |---|---|---|
 | [House Buying](./house-buying) | 中国住宅购房尽调与决策分析，覆盖成交、学区溢价、升学、生源、小区人口和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
+| [Memory Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
 
 ---
 
@@ -102,6 +103,37 @@ Agent 会自动运行诊断、生成报告、输出修复计划。也可以指�
 - 使用前运行 `python scripts/update_self.py --apply`
 - 自动检查并同步 GitHub 上的 `skills-doctor` skill 目录
 - 自动检查并更新 `agent-skill-doctor` npm 包到最新版
+
+### [Memory Forge](./memory-forge)
+
+把任意学习材料（粘贴文字、`.txt` / `.md` / `.docx` / `.pdf`）重新锻造成好懂好记的东西。用记忆科学把知识点拆成一张张小卡片，配故事 / 类比 / 互补图示、出测验、排复习计划——因为人脑对纯文字记忆很烂，对画面和故事好得多。
+
+**核心能力：**
+- 一概念一卡：每张卡只装一个知识点，避免挤爆工作记忆
+- 抽象概念必配故事 / 类比；视觉必须和文字互补（不是装饰图）
+- 翻转知识卡：正面问题 → 翻面大白话 + 要点 + 助记符
+- 知识脑图：把全篇关系画成可点击高亮的树
+- 自测区：先答再揭晓解析（测试效应）
+- 艾宾浩斯 / SM-2 复习计划：0–5 自评即时算下次间隔
+- 联网深潜：遇到陌生术语主动搜权威解释 + 配图，标来源日期
+- 双轨交付：对话内即时讲解 + 导出离线自包含 HTML / Markdown 学习包
+
+**使用方式：**
+
+对 Agent 说：
+```
+用 memory-forge 帮我把这份前端笔记学懂并记住，出一个能下载的包
+```
+或直接粘贴 / 上传材料：
+```
+（粘贴一段学习资料或上传 docx/pdf）帮我快速记住里面的要点
+```
+
+Agent 会先抽取概念，再逐步生成卡片、故事、脑图、自测和复习计划，最后给出对话内讲解和可下载的学习包。
+
+**自动更新：**
+- 使用前运行 `python scripts/update_self.py --apply`
+- 自动检查并同步 GitHub 上的 `memory-forge` skill 目录
 
 ---
 

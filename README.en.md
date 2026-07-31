@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-2-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-3-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -35,6 +35,7 @@ The self-update helper requires `python`; npm-backed skills such as Skills Docto
 |---|---|---|
 | [House Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
+| [Memory Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
 
 ---
 
@@ -104,6 +105,37 @@ Detect zombie skills
 - Run `python scripts/update_self.py --apply` before use
 - Checks and syncs the latest `skills-doctor` skill folder from GitHub
 - Checks and updates the `agent-skill-doctor` npm package to the latest version
+
+### [Memory Forge](./memory-forge)
+
+Forge any study material (pasted text, `.txt` / `.md` / `.docx` / `.pdf`) into something easy to understand and remember. It uses memory science to break knowledge into small cards, paired with stories / analogies / complementary visuals, quizzes, and a review schedule — because brains remember pictures and stories far better than raw text.
+
+**Key Features:**
+- One concept per card: each card holds a single idea to avoid overloading working memory
+- Abstract concepts always get a story / analogy; visuals must complement (not decorate) the text
+- Flip cards: question on the front → plain-language answer + key points + mnemonic on the back
+- Knowledge mind-map: the whole relationship graph as a clickable, highlightable tree
+- Quiz section: answer first, then reveal the explanation (testing effect)
+- Ebbinghaus / SM-2 review plan: 0–5 self-rating instantly computes the next interval
+- Web deep-dive: proactively fetches authoritative explanations + diagrams for unfamiliar terms, with source and date
+- Dual delivery: inline explanation in chat + export an offline, self-contained HTML / Markdown package
+
+**Usage:**
+
+Tell your Agent:
+```
+Use memory-forge to help me understand and remember these frontend notes, and give me a downloadable package
+```
+Or just paste / upload material:
+```
+(paste study text or upload a docx/pdf) help me memorize the key points quickly
+```
+
+The Agent extracts concepts, then progressively generates cards, stories, a mind-map, quizzes, and a review plan, finishing with inline explanation and a downloadable package.
+
+**Auto-update:**
+- Run `python scripts/update_self.py --apply` before use
+- Checks and syncs the latest `memory-forge` skill folder from GitHub
 
 ---
 

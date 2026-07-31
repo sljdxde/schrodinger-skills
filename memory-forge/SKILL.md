@@ -1,0 +1,75 @@
+---
+name: memory-forge
+description: Use when the user pastes or uploads study material (notes, articles, lecture text, .txt/.md/.docx/.pdf) and wants to understand and remember it — generates one-concept-per-card knowledge cards, plain-language stories and analogies, complementary diagrams or mind-maps, mnemonics, interactive self-test quizzes, and a spaced-repetition (SM-2) review schedule; can open a real browser or search the web to explain unfamiliar terms with authoritative diagrams.
+---
+
+# Memory Forge
+
+把任意学习材料（粘贴的大段文字、`.txt` / `.md` / `.docx` / `.pdf`）重新锻造成「好懂 + 好记」的东西。它不替你做笔记摘要，而是用记忆科学把知识点拆成一张张小卡片、配故事/类比/互补图示、出测验、排复习计划——因为人脑对纯文字记忆很烂，对画面和故事好得多。
+
+## 核心原则
+
+- **一概念一卡**：每张卡只装一个知识点，避免挤爆工作记忆（Miller/Cowan：工作记忆约 4 个组块）。
+- **抽象必配故事或类比**：每个抽象概念都给一个具体画面（故事优势：Bower & Clark 93% vs 13% 死记；Heath & Aaker 63% vs 5%）。
+- **视觉必须互补，绝不装饰**：图要提供文字没有的结构/空间信息（双重编码）；放装饰图或把文字再说一遍会触发冗余效应，反而伤记忆。
+- **先问题，后揭示**：每张卡正面是问题/提示，先让大脑检索，再翻背面看答案（测试效应：检索练习 > 重读）。
+- **复习用 SM-2 扩展间隔**：默认第 0 天学，之后 +1 / +6 / +16 / +40… 天复习；每次自评 0–5 分，分数驱动下次间隔。
+- **让学习者产出**：填空、自己举例子，比被动读记得牢（生成效应）。
+- **联网解释必标来源 + 日期**：凡是去网上查的权威解释/图，都要写清出处和获取时间。
+
+## 使用前自检更新
+
+每次使用本 skill 前，先运行：
+
+```bash
+python scripts/update_self.py --apply
+```
+
+该脚本会检查 GitHub 上 `memory-forge` 目录是否有更新，发现更新时先备份本地 skill，再自动同步最新文件。若脚本显示已更新，重新读取当前 `SKILL.md` 和相关 references 后再继续；若网络或环境导致更新失败，说明失败原因并继续使用当前版本。
+
+## 工作流
+
+1. **自检更新**：执行上面的 `scripts/update_self.py --apply`，必要时重新加载 skill。
+2. **输入采集**：按 `references/input-parsing.md` 摄取材料。粘贴文本直接用；`.txt` / `.md` 用 `Read`；`.docx` 调 `markitdown-skill` 转 md 再读；`.pdf` 先 `Read`，失败退回 `markitdown-skill`。材料过长先分段（chunk）抽取再合并去重。
+3. **确认需求（最多问一轮，≤5 个问题）**：受众基础（小白/进阶）、是否需要导出学习包、输出语言（默认中文）、是否有重点章节。信息基本够就直接开工，别用「我先看看」绕过。
+4. **概念解析**：把材料拆成概念清单 + 它们的关系；按熟悉度判断哪些概念需要联网深潜（见第 5 步）。
+5. **Web 深潜（按需）**：遇到材料里没讲清、或用户明显不熟的术语（如例子里的「发改大脑」「无感监测」），调 `web-access` 取权威解释 + 图（官方文档 / Wikipedia / 行业站点），浓缩进卡片背面；图转内联 SVG 或 `ImageGen` 示意图；标来源 + 日期。规则见 `references/web-deepdive.md`。
+6. **逐概念锻造记忆辅助**（严格遵循 `references/memory-science.md` 的 15 条规则）：对每个概念产出
+   - 知识卡：正面 = 一个引导问题；背面 = 大白话解释 + 2–4 个要点 + 助记符/口诀。
+   - 故事或类比（抽象概念必给）。
+   - 互补视觉（结构图 / 示意图 / 脑图节点），不要装饰图。
+   - 自测题（1 道，MCQ 或填空，附解析）。
+   - 复习条目（`id` + `EF=2.5, n=0, I=1`）。
+   - 费曼自述提示（「用自己的话讲一遍」）。
+7. **组装脑图**：用根节点 + 分类 + 概念把全篇关系画成树，配合卡片。
+8. **组装复习计划**：按默认 `EF=2.5` 预生成排程（公式见 `memory-science.md`）。
+9. **预览确认**：先内联渲染 1–2 张翻转卡 + 脑图 + 1 道自测，确认方向再继续。用 Visualizer `show_widget`（与导出同源）。
+10. **双轨交付**：
+    - **Inline**：用 `show_widget` 继续把其余卡片/故事/脑图/自测在对话里讲清楚。
+    - **导出**：把结构化内容写成 `payload.json`，运行
+      ```bash
+      python scripts/build_package.py --in payload.json --out memory-forge-package.html
+      ```
+      （或 `--format md` 出 Markdown 版），用 `Write` 落盘并把路径给用户。包内全部 CSS/JS/SVG 内联，离线可用。
+
+## 何时追问
+
+- 受众基础缺失：小白需要更多类比/铺垫，进阶可省略基础解释。
+- 是否导出、语言、重点：缺失时给默认值（导出=是，语言=中文）并说明。
+- 材料本身杂乱、无明确主题：先和用户输入摘要对齐，再开锻。
+
+## 输出要求
+
+- 每张卡只讲一件事；解释用大白话，术语第一次出现必须马上用简单话重定义。
+- 视觉和文字互补，不重复、不堆砌装饰。
+- 自测题先让答再揭晓解析；鼓励用户自己举例子。
+- 复习计划给出明确日期（以「今天」为 D0 推算），不是模糊的「以后复习」。
+- 不编造材料里没有的事实；联网补充的内容必须标来源。
+
+## 参考文件
+
+- `references/memory-science.md`：记忆科学证据 + 15 条可落地设计规则（含 SM-2 公式、艾宾浩斯留存率）。
+- `references/input-parsing.md`：各输入格式摄取规则、分段阈值、概念抽取与熟悉度判断。
+- `references/output-templates.md`：卡片 / 故事 / 脑图 / 测验 / 复习计划模板，以及 `build_package.py` 的 JSON schema。
+- `references/web-deepdive.md`：何时联网、可信源优先级、取文取图、图转内联 SVG、标来源日期。
+- `references/examples.md`：端到端示例（前端资料走完整流程）。
