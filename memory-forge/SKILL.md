@@ -52,6 +52,7 @@ python scripts/update_self.py --apply
       python scripts/build_package.py --in payload.json --out memory-forge-package.html
       ```
       （或 `--format md` 出 Markdown 版），用 `Write` 落盘并把路径给用户。包内全部 CSS/JS/SVG 内联，离线可用。
+    - **视觉主题**（默认 `editorial`）：`--theme editorial` 暖米纸 + 衬线大标题（杂志风）；`--theme swiss` 近白底 + 单一克莱因蓝 + 全程无衬线 + 直角（瑞士国际主义风）。两套都只用系统字体、零外链、零 emoji。
 
 ## 何时追问
 
