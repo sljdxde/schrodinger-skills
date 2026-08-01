@@ -119,7 +119,7 @@ Forge any study material (pasted text, `.txt` / `.md` / `.docx` / `.pdf`) into s
 - Ebbinghaus / SM-2 review plan: 0–5 self-rating instantly computes the next interval
 - Web deep-dive: proactively fetches authoritative explanations + diagrams for unfamiliar terms, with source and date
 - Dual delivery: inline explanation in chat + export an offline, self-contained HTML / Markdown package
-- Gamification: built-in levels / XP / badge wall / study streak (saved in browser local storage), with theme-specific custom badges to boost retention and engagement
+- Theme: `--theme editorial` (default, warm paper + serif display, magazine style) / `--theme swiss` (near-white + single Klein Blue + all sans-serif + right angles, Swiss International style); both fully offline, emoji-free, switchable anytime
 
 **Usage:**
 
