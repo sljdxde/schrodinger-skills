@@ -128,9 +128,9 @@ python scripts/build_package.py --in payload.json --format md --out memory-forge
   "levels":  [ {"level":1,"title":"初心学徒","min_xp":0}, ... ],
   "xp_rules": { "flip_card":3, "quiz_correct":12, "quiz_wrong":3, "review_rate":10, "feynman_done":8 },
   "badges":  [
-    { "id":"first_pack","name":"启程","icon":"🌱",
+    { "id":"first_pack","name":"启程","icon":"sprout",
       "desc":"打开学习包即得","trigger":"on_generate" },
-    { "id":"streak3","name":"三日之约","icon":"🔥",
+    { "id":"streak3","name":"三日之约","icon":"flame",
       "desc":"连续 3 天学习","trigger":"streak>=3" }
   ]
 }
@@ -138,5 +138,6 @@ python scripts/build_package.py --in payload.json --format md --out memory-forge
 
 - 不提供 `gamification` 时脚本用**内置默认集**（7 级 + 11 枚勋章，见 gamification.md）。
 - `trigger` 枚举：`on_generate` / `quiz_correct_first` / `quiz_all_correct` / `review_rate_first` / `review_count>=N` / `all_review_ge4` / `feynman_all` / `streak>=N` / `level>=N` / `web_deepdive>=1`。
+- `icon` 用**图标名**（Lucide stroke，脚本内联为 SVG，不用 emoji）：`sprout` `snowflake` `target` `sunrise` `shield` `trophy` `pen-line` `flame` `sparkles` `scroll` `compass` `medal` `book` `award` 等；未知名将回退到 `medal`。
 - 脚本**自动剔除不可能获得的勋章**（包内无联网深潜 → 不显示「知识猎人」；无费曼卡片 → 不显示「费曼小能手」；无自测 → 不显示「火眼金睛」），保证勋章墙「每一枚都拿得到」。
 - Agent 可按材料主题加 `badges`（如荣誉材料加「荣誉满墙」），增强代入感。

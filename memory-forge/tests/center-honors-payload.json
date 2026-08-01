@@ -172,8 +172,8 @@
   ],
   "gamification": {
     "badges": [
-      {"id": "honor_wall", "name": "荣誉满墙", "icon": "🏅", "desc": "通览了中心的荣誉与资质全貌", "trigger": "on_generate"},
-      {"id": "paper_harvester", "name": "论文收割机", "icon": "📚", "desc": "答对「学术与刊物」相关自测", "trigger": "quiz_correct_first"}
+      {"id": "honor_wall", "name": "荣誉满墙", "icon": "medal", "desc": "通览了中心的荣誉与资质全貌", "trigger": "on_generate"},
+      {"id": "paper_harvester", "name": "论文收割机", "icon": "book", "desc": "答对「学术与刊物」相关自测", "trigger": "quiz_correct_first"}
     ]
   }
 }

@@ -39,21 +39,21 @@
 
 ## 4. 勋章集（默认 trigger 枚举）
 
-每个勋章：`id` / `name` / `icon`（emoji 或内联 SVG）/ `desc` / `trigger`（解锁条件标识）。
+每个勋章：`id` / `name` / `icon`（**图标名**，取 Lucide stroke 图标，脚本内联为 SVG，**不用 emoji**）/ `desc` / `trigger`（解锁条件标识）。可用图标名：`sprout` `snowflake` `target` `sunrise` `shield` `trophy` `pen-line` `flame` `sparkles` `scroll` `compass` `medal` `book` `award` `package` `link` `square` `check`。
 
 | id | 名称 | 图标 | trigger | 解锁条件 |
 |---|---|---|---|---|
-| `first_pack` | 启程 | 🌱 | `on_generate` | 打开学习包即得 |
-| `first_quiz` | 破冰 | ❄️ | `quiz_correct_first` | 首次答对自测 |
-| `all_quiz` | 火眼金睛 | 🎯 | `quiz_all_correct` | 本包自测全对 |
-| `first_review` | 温故知新 | 🌅 | `review_rate_first` | 首次复习自评 |
-| `iron_will` | 百炼成钢 | 🛡️ | `review_count>=10` | 复习自评累计 10 次 |
-| `master_all` | 融会贯通 | 🏆 | `all_review_ge4` | 所有概念自评 ≥4 |
-| `feynman_master` | 费曼小能手 | ✍️ | `feynman_all` | 完成全部费曼自述 |
-| `streak3` | 三日之约 | 🔥 | `streak>=3` | 连续 3 天学习 |
-| `streak7` | 一周不辍 | 🌟 | `streak>=7` | 连续 7 天学习 |
-| `level5` | 满腹经纶 | 📜 | `level>=5` | 等级达到「满腹经纶」 |
-| `knowledge_hunter` | 知识猎人 | 🧭 | `web_deepdive>=1` | 包内含联网深潜讲解 |
+| `first_pack` | 启程 | `sprout` | `on_generate` | 打开学习包即得 |
+| `first_quiz` | 破冰 | `snowflake` | `quiz_correct_first` | 首次答对自测 |
+| `all_quiz` | 火眼金睛 | `target` | `quiz_all_correct` | 本包自测全对 |
+| `first_review` | 温故知新 | `sunrise` | `review_rate_first` | 首次复习自评 |
+| `iron_will` | 百炼成钢 | `shield` | `review_count>=10` | 复习自评累计 10 次 |
+| `master_all` | 融会贯通 | `trophy` | `all_review_ge4` | 所有概念自评 ≥4 |
+| `feynman_master` | 费曼小能手 | `pen-line` | `feynman_all` | 完成全部费曼自述 |
+| `streak3` | 三日之约 | `flame` | `streak>=3` | 连续 3 天学习 |
+| `streak7` | 一周不辍 | `sparkles` | `streak>=7` | 连续 7 天学习 |
+| `level5` | 满腹经纶 | `scroll` | `level>=5` | 等级达到「满腹经纶」 |
+| `knowledge_hunter` | 知识猎人 | `compass` | `web_deepdive>=1` | 包内含联网深潜讲解 |
 
 `trigger` 阈值类用 `<key>>=N` 形式（`review_count`、`streak`、`level`），脚本解析。解锁时弹 toast + 勋章墙点亮（彩色）；未解锁灰显 + 悬停显示「如何获得」。
 
@@ -72,7 +72,7 @@
   "levels": [ {"level":1,"title":"初心学徒","min_xp":0}, ... ],
   "xp_rules": { "flip_card":3, "quiz_correct":12, "quiz_wrong":3, "review_rate":10, "feynman_done":8 },
   "badges": [
-    { "id":"honor_wall","name":"荣誉满墙","icon":"🏅",
+    { "id":"honor_wall","name":"荣誉满墙","icon":"medal",
       "desc":"通览了中心的荣誉与资质全貌","trigger":"on_generate" }
   ]
 }
