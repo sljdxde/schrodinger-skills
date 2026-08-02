@@ -46,13 +46,13 @@ python scripts/update_self.py --apply
 9. **生成荣誉体系**（遵循 `references/gamification.md`）：默认给一套等级 + 经验 + 勋章墙 + 连续学习 streak；可**按材料主题加定制勋章**（如荣誉材料加「荣誉满墙」、前端材料加「DOM 驯服者」），让收集有语境代入感。把 `gamification` 段写进 `payload.json`，脚本会自动剔除拿不到的勋章（如包内无联网深潜则不显示「知识猎人」）。
 10. **预览确认**：先内联渲染 1–2 张翻转卡 + 脑图 + 1 道自测 + 荣誉条，确认方向再继续。用 Visualizer `show_widget`（与导出同源）。
 11. **双轨交付**：
-    - **Inline**：用 `show_widget` 继续把其余卡片/故事/脑图/自测在对话里讲清楚。
+    - **Inline**：用 `show_widget` 继续把其余卡片/故事/自测在对话里讲清楚。
     - **导出**：把结构化内容写成 `payload.json`，运行
       ```bash
       python scripts/build_package.py --in payload.json --out memory-forge-package.html
       ```
       （或 `--format md` 出 Markdown 版），用 `Write` 落盘并把路径给用户。包内全部 CSS/JS/SVG 内联，离线可用。
-    - **视觉主题**（默认 `editorial`）：`--theme editorial` 暖米纸 + 衬线大标题（杂志风）；`--theme swiss` 近白底 + 单一克莱因蓝 + 全程无衬线 + 直角（瑞士国际主义风）。两套都只用系统字体、零外链、零 emoji。
+    - **视觉主题**（默认 `claude`）：`--theme claude` 暖象牙底 + 陶土色点缀 + 衬线大标题（Claude Design 风）；`--theme editorial` 暖米纸 + 衬线大标题（杂志风）；`--theme swiss` 近白底 + 单一克莱因蓝 + 全程无衬线 + 直角（瑞士国际主义风）。三套都只用系统字体、零外链、零 emoji。
 
 ## 何时追问
 

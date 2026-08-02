@@ -55,92 +55,6 @@ def icon(name: str, size: int = 18, cls: str = "") -> str:
     )
 
 
-# ---------------------------------------------------------------------------
-# Mind-map layout (left-to-right tidy tree)
-# ---------------------------------------------------------------------------
-def layout_tree(nodes: list[dict]) -> tuple[dict, int, int]:
-    """Return {node_id: (x, y)} plus svg width/height for a left->right tree."""
-    by_id: dict[str, dict] = {n["id"]: n for n in nodes}
-    children: dict[str, list[str]] = {}
-    root = None
-    for n in nodes:
-        pid = n.get("parent")
-        if pid is None or pid not in by_id:
-            root = n["id"]
-        else:
-            children.setdefault(pid, []).append(n["id"])
-
-    next_leaf = [0]
-    ypos: dict[str, float] = {}
-
-    def assign(nid: str, depth: int) -> int:
-        kids = children.get(nid, [])
-        if not kids:
-            ypos[nid] = next_leaf[0]
-            next_leaf[0] += 1
-        else:
-            for k in kids:
-                assign(k, depth + 1)
-            ys = [ypos[k] for k in kids]
-            ypos[nid] = sum(ys) / len(ys)
-        return depth
-
-    max_depth = assign(root, 0) if root else 0
-    leaves = next_leaf[0]
-    margin_x, margin_y = 30, 30
-    x_gap, y_gap = 200, 64
-    node_w, node_h = 150, 40
-    coords: dict[str, tuple[float, float]] = {}
-    for nid, y in ypos.items():
-        depth = 0
-        p = by_id[nid].get("parent")
-        while p is not None and p in by_id:
-            depth += 1
-            p = by_id[p].get("parent")
-        x = margin_x + depth * x_gap
-        yy = margin_y + y * y_gap + node_h / 2
-        coords[nid] = (x, yy)
-    width = margin_x * 2 + (max_depth + 1) * x_gap
-    height = margin_y * 2 + max(1, leaves) * y_gap
-    return coords, int(width), int(height)
-
-
-def render_mindmap(mindmap: dict) -> str:
-    nodes = mindmap.get("nodes", [])
-    root_label = html.escape(str(mindmap.get("root", "主题")))
-    if not nodes:
-        return ""
-    coords, w, h = layout_tree(nodes)
-    by_id = {n["id"]: n for n in nodes}
-    parts = [
-        f'<svg viewBox="0 0 {w} {h}" width="100%" class="mindmap-svg" '
-        f'role="img" aria-label="mind map">'
-    ]
-    # connectors first
-    for nid, (x, y) in coords.items():
-        n = by_id[nid]
-        pid = n.get("parent")
-        if pid in coords:
-            px, py = coords[pid]
-            parts.append(
-                f'<line x1="{px + 150}" y1="{py}" x2="{x}" y2="{y}" '
-                f'class="mm-link"/>'
-            )
-    # nodes
-    node_w = 150
-    for nid, (x, y) in coords.items():
-        is_root = by_id[nid].get("parent") is None
-        cls = "mm-node mm-root" if is_root else "mm-node"
-        label = html.escape(str(by_id[nid].get("label", "")))
-        parts.append(
-            f'<g class="{cls}">'
-            f'<rect x="{x}" y="{y - 20}" width="{node_w}" height="40" rx="8" '
-            f'class="mm-rect"/>'
-            f'<text x="{x + node_w / 2}" y="{y + 5}" class="mm-text">{label}</text>'
-            f"</g>"
-        )
-    parts.append("</svg>")
-    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------
@@ -502,12 +416,6 @@ section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-
 .websource svg{flex-shrink:0;display:block}
 .visual{margin-top:13px}
 .visual svg{max-width:100%;height:auto}
-.mindmap-svg{width:100%;height:auto}
-.mm-link{stroke-width:1.5}
-.mm-rect{stroke-width:1.5}
-.mm-text{font-size:13px;text-anchor:middle;font-family:inherit}
-.mm-root .mm-text{font-weight:700}
-.mm-link{stroke:var(--line-2)}
 
 /* quiz */
 .quiz{margin-top:13px;padding:14px 15px}
@@ -603,11 +511,6 @@ section h2 .badge{background:var(--brand-soft);color:var(--brand)}
 .story{background:#faf3e6;border-left:3px solid var(--gold)}
 .mnemonic{background:#eef5f0;border-left:3px solid var(--good)}
 .feynman{background:#f1f7f2;border-left:3px solid var(--good)}
-.mindmap-svg{background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r-sm)}
-.mm-rect{fill:var(--card);stroke:var(--brand)}
-.mm-root .mm-rect{fill:var(--brand);stroke:var(--brand)}
-.mm-text{fill:var(--ink)}
-.mm-root .mm-text{fill:#fff}
 .quiz{background:var(--brand-soft);border:1px dashed var(--line-2);border-radius:var(--r-sm)}
 .quiz-tag{background:#f0e2da;color:var(--brand)}
 .opt input{accent-color:var(--brand)}
@@ -677,11 +580,6 @@ section h2 .badge{background:var(--accent);color:#fff;border-radius:0}
 .story,.mnemonic,.feynman{background:transparent;border-left:2px solid var(--accent);border-radius:0;padding:2px 0 2px 13px}
 .mnemonic{border-left-color:var(--good)}
 .feynman{border-left-color:var(--good)}
-.mindmap-svg{border:1px solid var(--line);border-radius:0;background:#fff}
-.mm-rect{fill:#fff;stroke:var(--ink)}
-.mm-root .mm-rect{fill:var(--accent);stroke:var(--accent)}
-.mm-text{fill:var(--ink)}
-.mm-root .mm-text{fill:#fff}
 .quiz{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0;background:transparent}
 .quiz-tag{background:var(--accent);color:#fff}
 .opt input{accent-color:var(--accent)}
@@ -702,7 +600,75 @@ section h2 .badge{background:var(--accent);color:#fff;border-radius:0}
 }
 """
 
-CSS = CSS_COMMON + CSS_EDITORIAL  # default; build_html picks per --theme
+CSS_CLAUDE = """
+:root{
+  --paper:#FBFAF7; --paper-2:#F2EFE9; --card:#FFFFFF;
+  --ink:#26231F; --ink-2:#3A352F; --muted:#6E6A62;
+  --line:#E9E3D9; --line-2:#DBD3C5;
+  --brand:var(--accent); --accent:#CC785C; --brand-soft:#F6ECE6; --brand-deep:#A8593F;
+  --good:#3F7D5A; --bad:#C0492F; --warn:#C5791F;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Songti SC","Noto Serif SC",serif;
+  --sans:system-ui,-apple-system,"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px}
+header.pkg h1{font-family:var(--serif);font-weight:600;color:var(--ink);letter-spacing:-.01em;line-height:1.1}
+header.pkg .meta{color:var(--muted)}
+header.pkg:after{content:"";display:block;width:48px;height:3px;border-radius:2px;background:var(--accent);margin-top:16px}
+.offline{border:1px solid var(--line-2);color:var(--muted);padding:4px 11px;border-radius:var(--r-pill);background:var(--card)}
+.offline svg{display:block}
+
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 28px;box-shadow:var(--shadow-sm)}
+section h2{font-family:var(--serif);font-weight:600}
+section h2 .badge{background:var(--brand-soft);color:var(--accent)}
+
+.honor-bar{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm)}
+.hb-badge{background:var(--accent);color:#fff;border-radius:10px}
+.hb-lv{background:var(--card);border:1px solid var(--line-2);color:var(--ink-2)}
+.hb-xp-track{background:var(--line)}
+.hb-xp-fill{background:linear-gradient(90deg,#E0A187,#CC785C);box-shadow:0 0 10px rgba(204,120,92,.35)}
+.hb-streak{color:var(--accent)}
+#hbStreakIcon{color:var(--accent)}
+.hall-head{color:var(--ink)}
+.hall-head svg{color:var(--accent)}
+.badge-card{border:1px solid var(--line);border-radius:16px;padding:16px 10px;text-align:center;background:var(--card)}
+.badge-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
+.bc-icon{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto;border-radius:50%;background:var(--brand-soft);color:var(--accent);transition:all .25s}
+.badge-card.locked{filter:grayscale(.85);opacity:.42}
+.badge-card.locked .bc-icon{background:var(--paper-2);color:var(--muted)}
+.badge-card.unlocked{border-color:var(--accent);box-shadow:var(--shadow-md)}
+.badge-card.unlocked .bc-icon{background:linear-gradient(135deg,#E0A187,#CC785C);color:#fff;box-shadow:0 4px 14px rgba(204,120,92,.4)}
+.bc-check{position:absolute;top:8px;right:10px;display:none;color:var(--good)}
+.badge-card.unlocked .bc-check{display:flex}
+
+.card{border:1px solid var(--line);border-radius:16px;padding:18px 20px;background:var(--card);box-shadow:var(--shadow-sm);transition:box-shadow .2s}
+.card:hover{box-shadow:var(--shadow-md)}
+.card-no{background:var(--accent);color:#fff;border-radius:10px}
+.flip-front,.flip-back{border:1px solid var(--line);border-radius:12px}
+.flip-front{background:var(--brand-soft)}
+.flip-back{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--brand-soft)}
+.tag{background:var(--brand-soft);color:var(--accent)}
+.story{background:#FBF4EE;border-left:3px solid var(--accent)}
+.mnemonic{background:#EEF5F0;border-left:3px solid var(--good)}
+.feynman{background:#F1F7F2;border-left:3px solid var(--good)}
+.quiz{background:var(--brand-soft);border:1px dashed var(--line-2);border-radius:12px}
+.quiz-tag{background:#F0E4DC;color:var(--accent)}
+.opt input{accent-color:var(--accent)}
+.fill-input{border:1px solid var(--line);border-radius:10px;transition:border-color .15s,box-shadow .15s}
+.fill-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--brand-soft)}
+.quiz-check{background:var(--accent)}
+.quiz-check:hover{background:var(--ink-2)}
+.rate{border:1px solid var(--line);border-radius:10px}
+.rate:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.rv-next{color:var(--accent)}
+.feynman-check{background:var(--card);border:1.5px solid var(--good);color:#2F7A53;border-radius:10px;padding:6px 12px}
+.feynman-check:hover{background:#F1F7F2}
+.feynman-check.done{background:var(--good);border-color:var(--good);color:#fff}
+.toast{background:var(--ink)}
+.toast .t-icon{color:var(--accent)}
+"""
+
+CSS = CSS_COMMON + CSS_EDITORIAL  # fallback; build_html picks per --theme
 
 
 JS = r"""
@@ -879,11 +845,6 @@ PAGE = """<!DOCTYPE html>
 </section>
 
 <section>
-  <h2><span class="badge">结构</span> 知识脑图</h2>
-  {mindmap}
-</section>
-
-<section>
   <h2><span class="badge">记忆</span> 知识卡片（点击翻转）</h2>
   {cards}
 </section>
@@ -918,7 +879,6 @@ def build_html(data: dict, theme: str = "editorial") -> str:
     )
     concepts = data.get("concepts", [])
     cards_html = render_cards(concepts)
-    mindmap_html = render_mindmap(data.get("mindmap", {}) or {})
     review_html = render_review(concepts, data.get("review_schedule", []))
     gam = compute_gamification(data)
     honor_bar, hall_of_fame, pkg_json = render_gamification(data, gam)
@@ -934,7 +894,6 @@ def build_html(data: dict, theme: str = "editorial") -> str:
         audience=audience,
         generated_at=generated_at,
         narrative=narrative,
-        mindmap=mindmap_html or "<p class='muted'>（无脑图数据）</p>",
         cards=cards_html or "<p class='muted'>（无概念数据）</p>",
         quizzes_intro=quizzes_intro,
         review=review_html or "<p class='muted'>（无复习计划）</p>",
@@ -942,7 +901,9 @@ def build_html(data: dict, theme: str = "editorial") -> str:
         hall_of_fame=hall_of_fame,
         offline_icon=icon("package", 12),
         js=JS.replace("__PKG__", pkg_json).replace("__ICONS__", json.dumps(ICONS, ensure_ascii=False)),
-        css=(CSS_COMMON + CSS_SWISS) if theme == "swiss" else (CSS_COMMON + CSS_EDITORIAL),
+        css=(CSS_COMMON + CSS_SWISS) if theme == "swiss"
+            else (CSS_COMMON + CSS_CLAUDE) if theme == "claude"
+            else (CSS_COMMON + CSS_EDITORIAL),
     )
 
 
@@ -956,18 +917,6 @@ def build_md(data: dict) -> str:
     if nar.get("body"):
         lines.append("## 一句话故事")
         lines.append(nar["body"])
-        lines.append("")
-    mm = data.get("mindmap", {}) or {}
-    if mm.get("nodes"):
-        lines.append("## 知识脑图")
-        by_id = {n["id"]: n for n in mm["nodes"]}
-        for n in mm["nodes"]:
-            depth = 0
-            p = n.get("parent")
-            while p in by_id:
-                depth += 1
-                p = by_id[p].get("parent")
-            lines.append(f"{'  ' * depth}- {n.get('label', '')}")
         lines.append("")
     for i, c in enumerate(data.get("concepts", []), 1):
         lines.append(f"## {i}. {c.get('term', '')}")
@@ -1032,10 +981,11 @@ def main() -> int:
     ap.add_argument("--out", dest="outfile", help="Output file path.")
     ap.add_argument("--format", dest="fmt", choices=["html", "md"], default="html",
                     help="Output format (default html).")
-    ap.add_argument("--theme", dest="theme", choices=["editorial", "swiss"],
-                    default="editorial",
-                    help="Visual theme for HTML output: editorial (warm magazine) "
-                         "or swiss (Swiss International / right angles). Default editorial.")
+    ap.add_argument("--theme", dest="theme", choices=["claude", "editorial", "swiss"],
+                    default="claude",
+                    help="Visual theme for HTML output: claude (Claude Design: warm ivory + "
+                         "clay accent + serif display, default), editorial (warm magazine), "
+                         "or swiss (Swiss International / right angles).")
     args = ap.parse_args()
 
     payload = json.loads(Path(args.infile).read_text(encoding="utf-8"))
