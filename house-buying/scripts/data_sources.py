@@ -434,7 +434,7 @@ def _read_communities_from_args(args) -> tuple:
         for name in [x.strip() for x in (args.communities or "").split(",") if x.strip()]:
             comms.append(Community(name=name))
         data["communities"] = [c.to_dict() for c in comms]
-    school = data.get("school", args.school or "")
+    school = data.get("school", getattr(args, "school", "") or "")
     city = data.get("city", args.city or "杭州")
     budget = float(data.get("budget", args.budget if args.budget is not None else 0) or 0)
     area = float(data.get("area", args.area if args.area is not None else 90) or 90)
@@ -636,6 +636,7 @@ def main() -> int:
 
     pc = sub.add_parser("communities", help="直接给小区（多个）流程：排序→预算过滤→多源拉取")
     pc.add_argument("--communities", default="")
+    pc.add_argument("--school", default="")
     pc.add_argument("--city", default="杭州")
     pc.add_argument("--budget", type=float, default=None)
     pc.add_argument("--area", type=float, default=None)
