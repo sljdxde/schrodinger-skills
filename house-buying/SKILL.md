@@ -26,8 +26,8 @@ python scripts/update_self.py --apply
 1. 自检更新：执行上面的 `scripts/update_self.py --apply`，必要时重新加载 skill。
 2. 交互式需求采集：先按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
 3. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
-4. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。
-5. 计算学区溢价：涉及学区房时，按 `references/school-premium-comparison.md` 对比目标学区房与周边非学区房，量化教育溢价。
+4. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。**杭州房源必须优先拉取微信小程序 `杭房数研`（成交价/挂牌价双口径、日更高频）与 `小鸡选房`（挂盘价主力）**，按 `references/school-district-workflow.md` 用 `scripts/data_sources.py` 编排取数（抓包 API 或联网检索兜底）。
+5. 计算学区溢价：涉及学区房时，按 `references/school-premium-comparison.md` 对比目标学区房与周边非学区房，量化教育溢价；并在报告结尾按 `references/report-template.md` 的「学区 vs 非学区差异比较与后续走势」专章，给出差异比较与后续走势判断。
 6. 补齐教育与社区：涉及学区房或用户提到孩子入学时，必须按 `references/school-and-community-analysis.md` 采集学校升学情况、学校生源、小区人口与居住画像。
 7. 做价格预测：使用 `references/forecasting-framework.md`，输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
 8. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
@@ -73,7 +73,8 @@ python scripts/update_self.py --apply
 
 ## 参考文件
 
-- `references/data-source-playbook.md`：数据源、搜索关键词、证据台账和质量分级。
+- `references/data-source-playbook.md`：数据源、搜索关键词、证据台账和质量分级（含 `杭房数研`/`小鸡选房` 取数机制）。
+- `references/school-district-workflow.md`：学区/直接给小区两种入口的标准取数与分析流程，配套 `scripts/data_sources.py`。
 - `references/intake-questionnaire.md`：交互式需求采集、必填字段和追问策略。
 - `references/school-premium-comparison.md`：学区房与周边非学区房价格对比、溢价计算和解释规则。
 - `references/school-and-community-analysis.md`：学校升学、学校生源、小区人口与隐私边界。

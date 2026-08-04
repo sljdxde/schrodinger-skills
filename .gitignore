@@ -6,3 +6,7 @@ __pycache__/
 *.pyc
 skill-report.html
 .workbuddy/
+# 含抓包登录态(token)的真实数据源配置，禁止提交；模板 sources.example.json 可提交
+house-buying/scripts/sources.json
+*/sources.json
+

@@ -1,0 +1,15 @@
+{
+  "_说明": "微信小程序（杭房数研 / 小鸡选房）是封闭生态，没有公开网页 API。取数做法：在手机上用 mitmproxy / Charles 对微信抓包，拿到小程序调用后端时的 HTTPS 接口 endpoint 与登录态 token，复制本文件为 sources.json 并填入下面的值，data_sources.py 即可脚本化拉取。抓包一次、长期复用。未配置时脚本自动退回「联网检索」模式，生成精确到小程序名的检索式由 AI 代理取数。",
+  "杭房数研": {
+    "endpoint": "https://<抓包得到的杭房数研后端域名>/api/community/detail",
+    "token": "<抓包得到的登录态，如 Authorization: Bearer xxx 中的 xxx>"
+  },
+  "小鸡选房": {
+    "endpoint": "https://<抓包得到的小鸡选房后端域名>/api/search/community",
+    "token": "<抓包得到的登录态>"
+  },
+  "贝壳": {
+    "endpoint": "",
+    "token": ""
+  }
+}
