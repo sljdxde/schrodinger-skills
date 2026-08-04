@@ -4,16 +4,23 @@
 
 用法:
     python3 mtd.py <URL> [-t 线程数(默认16)] [-o 输出文件名]
+                       [--chunk 分块MB(默认5)] [--max-retry 次数(默认5)]
                        [--sha256 HEX] [--no-checksum] [--no-clear-quarantine]
+                       [--resume] [--overwrite] [--single]
 
 特性:
     - 自动探测文件大小与服务器是否支持 Range(分段下载)
-    - 支持分段时用多线程并行下载；不支持、文件过小或大小未知时退回单线程
+    - 多线程「固定小分块 + 高并发 + 块级重试容错」下载：默认把文件切成 5MB 小块，
+      由线程池消费任务队列，每块独立下载、独立重试(默认5次)，单块失败不影响其他块。
+      ——专门解决国产 CDN「单连接限速 + 大块 Range 挂死」问题(见 references/troubleshooting.md)
     - 每个线程使用「原始 URL + curl -L」独立跟随 CDN 重定向，规避带鉴权参数
       的 CDN URL 过期问题（不会把 HTML 错误页当作文件内容写入磁盘）
     - Range 内容非零校验：部分国产 CDN 声称支持 Range 且返回 206，但 body 是全
       零字节。探测阶段实测一块数据，若 >95% 为零则判定该 CDN 的 Range 实现有
       缺陷，自动退化为单线程整文件下载
+    - 断点续传(--resume)：多线程模式下跳过已完成的块(进度记录在 <输出>.mtd-progress)；
+      单线程模式下用 curl -C - 续传循环(--max-time 600 + 自动重连)，专门兜底
+      不稳定 CDN 的断流问题
     - 下载后可选 SHA256 校验（--sha256 比对官方值；默认打印实际 SHA256 供核对）
     - macOS 上下载完成后自动清除 Gatekeeper 隔离标记（com.apple.quarantine），
       避免双击 DMG 报「磁盘映像已损坏」；可用 --no-clear-quarantine 关闭
@@ -25,20 +32,24 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import subprocess
 import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 THREADS = 16
-RETRIES = 3
-PART_THRESHOLD = 4 * 1024 * 1024  # 小于此大小不分段
-RANGE_PROBE_LEN = 16384           # Range 内容非零探测长度
-RANGE_ZERO_RATIO = 0.05           # 非零字节占比低于此值(即 >95% 为零)判定 CDN 缺陷
+CHUNK_MB = 5                         # 多线程固定分块大小(MB)，小分块抗 CDN 限速挂死
+MAX_RETRY = 5                        # 单块重试上限
+PART_THRESHOLD = 4 * 1024 * 1024     # 小于此大小不分段(直接用单线程)
+RANGE_PROBE_LEN = 16384              # Range 内容非零探测长度
+RANGE_ZERO_RATIO = 0.05              # 非零字节占比低于此值(即 >95% 为零)判定 CDN 缺陷
+PROGRESS_SUFFIX = ".mtd-progress"    # 断点续传进度文件后缀
 
 
 def _have_curl() -> bool:
@@ -50,9 +61,9 @@ def _have_xattr() -> bool:
 
 
 class Bar:
-    def __init__(self, total, label=""):
+    def __init__(self, total, label="", initial=0):
         self.total = total
-        self.done = 0
+        self.done = initial
         self.label = label
         self.lock = threading.Lock()
         self.start = time.time()
@@ -97,7 +108,6 @@ def get_remote_info(url):
     返回 (size, supports_range)。探测统一使用原始 URL + -L 跟随重定向，
     避免依赖一次性的 CDN 鉴权 URL。
     """
-    # 跟随重定向，拿最终响应的 content-length 与 accept-ranges
     result = subprocess.run(
         ["curl", "-sIL", "--max-time", "15", "-o", "/dev/null",
          "-w", "SIZE:%header{content-length}\nRANGE:%header{accept-ranges}\nCODE:%{response_code}",
@@ -141,6 +151,12 @@ def _range_content_ok(url, total_size) -> bool:
 
     为降低误判(某些正常文件开头恰好是零区)，优先测试文件「中部」区间；
     文件过小则测试开头。
+
+    双重校验：
+    1) 先用响应头看 Content-Length：若服务器无视 Range、把整文件塞回来，
+       其 Content-Length 会是 total_size 而非请求段长度 → 识别「撒谎 Range」，
+       直接判定不支持分段（否则多线程会把文件头部错写进每个分块）。
+    2) 再下载一小段确认非零（防全零缺陷）。
     """
     if total_size <= 0:
         return True
@@ -149,79 +165,185 @@ def _range_content_ok(url, total_size) -> bool:
     else:
         start = 0
     end = min(start + RANGE_PROBE_LEN, total_size) - 1
+    expected = end - start + 1
+
+    try:
+        head = subprocess.run(
+            ["curl", "-sL", "--max-time", "15", "-D", "-", "-o", "/dev/null",
+             "-r", f"{start}-{end}", url],
+            capture_output=True, text=True, timeout=20)
+    except Exception:
+        return False
+    if head.returncode != 0:
+        return False
+    cl = 0
+    for line in head.stdout.split("\n"):
+        if line.lower().startswith("content-length:"):
+            try:
+                cl = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                pass
+    if cl > expected * 2:
+        return False
+
     try:
         proc = subprocess.run(
             ["curl", "-sLf", "--max-time", "15", "-r", f"{start}-{end}", url],
             capture_output=True, timeout=20)
     except Exception:
         return False
-    if proc.returncode != 0:
+    if proc.returncode != 0 or not proc.stdout:
         return False
-    data = proc.stdout
-    if not data:
+    if len(proc.stdout) > expected * 4:
         return False
-    non_zero = sum(1 for b in data if b != 0)
-    return non_zero >= len(data) * RANGE_ZERO_RATIO
+    non_zero = sum(1 for b in proc.stdout if b != 0)
+    return non_zero >= len(proc.stdout) * RANGE_ZERO_RATIO
 
 
-def download_part(url, start, end, part_id, fd, bar, errors):
-    """下载 [start, end) 区间。
+def _download_block(url, start, end, fd, max_retry):
+    """下载单个固定小块 [start, end]，块内独立重试，成功返回 True。
 
-    关键稳健性: 无论服务器是否真的遵守 Range，本函数都只把属于自己区间的数据
-    写入 fd（用 os.pwrite 按绝对偏移写），并丢弃区间外的多余数据，避免越界覆盖
-    其它线程的分块。
-
-    每个线程使用原始 URL + -L 独立跟随 CDN 重定向（不共用一次性鉴权 URL），
-    并带 -f 使 HTTP 错误(>=400)时返回非 0 退出码，避免把错误页当作文件数据。
+    关键稳健性:
+    - 每个块都用「原始 URL + curl -Lf」独立重定向，规避 CDN 鉴权 URL 过期。
+    - 精确读取本块字节数(need)，用 os.pwrite 按绝对偏移写，排空多余的响应体，
+      避免越界覆盖其它块。
+    - 探测阶段已校验非全零，流式写入安全；重试时重新整块覆盖同一偏移即可。
     """
-    remaining = end - start
-    for attempt in range(RETRIES):
+    need = end - start + 1
+    for attempt in range(max_retry):
         try:
             proc = subprocess.Popen(
-                ["curl", "-sLf", "--max-time", "60", "-r", f"{start}-{end - 1}", url],
+                ["curl", "-sLf", "--max-time", "60", "-r", f"{start}-{end}", url],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-
             pos = start
-            while remaining > 0:
-                chunk = proc.stdout.read(min(65536, remaining))
-                if not chunk:
+            got = 0
+            while got < need:
+                buf = proc.stdout.read(min(65536, need - got))
+                if not buf:
                     break
-                os.pwrite(fd, chunk, pos)
-                pos += len(chunk)
-                remaining -= len(chunk)
-                bar.add(len(chunk))
-
-            # 排空剩余数据（若服务器无视 Range 返回了超出本区间的内容）
+                os.pwrite(fd, buf, pos)
+                pos += len(buf)
+                got += len(buf)
+            # 排空剩余数据（若服务器无视 Range 返回了超出本块的内容）
             while proc.stdout.read(65536):
                 pass
-
             ret = proc.wait()
-            if ret == 0 and remaining == 0:
+            if ret == 0 and got == need:
                 return True
-            if attempt < RETRIES - 1:
-                time.sleep(1 + attempt)
-                continue
-            errors.append(f"  分块{part_id} 重试{RETRIES}次仍失败 (ret={ret}, 缺{remaining}字节)")
-            return False
-        except Exception as e:
-            if attempt < RETRIES - 1:
-                time.sleep(1 + attempt)
-                continue
-            errors.append(f"  分块{part_id} 异常: {e}")
-            return False
+        except Exception:
+            pass
+        # 指数退避后重试（覆盖重下同一偏移，安全）
+        time.sleep(min(2 ** attempt, 8))
     return False
 
 
-def _download_single(url, out_path, total_size):
-    """单线程流式下载，兼容已知大小与未知大小（total_size==0）。
+def _save_progress(progress_file: Path, done_set, total_chunks):
+    """原子写入已完成块集合，供断点续传恢复。"""
+    try:
+        tmp = progress_file.parent / (progress_file.name + ".tmp")
+        tmp.write_text(json.dumps({"total": total_chunks, "done": sorted(done_set)}))
+        os.replace(tmp, progress_file)
+    except Exception:
+        pass
 
-    带 -f: CDN 返回错误页时 curl 非 0 退出，不会把错误页当作文件内容。
-    """
-    sys.stderr.write("  单线程下载...\n")
-    bar = Bar(total_size, out_path.name)
+
+def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, resume):
+    """多线程固定小分块下载 + 块级重试容错 + 断点续传。"""
+    chunks = []
+    pos = 0
+    cid = 0
+    while pos < total_size:
+        end = min(pos + chunk_size, total_size) - 1
+        chunks.append((cid, pos, end))
+        pos = end + 1
+        cid += 1
+    total_chunks = len(chunks)
+    sys.stderr.write(
+        f"  多线程小分块下载: {total_chunks} 块 × {chunk_size/1024/1024:.0f}MB, 并发 {threads}\n")
+
+    # 预分配：resume 且文件已存在时保留已完成数据（用 r+b），
+    # 否则新建并清空（wb）。注意 "wb" 会截断已有内容，续传时绝不能用。
+    if resume and out_path.exists():
+        f = open(out_path, "r+b")
+    else:
+        f = open(out_path, "wb")
+    with f:
+        f.truncate(total_size)
+    fd = os.open(str(out_path), os.O_WRONLY)
+
+    progress_file = out_path.with_name(out_path.name + PROGRESS_SUFFIX)
+    done: set = set()
+    if resume and progress_file.exists():
+        try:
+            j = json.loads(progress_file.read_text())
+            if j.get("total") == total_chunks:
+                done = set(j.get("done", []))
+        except Exception:
+            done = set()
+    elif progress_file.exists():
+        try:
+            progress_file.unlink()
+        except OSError:
+            pass
+
+    done_bytes = sum(e - s + 1 for (_, s, e) in chunks if _ in done)
+    bar = Bar(total_size, out_path.name, initial=done_bytes)
     printer = threading.Thread(target=bar.print_thread, daemon=True)
     printer.start()
 
+    errors = []
+    prog_lock = threading.Lock()
+    try:
+        with ThreadPoolExecutor(max_workers=threads) as pool:
+            futures = {}
+            for cid, s, e in chunks:
+                if cid in done:
+                    continue
+                futures[pool.submit(_download_block, url, s, e, fd, max_retry)] = (cid, s, e)
+            for fut in as_completed(futures):
+                cid, s, e = futures[fut]
+                if fut.result():
+                    bar.add(e - s + 1)
+                    with prog_lock:
+                        done.add(cid)
+                        _save_progress(progress_file, done, total_chunks)
+                else:
+                    errors.append(f"  分块{cid}({s}-{e}) 重试{max_retry}次仍失败")
+    finally:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        bar.alive = False
+        printer.join(timeout=1)
+
+    if errors:
+        for e in errors:
+            sys.stderr.write(e + "\n")
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
+        try:
+            progress_file.unlink()
+        except OSError:
+            pass
+        sys.stderr.write("  下载未完成，已删除不完整的文件\n")
+        return False
+
+    try:
+        progress_file.unlink()
+    except OSError:
+        pass
+    if out_path.stat().st_size != total_size:
+        sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
+        return False
+    sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
+    return True
+
+
+def _curl_stream(url, out_path, total_size, bar):
+    """单线程流式下载（从头），带 -f 防止错误页写入。"""
     proc = subprocess.Popen(["curl", "-sLf", "--max-time", "600", url],
                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
     ok = True
@@ -242,80 +364,66 @@ def _download_single(url, out_path, total_size):
         sys.stderr.write(f"  ⚠ 单线程下载异常: {e}\n")
     finally:
         bar.alive = False
-        printer.join(timeout=1)
-
     if ok and total_size > 0 and out_path.stat().st_size != total_size:
         ok = False
         sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
-
     if not ok:
         try:
             out_path.unlink()
-            sys.stderr.write("  下载未完成，已删除不完整的文件\n")
         except OSError:
             pass
-        return False
-
-    sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
-    return True
+        sys.stderr.write("  下载未完成，已删除不完整的文件\n")
+    return ok
 
 
-def _download_multi(url, out_path, total_size, threads):
-    """多线程分段下载，最后校验大小并清理失败残留。"""
-    part_size = (total_size + threads - 1) // threads
-    parts = []
-    for i in range(threads):
-        start = i * part_size
-        end = min(start + part_size, total_size)
-        if start < total_size:
-            parts.append((start, end))
-    sys.stderr.write(f"  启动 {len(parts)} 个线程(多线程分段下载)...\n")
+def _download_single(url, out_path, total_size, resume, bar):
+    """单线程路径：不支持 Range / 文件过小 / 未知大小 / 强制单线程。
 
-    # 预分配文件
-    with open(out_path, "wb") as f:
-        f.truncate(total_size)
-
-    fd = os.open(str(out_path), os.O_WRONLY)
-    errors = []
-    try:
-        bar = Bar(total_size, out_path.name)
-        printer = threading.Thread(target=bar.print_thread, daemon=True)
-        printer.start()
-
-        workers = []
-        for i, (start, end) in enumerate(parts):
-            t = threading.Thread(
-                target=download_part, args=(url, start, end, i, fd, bar, errors))
-            t.start()
-            workers.append(t)
-
-        for t in workers:
-            t.join()
-
-        bar.alive = False
-        printer.join(timeout=1)
-    finally:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-
-    if errors:
-        for e in errors:
-            sys.stderr.write(f"{e}\n")
-        try:
-            out_path.unlink()
-            sys.stderr.write("  下载未完成，已删除不完整的文件\n")
-        except OSError:
-            pass
-        return False
-
-    if out_path.stat().st_size != total_size:
-        sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
-        return False
-
-    sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
-    return True
+    支持 --resume 续传循环（curl -C - + --max-time 600 + 自动重连）。
+    """
+    if resume:
+        attempt = 0
+        while True:
+            attempt += 1
+            cur = out_path.stat().st_size if out_path.exists() else 0
+            if total_size and cur >= total_size:
+                bar.done = cur
+                break
+            sys.stderr.write(
+                f"  [第{attempt}次续传] {cur/1024/1024:.0f}MB"
+                + (f"/{total_size/1024/1024:.0f}MB" if total_size else "")
+                + "\n")
+            ret = subprocess.run(
+                ["curl", "-sL", "--max-time", "600", "--connect-timeout", "30",
+                 "-C", "-", "-o", str(out_path), url],
+                capture_output=True).returncode
+            new = out_path.stat().st_size if out_path.exists() else 0
+            bar.done = new
+            if total_size:
+                if new >= total_size:
+                    break
+            else:
+                if ret == 0:
+                    break
+            if ret != 0 and new <= cur:
+                time.sleep(3)
+        ok = (total_size == 0) or (out_path.stat().st_size == total_size)
+        if not ok:
+            try:
+                out_path.unlink()
+            except OSError:
+                pass
+            sys.stderr.write("  续传未完成，已删除文件\n")
+        return ok
+    else:
+        # 从头下载（若已存在则覆盖）
+        if out_path.exists():
+            try:
+                out_path.unlink()
+            except OSError:
+                pass
+        sys.stderr.write("  单线程下载...\n")
+        return _curl_stream(url, out_path, total_size, bar)
 
 
 def compute_sha256(path: Path) -> str:
@@ -339,9 +447,10 @@ def clear_quarantine(path: Path) -> None:
         pass
 
 
-def download(url, out_name=None, threads=THREADS,
-             expected_sha256=None, compute_checksum=True,
-             clear_quarantine_flag=True):
+def download(url, out_name=None, threads=THREADS, chunk_mb=CHUNK_MB,
+             max_retry=MAX_RETRY, expected_sha256=None, compute_checksum=True,
+             clear_quarantine_flag=True, resume=False, overwrite=False,
+             force_single=False):
     if not _have_curl():
         sys.stderr.write("❌ 未找到 curl，无法下载（需要系统自带 curl）\n")
         return False
@@ -365,16 +474,46 @@ def download(url, out_name=None, threads=THREADS,
     out_path = Path(out_name).resolve()
     sys.stderr.write(f"  输出: {out_path}\n")
 
-    # 3. 多线程 or 单线程
-    if total_size > 0 and supports_range and total_size > PART_THRESHOLD:
-        ok = _download_multi(url, out_path, total_size, threads)
+    # 3. 已存在文件策略
+    progress_file = out_path.with_name(out_path.name + PROGRESS_SUFFIX)
+    if out_path.exists():
+        if overwrite:
+            try:
+                out_path.unlink()
+            except OSError:
+                pass
+            try:
+                progress_file.unlink()
+            except OSError:
+                pass
+        elif resume:
+            pass  # 保留文件，进入续传逻辑
+        else:
+            sys.stderr.write(
+                f"❌ 输出文件已存在: {out_path}\n"
+                f"   使用 --resume 断点续传，或 --overwrite 覆盖\n")
+            return False
+
+    # 4. 多线程 or 单线程
+    use_multi = (total_size > 0 and supports_range
+                 and total_size > PART_THRESHOLD and not force_single)
+    if use_multi:
+        ok = _download_multi(url, out_path, total_size, threads,
+                             chunk_mb * 1024 * 1024, max_retry, resume)
     else:
-        ok = _download_single(url, out_path, total_size)
+        bar = Bar(total_size, out_path.name)
+        printer = threading.Thread(target=bar.print_thread, daemon=True)
+        printer.start()
+        try:
+            ok = _download_single(url, out_path, total_size, resume, bar)
+        finally:
+            bar.alive = False
+            printer.join(timeout=1)
 
     if not ok:
         return False
 
-    # 4. SHA256 校验
+    # 5. SHA256 校验
     if compute_checksum:
         sys.stderr.write("  计算 SHA256... ")
         actual = compute_sha256(out_path)
@@ -386,7 +525,7 @@ def download(url, out_name=None, threads=THREADS,
                 sys.stderr.write("  ❌ SHA256 不匹配！文件可能损坏，已保留文件供排查\n")
                 return False
 
-    # 5. macOS 清除隔离标记
+    # 6. macOS 清除隔离标记
     if clear_quarantine_flag:
         clear_quarantine(out_path)
 
@@ -399,9 +538,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("url", help="下载地址")
     parser.add_argument("-t", "--threads", type=int, default=THREADS,
-                        help=f"线程数 (默认 {THREADS})")
+                        help=f"并发数 (默认 {THREADS})")
     parser.add_argument("-o", "--output", default=None,
                         help="输出文件名 (默认从 URL 推断)")
+    parser.add_argument("--chunk", type=int, default=CHUNK_MB,
+                        help=f"多线程固定分块大小 MB (默认 {CHUNK_MB})，"
+                             f"小分块抗 CDN 限速挂死")
+    parser.add_argument("--max-retry", type=int, default=MAX_RETRY,
+                        help=f"单块重试上限 (默认 {MAX_RETRY})")
+    parser.add_argument("--single", action="store_true",
+                        help="强制单线程下载")
+    parser.add_argument("--resume", action="store_true",
+                        help="断点续传（多线程跳过已完成块 / 单线程 curl -C - 续传循环）")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="覆盖已存在的输出文件")
     parser.add_argument("--sha256", default=None,
                         help="官方 SHA256 值，下载后自动比对")
     parser.add_argument("--no-checksum", action="store_true",
@@ -410,10 +560,12 @@ def main():
                         help="macOS 上下载后不清除 Gatekeeper 隔离标记")
     args = parser.parse_args()
 
-    ok = download(args.url, args.output, args.threads,
-                  expected_sha256=args.sha256,
+    ok = download(args.url, args.output, args.threads, args.chunk,
+                  args.max_retry, expected_sha256=args.sha256,
                   compute_checksum=not args.no_checksum,
-                  clear_quarantine_flag=not args.no_clear_quarantine)
+                  clear_quarantine_flag=not args.no_clear_quarantine,
+                  resume=args.resume, overwrite=args.overwrite,
+                  force_single=args.single)
     sys.exit(0 if ok else 1)
 
 
