@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-3-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-4-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -34,6 +34,7 @@
 | [House Buying](./house-buying) | 中国住宅购房尽调与决策分析，覆盖成交、学区溢价、升学、生源、小区人口和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
+| [MTD Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
 
 ---
 
@@ -136,6 +137,40 @@ Agent 会先抽取概念，再逐步生成卡片、故事、脑图、自测和�
 **自动更新：**
 - 使用前运行 `python scripts/update_self.py --apply`
 - 自动检查并同步 GitHub 上的 `memory-forge` skill 目录
+
+### [MTD Download](./mtd-download)
+
+基于系统 `curl` 的多线程下载工具。把一个大文件按字节区间切成多段并行下载，服务器支持 `Range` 时显著提速；不支持、文件过小或拿不到大小时自动退回单线程流式下载。纯标准库 + 系统 `curl`，不需要 `pip install` 任何依赖。
+
+**核心能力：**
+- 自动探测文件大小与服务器 `Range` 支持，能分段且文件 > 4MB 才开多线程
+- 多线程用 `os.pwrite` 按绝对偏移写，区间互不越界，服务器无视 Range 也只保留本段
+- 单线程回退：不支持 Range / 文件 ≤ 4MB / 拿不到大小都能下
+- 实时进度条（进度 / 已下 / 速度 / ETA），输出走 stderr 不污染 stdout
+- 分块失败自动重试 3 次；整体失败清理不完整的输出文件，不留损坏文件
+- 退出码成功 `0`、失败 `1`，方便脚本判断
+
+**使用方式：**
+
+对 Agent 说：
+```
+用 mtd-download 下载这个大文件：https://example.com/big-file.iso
+```
+
+或直接运行：
+```bash
+# 默认 16 线程，自动从 URL 推断文件名
+python scripts/mtd.py <URL>
+
+# 指定线程数与输出名
+python scripts/mtd.py <URL> -t 32 -o myfile.iso
+```
+
+Agent 会先运行探测，再按策略完成下载并报告结果。
+
+**自动更新：**
+- 使用前运行 `python scripts/update_self.py --apply`
+- 自动检查并同步 GitHub 上的 `mtd-download` skill 目录
 
 ---
 

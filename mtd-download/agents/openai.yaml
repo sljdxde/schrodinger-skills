@@ -1,0 +1,4 @@
+interface:
+  display_name: "MTD Download"
+  short_description: "多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示"
+  default_prompt: "Use $mtd-download to download a large file with multi-threaded range requests when a single connection is too slow."

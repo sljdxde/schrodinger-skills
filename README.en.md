@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-3-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-4-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -36,6 +36,7 @@ The self-update helper requires `python`; npm-backed skills such as Skills Docto
 | [House Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
+| [MTD Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
 
 ---
 
@@ -137,6 +138,40 @@ The Agent extracts concepts, then progressively generates cards, stories, a mind
 **Auto-update:**
 - Run `python scripts/update_self.py --apply` before use
 - Checks and syncs the latest `memory-forge` skill folder from GitHub
+
+### [MTD Download](./mtd-download)
+
+A multi-threaded download tool built on the system `curl`. It splits a large file into byte-range chunks downloaded in parallel — much faster when the server supports `Range`. When Range is unsupported, the file is small, or the size is unknown, it falls back to single-threaded streaming. Pure standard library plus system `curl`; no `pip install` needed.
+
+**Key Features:**
+- Auto-detects file size and server `Range` support; multi-threaded only when Range works and file > 4MB
+- Multi-threaded writes use `os.pwrite` at absolute offsets so chunks never overlap; even if the server ignores Range, only this chunk's bytes are kept
+- Single-threaded fallback: works without Range, for files ≤ 4MB, or when size is unknown
+- Live progress bar (percent / downloaded / speed / ETA), all on stderr so stdout stays clean
+- Per-chunk retry (3 tries); on overall failure the incomplete output is removed instead of left behind
+- Exit code `0` on success, `1` on failure, for easy scripting
+
+**Usage:**
+
+Tell your Agent:
+```
+Use mtd-download to download this large file: https://example.com/big-file.iso
+```
+
+Or run directly:
+```bash
+# default 16 threads, filename inferred from the URL
+python scripts/mtd.py <URL>
+
+# specify thread count and output name
+python scripts/mtd.py <URL> -t 32 -o myfile.iso
+```
+
+The Agent probes first, then downloads with the right strategy and reports the result.
+
+**Auto-update:**
+- Run `python scripts/update_self.py --apply` before use
+- Checks and syncs the latest `mtd-download` skill folder from GitHub
 
 ---
 
