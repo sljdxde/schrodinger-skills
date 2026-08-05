@@ -25,7 +25,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 Skills in this repository that provide self-update support can compare their local folder with the latest GitHub copy, back up and sync themselves when needed, and update backing tool packages when the skill depends on one. Bundles also provide an explicit installation entry point.
 
-The self-update helper requires `python`; npm-backed skills such as Skills Doctor also require `npm` for package updates.
+The self-update helper requires `python`; npm-backed skills such as Skills-Doctor also require `npm` for package updates.
 
 ---
 
@@ -33,11 +33,11 @@ The self-update helper requires `python`; npm-backed skills such as Skills Docto
 
 | Name | One-liner | Link |
 |---|---|---|
-| [House Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
-| [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
-| [Memory Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
-| [MTD Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
-| [Personal Knowledge Base](./personal-knowledge-base) | A Codex + Obsidian + `ob` CLI bundle for local personal knowledge management, including `ob-llm-wiki` and `ob` | [README.md](./personal-knowledge-base/README.md) |
+| [House-Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
+| [Skills-Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
+| [Memory-Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
+| [MTD-Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
+| [Personal-Knowledge-Base](./personal-knowledge-base) | A Codex + Obsidian + `ob` CLI bundle for local personal knowledge management, including `ob-llm-wiki` and `ob` | [README.md](./personal-knowledge-base/README.md) |
 
 ---
 
@@ -61,7 +61,7 @@ Install the complete personal-knowledge-base bundle from schrodinger-skills, inc
 
 ## Skills
 
-### [House Buying](./house-buying)
+### [House-Buying](./house-buying)
 
 Due diligence and decision support for Chinese residential property purchases. It is designed for target communities, school-district homes, area comparisons, and buy/watch decisions, with explicit evidence tracking for transaction prices, listings, school-premium comparisons, admissions policy, student sources, community demographics, and city fundamentals.
 
@@ -86,7 +86,7 @@ The Agent will verify public data first, then produce an evidence-backed report 
 - Run `python scripts/update_self.py --apply` before use
 - Checks and syncs the latest `house-buying` skill folder from GitHub
 
-### [Skills Doctor](./skills-doctor)
+### [Skills-Doctor](./skills-doctor)
 
 Diagnose and govern local AI Agent Skills. Supports Claude Code, Codex, Cursor, OpenCode and more. Detects risks, conflicts, duplicates, zombies and generates fix suggestions.
 
@@ -114,7 +114,7 @@ Detect zombie skills
 - Checks and syncs the latest `skills-doctor` skill folder from GitHub
 - Checks and updates the `agent-skill-doctor` npm package to the latest version
 
-### [Memory Forge](./memory-forge)
+### [Memory-Forge](./memory-forge)
 
 Forge any study material (pasted text, `.txt` / `.md` / `.docx` / `.pdf`) into something easy to understand and remember. It uses memory science to break knowledge into small cards, paired with stories / analogies / complementary visuals, quizzes, and a review schedule — because brains remember pictures and stories far better than raw text.
 
@@ -146,7 +146,7 @@ The Agent extracts concepts, then progressively generates cards, stories, a mind
 - Run `python scripts/update_self.py --apply` before use
 - Checks and syncs the latest `memory-forge` skill folder from GitHub
 
-### [Personal Knowledge Base](./personal-knowledge-base)
+### [Personal-Knowledge-Base](./personal-knowledge-base)
 
 A local knowledge-base bundle designed specifically for **Codex + Obsidian + the `ob` CLI**. Codex interprets requests, keeps reads narrow, extracts reusable conclusions, and maintains indexes; `ob` is the vault read/write boundary; Obsidian remains the human-facing browsing and review surface.
 
@@ -173,7 +173,7 @@ Install both ob-llm-wiki and ob.
 
 See [personal-knowledge-base/README.md](./personal-knowledge-base/README.md) for the full capability description, layout, and examples.
 
-### [MTD Download](./mtd-download)
+### [MTD-Download](./mtd-download)
 
 A multi-threaded download tool built on the system `curl`. It splits a large file into byte-range chunks downloaded in parallel — much faster when the server supports `Range`. When Range is unsupported, the file is small, or the size is unknown, it falls back to single-threaded streaming. Pure standard library plus system `curl`; no `pip install` needed.
 

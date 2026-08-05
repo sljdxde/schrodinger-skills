@@ -23,7 +23,7 @@
 
 本仓库中提供自检更新机制的 skill 会在运行时检查 GitHub 上对应目录是否更新，必要时备份并同步本地 skill；带外部工具依赖的 skill 还会检查对应工具包版本。组合包会额外提供明确的安装入口。
 
-自检更新需要本机可运行 `python`；`Skills Doctor` 的 npm 包自动更新还需要本机可运行 `npm`。
+自检更新需要本机可运行 `python`；`Skills-Doctor` 的 npm 包自动更新还需要本机可运行 `npm`。
 
 ---
 
@@ -31,11 +31,11 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
-| [House Buying](./house-buying) | 中国住宅购房尽调与决策分析，覆盖成交、学区溢价、升学、生源、小区人口和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
-| [Skills Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
-| [Memory Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
-| [MTD Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
-| [Personal Knowledge Base](./personal-knowledge-base) | Codex + Obsidian + `ob` CLI 的本地个人知识库组合包，包含 `ob-llm-wiki` 与 `ob` 两个 skill | [README.md](./personal-knowledge-base/README.md) |
+| [House-Buying](./house-buying) | 中国住宅购房尽调与决策分析，覆盖成交、学区溢价、升学、生源、小区人口和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
+| [Skills-Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
+| [Memory-Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
+| [MTD-Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
+| [Personal-Knowledge-Base](./personal-knowledge-base) | Codex + Obsidian + `ob` CLI 的本地个人知识库组合包，包含 `ob-llm-wiki` 与 `ob` 两个 skill | [README.md](./personal-knowledge-base/README.md) |
 
 ---
 
@@ -59,7 +59,7 @@
 
 ## Skills
 
-### [House Buying](./house-buying)
+### [House-Buying](./house-buying)
 
 中国住宅购房尽调和决策分析工具。适合评估具体楼盘、学区房、片区对比和买入时机，要求联网核验成交、挂牌、学校、政策、升学、生源、小区人口、学区溢价与城市基本面数据。
 
@@ -84,7 +84,7 @@ Agent 会先核验公开数据，再输出证据台账、风险评估、横向�
 - 使用前运行 `python scripts/update_self.py --apply`
 - 自动检查并同步 GitHub 上的 `house-buying` skill 目录
 
-### [Skills Doctor](./skills-doctor)
+### [Skills-Doctor](./skills-doctor)
 
 诊断和治理本地 AI Agent Skills 的工具。支持 Claude Code、Codex、Cursor、OpenCode 等多种生态，检测风险、冲突、重复、僵尸等问题并生成修复建议。
 
@@ -112,7 +112,7 @@ Agent 会自动运行诊断、生成报告、输出修复计划。也可以指�
 - 自动检查并同步 GitHub 上的 `skills-doctor` skill 目录
 - 自动检查并更新 `agent-skill-doctor` npm 包到最新版
 
-### [Memory Forge](./memory-forge)
+### [Memory-Forge](./memory-forge)
 
 把任意学习材料（粘贴文字、`.txt` / `.md` / `.docx` / `.pdf`）重新锻造成好懂好记的东西。用记忆科学把知识点拆成一张张小卡片，配故事 / 类比 / 互补图示、出测验、排复习计划——因为人脑对纯文字记忆很烂，对画面和故事好得多。
 
@@ -145,7 +145,7 @@ Agent 会先抽取概念，再逐步生成卡片、故事、脑图、自测和�
 - 使用前运行 `python scripts/update_self.py --apply`
 - 自动检查并同步 GitHub 上的 `memory-forge` skill 目录
 
-### [Personal Knowledge Base](./personal-knowledge-base)
+### [Personal-Knowledge-Base](./personal-knowledge-base)
 
 面向 **Codex + Obsidian + 本地 `ob` CLI** 的个人知识库组合包。Codex 负责理解问题、选择最小读取范围、提炼可复用结论和维护索引；`ob` 负责把所有读写限制在当前 Obsidian vault；Obsidian 负责人工浏览、链接导航和最终确认。
 
@@ -172,7 +172,7 @@ https://github.com/sljdxde/schrodinger-skills/tree/main/personal-knowledge-base
 
 更完整的能力说明、目录结构和使用示例见 [personal-knowledge-base/README.md](./personal-knowledge-base/README.md)。
 
-### [MTD Download](./mtd-download)
+### [MTD-Download](./mtd-download)
 
 基于系统 `curl` 的多线程下载工具。把一个大文件按字节区间切成多段并行下载，服务器支持 `Range` 时显著提速；不支持、文件过小或拿不到大小时自动退回单线程流式下载。纯标准库 + 系统 `curl`，不需要 `pip install` 任何依赖。
 
