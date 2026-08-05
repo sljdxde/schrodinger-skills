@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-4-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-6-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -23,7 +23,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 *Note for English readers: This project originated in the Chinese AI community. Contributions and translations are welcome.*
 
-Every skill in this repository includes a pre-use self-update check. Before running, the skill can compare its local folder with the latest GitHub copy, back up and sync itself when needed, and update backing tool packages when the skill depends on one.
+Skills in this repository that provide self-update support can compare their local folder with the latest GitHub copy, back up and sync themselves when needed, and update backing tool packages when the skill depends on one. Bundles also provide an explicit installation entry point.
 
 The self-update helper requires `python`; npm-backed skills such as Skills Doctor also require `npm` for package updates.
 
@@ -37,6 +37,7 @@ The self-update helper requires `python`; npm-backed skills such as Skills Docto
 | [Skills Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
+| [Personal Knowledge Base](./personal-knowledge-base) | A Codex + Obsidian + `ob` CLI bundle for local personal knowledge management, including `ob-llm-wiki` and `ob` | [README.md](./personal-knowledge-base/README.md) |
 
 ---
 
@@ -49,6 +50,12 @@ Install this skill: https://github.com/sljdxde/schrodinger-skills/tree/main/<ski
 ```
 
 Replace `<skill-name>` with the one you want. The Agent will clone it to the right directory automatically.
+
+The personal knowledge base is a bundle. Install the whole directory and explicitly ask the Agent to install both components:
+
+```
+Install the complete personal-knowledge-base bundle from schrodinger-skills, including ob-llm-wiki and ob. Do not install only one component.
+```
 
 ---
 
@@ -138,6 +145,33 @@ The Agent extracts concepts, then progressively generates cards, stories, a mind
 **Auto-update:**
 - Run `python scripts/update_self.py --apply` before use
 - Checks and syncs the latest `memory-forge` skill folder from GitHub
+
+### [Personal Knowledge Base](./personal-knowledge-base)
+
+A local knowledge-base bundle designed specifically for **Codex + Obsidian + the `ob` CLI**. Codex interprets requests, keeps reads narrow, extracts reusable conclusions, and maintains indexes; `ob` is the vault read/write boundary; Obsidian remains the human-facing browsing and review surface.
+
+**The bundle contains two skills that should be installed together:**
+- `ob-llm-wiki`: session startup, querying, ingest, structuring, auditing, and conversation archiving
+- `ob`: vault checks, resolution, listing, reading, searching, writing, moving, and deleting
+
+**It can:**
+- Query existing notes by scope, tags, directories, and keywords while reading only what is needed
+- Store conclusions and source material under `raw/`, `concepts/`, `entities/`, `comparisons/`, and `queries/`
+- Maintain `index.md`, `log.md`, wikilinks, and `#个人` / `#工作` scope tags
+- Audit missing directories, broken links, stranded notes, index drift, and tag conflicts
+- Refuse to guess between multiple vaults and minimize sensitive reads and outputs
+
+**Install:**
+
+Tell your Agent:
+
+```
+Install this directory as a bundle:
+https://github.com/sljdxde/schrodinger-skills/tree/main/personal-knowledge-base
+Install both ob-llm-wiki and ob.
+```
+
+See [personal-knowledge-base/README.md](./personal-knowledge-base/README.md) for the full capability description, layout, and examples.
 
 ### [MTD Download](./mtd-download)
 

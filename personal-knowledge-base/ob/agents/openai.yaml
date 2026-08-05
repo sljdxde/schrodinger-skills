@@ -1,0 +1,5 @@
+interface:
+  display_name: "Obsidian Vault Operator"
+  short_description: "通过 ob CLI 安全操作本地 Obsidian vault"
+  default_prompt: "Use $ob to inspect or modify my configured local Obsidian vault, keeping all paths inside the resolved vault."
+

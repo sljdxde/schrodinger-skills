@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex + Ob Wiki"
+  short_description: "用 Codex + Obsidian + ob CLI 管理本地个人知识库"
+  default_prompt: "Use $ob-llm-wiki with the companion $ob skill to query, ingest, structure, audit, and archive my local Obsidian knowledge base."

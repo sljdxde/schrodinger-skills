@@ -1,0 +1,9 @@
+name: personal-knowledge-base
+display_name: Codex + Ob Personal Knowledge Base
+version: 0.1.0
+description: A bundled Codex workflow for maintaining a local Obsidian vault through the ob CLI.
+components:
+  required:
+    - ob-llm-wiki
+    - ob
+install_prompt: Install both ob-llm-wiki and ob from this directory as one bundle.

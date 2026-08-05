@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-4-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-6-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -21,7 +21,7 @@
 
 安装方式很简单——对 Agent 说一句话就行，不用操心路径和配置。
 
-本仓库的 skill 都内置使用前自检更新机制：运行时会先检查 GitHub 上对应 skill 目录是否更新，必要时备份并同步本地 skill；带外部工具依赖的 skill 还会检查对应工具包版本。
+本仓库中提供自检更新机制的 skill 会在运行时检查 GitHub 上对应目录是否更新，必要时备份并同步本地 skill；带外部工具依赖的 skill 还会检查对应工具包版本。组合包会额外提供明确的安装入口。
 
 自检更新需要本机可运行 `python`；`Skills Doctor` 的 npm 包自动更新还需要本机可运行 `npm`。
 
@@ -35,6 +35,7 @@
 | [Skills Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
+| [Personal Knowledge Base](./personal-knowledge-base) | Codex + Obsidian + `ob` CLI 的本地个人知识库组合包，包含 `ob-llm-wiki` 与 `ob` 两个 skill | [README.md](./personal-knowledge-base/README.md) |
 
 ---
 
@@ -47,6 +48,12 @@
 ```
 
 把 `<skill-name>` 换成你想装的那个。Agent 会自己 clone 到对应目录，不用你操心路径。
+
+个人知识库是组合包，安装时要把整个目录交给 Agent，并明确要求同时安装两个组件：
+
+```
+请安装 schrodinger-skills 的 personal-knowledge-base 整套能力，包含 ob-llm-wiki 和 ob；不要只安装其中一个目录。
+```
 
 ---
 
@@ -137,6 +144,33 @@ Agent 会先抽取概念，再逐步生成卡片、故事、脑图、自测和�
 **自动更新：**
 - 使用前运行 `python scripts/update_self.py --apply`
 - 自动检查并同步 GitHub 上的 `memory-forge` skill 目录
+
+### [Personal Knowledge Base](./personal-knowledge-base)
+
+面向 **Codex + Obsidian + 本地 `ob` CLI** 的个人知识库组合包。Codex 负责理解问题、选择最小读取范围、提炼可复用结论和维护索引；`ob` 负责把所有读写限制在当前 Obsidian vault；Obsidian 负责人工浏览、链接导航和最终确认。
+
+**包含两个需要一起安装的 skill：**
+- `ob-llm-wiki`：知识库启动、检索、摄取、结构化、审计和对话归档
+- `ob`：vault 检查、定位、列目录、读取、搜索、写入、移动和删除
+
+**能做到：**
+- 从个人/工作范围、标签和目录中检索已有知识，只读取必要笔记
+- 把对话结论、资料和研究结果沉淀到 `raw/`、`concepts/`、`entities/`、`comparisons/`、`queries/`
+- 自动维护 `index.md`、`log.md`、wikilink 和 `#个人` / `#工作` 范围标签
+- 审计缺目录、断链、孤立笔记、索引漂移和标签冲突
+- 在多个 vault 存在时先确认，不猜错目标库；对敏感内容执行最小读取和最小输出
+
+**安装方式：**
+
+对 Agent 说：
+
+```
+请把这个目录作为一个组合包安装：
+https://github.com/sljdxde/schrodinger-skills/tree/main/personal-knowledge-base
+需要同时安装其中的 ob-llm-wiki 和 ob 两个 skill。
+```
+
+更完整的能力说明、目录结构和使用示例见 [personal-knowledge-base/README.md](./personal-knowledge-base/README.md)。
 
 ### [MTD Download](./mtd-download)
 
