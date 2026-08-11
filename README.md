@@ -172,6 +172,11 @@ https://github.com/sljdxde/schrodinger-skills/tree/main/personal-knowledge-base
 
 更完整的能力说明、目录结构和使用示例见 [personal-knowledge-base/README.md](./personal-knowledge-base/README.md)。
 
+**自动更新：**
+- 若采用「整体复制组合包目录」方式安装，使用前运行 `python scripts/update_self.py --apply`
+- 自动检查并同步 GitHub 上的 `personal-knowledge-base` 组合包目录（含 `ob-llm-wiki` 与 `ob` 两个子 skill）
+- 若采用 `install_bundle.py` 分别安装子 skill，重新运行 `python scripts/install_bundle.py --replace` 即可更新
+
 ### [MTD-Download](./mtd-download)
 
 基于系统 `curl` 的多线程下载工具。把一个大文件按字节区间切成多段并行下载，服务器支持 `Range` 时显著提速；不支持、文件过小或拿不到大小时自动退回单线程流式下载。纯标准库 + 系统 `curl`，不需要 `pip install` 任何依赖。

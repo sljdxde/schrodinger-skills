@@ -53,6 +53,26 @@ https://github.com/sljdxde/schrodinger-skills/tree/main/personal-knowledge-base
 请检查 ob 是否可用，并告诉我当前 Obsidian vault 路径；不要修改任何笔记。
 ```
 
+## 自动更新
+
+本组合包自带自检更新脚本 `scripts/update_self.py`，与仓库内 `house-buying` 等 skill 的做法一致：把 GitHub 上最新的组合包目录（含 `ob-llm-wiki` 与 `ob` 两个子 skill）同步到本地，更新前会自动备份。
+
+前置条件：本机可运行 `python`。
+
+```bash
+# 检查是否有更新（仅打印 JSON 状态，不改动文件）
+python scripts/update_self.py --check
+
+# 应用更新（先备份再整体替换整个组合包目录）
+python scripts/update_self.py --apply
+```
+
+注意：
+
+- 该脚本适用于「整体复制 `personal-knowledge-base` 目录」的安装方式；它会原地更新整个组合包目录，因此 `ob-llm-wiki` 与 `ob` 会被一起更新。
+- 若你是用 `scripts/install_bundle.py` 把两个子 skill 分别安装到 Agent 的 skill 目录，请改用 `python scripts/install_bundle.py --replace` 来更新。
+- 在 git 工作副本中默认拒绝替换；确有必要可加 `--allow-repo-working-copy`。
+
 ## 使用示例
 
 ```text

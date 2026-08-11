@@ -173,6 +173,11 @@ Install both ob-llm-wiki and ob.
 
 See [personal-knowledge-base/README.md](./personal-knowledge-base/README.md) for the full capability description, layout, and examples.
 
+**Auto-update:**
+- If installed by copying the whole bundle directory, run `python scripts/update_self.py --apply` before use
+- Automatically checks and syncs the `personal-knowledge-base` bundle directory on GitHub (covering both `ob-llm-wiki` and `ob` sub-skills)
+- If sub-skills were installed separately via `install_bundle.py`, re-run `python scripts/install_bundle.py --replace` to update
+
 ### [MTD-Download](./mtd-download)
 
 A multi-threaded download tool built on the system `curl`. It splits a large file into byte-range chunks downloaded in parallel — much faster when the server supports `Range`. When Range is unsupported, the file is small, or the size is unknown, it falls back to single-threaded streaming. Pure standard library plus system `curl`; no `pip install` needed.
