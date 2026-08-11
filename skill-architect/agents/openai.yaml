@@ -1,0 +1,4 @@
+interface:
+  display_name: "Skill Architect"
+  short_description: "通过动态访谈把模糊需求或个人经验设计并编译成可安装的 AI Skill，并做质量评估"
+  default_prompt: "Use $skill-architect to interview the user (Need→Skill or Experience→Skill), produce a Skill Blueprint, compile it into a schrodinger-skills package, and evaluate the result."

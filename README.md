@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-6-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-7-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -31,10 +31,11 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
-| [House-Buying](./house-buying) | 中国住宅购房尽调与决策分析，覆盖成交、学区溢价、升学、生源、小区人口和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
+| [House-Buying](./house-buying) | 全国城市住宅购房尽调与决策分析，覆盖成交、学区溢价、升学、生源、小区人口、价格时间轴和价格预测 | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills-Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory-Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD-Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
+| [Skill-Architect](./skill-architect) | 通过第一性原理 10 维度决策树访谈，把模糊需求或个人经验设计成可安装的 AI Skill，编译成包并做质量评估 | [SKILL.md](./skill-architect/SKILL.md) |
 | [Personal-Knowledge-Base](./personal-knowledge-base) | Codex + Obsidian + `ob` CLI 的本地个人知识库组合包，包含 `ob-llm-wiki` 与 `ob` 两个 skill | [README.md](./personal-knowledge-base/README.md) |
 
 ---
@@ -64,7 +65,10 @@
 中国住宅购房尽调和决策分析工具。适合评估具体楼盘、学区房、片区对比和买入时机，要求联网核验成交、挂牌、学校、政策、升学、生源、小区人口、学区溢价与城市基本面数据。
 
 **核心能力：**
-- 成交/挂牌/库存/议价空间多源核验
+- 全国房源，用户可声明城市；同一数据源按城市配置接口或检索式
+- 成交/挂牌/库存/议价空间多源核验（贝壳、我爱我家、杭房数研、小鸡选房等）
+- 同一小区输出近 12-36 个月月度价格时间轴，含峰值/谷值/当前值与波动幅度
+- 网页源反爬适配：浏览器化请求、Cookie/Header 配置、可选 Playwright 渲染公开页面
 - 学区房与周边非学区/弱学区房价格对比，量化教育溢价
 - 学校升学、招生政策、学位预警和生源结构分析
 - 小区人口与居住画像，区分“买学位入口”和“可长期自住社区”
@@ -77,8 +81,12 @@
 ```
 请使用 house-buying 分析杭州耀江文鼎苑是否值得买，自住+学区，预算400万以内
 ```
+或指定其他城市：
+```
+请使用 house-buying 分析上海张江汤臣豪园是否值得买，自住+学区，预算800万以内，城市：上海
+```
 
-Agent 会先核验公开数据，再输出证据台账、风险评估、横向对比和购买建议。
+Agent 会先核验公开数据，再输出带月度价格时间轴的证据台账、风险评估、横向对比和购买建议。
 
 **自动更新：**
 - 使用前运行 `python scripts/update_self.py --apply`
@@ -210,6 +218,40 @@ Agent 会先运行探测，再按策略完成下载并报告结果。
 **自动更新：**
 - 使用前运行 `python scripts/update_self.py --apply`
 - 自动检查并同步 GitHub 上的 `mtd-download` skill 目录
+
+### [Skill-Architect](./skill-architect)
+
+把「模糊需求」或「个人/领域经验」变成**可直接安装的 AI Skill** 的 Meta Skill。核心思路：用户往往知道要解决什么问题，却不知道 Skill 该含什么能力——所以 AI 先当产品经理 + 领域专家做一次**第一性原理访谈**，再产出蓝图、编译成包、跑质量评估。
+
+**核心能力：**
+- 第一性原理拆维：把一个 Skill 必须定义清楚的 10 个维度（身份/受众/目标/输入/流程/分析框架/输出规格/边界/数据/交互质量）作为访谈骨架，绝不漏面
+- 决策树 + 问题簇：每面一次抛出 3–6 题成簇提问，靠分支下钻，不靠来回拉锯；已能推断的列为假设，不堆砌无关问题
+- 条件分支：分析/决策型 Skill 必深挖「分析框架」（维度/打分/证据严谨度/可视化）；有产出物的必问「输出规格」（md / html / json / 对话 / 多文件，并按格式再下钻交互与命名）
+- 双路径访谈：Path A（Need→Skill，需求驱动）+ Path B（Experience→Skill，经验沉淀），经验统一映射到同一张维度表
+- 领域补全库：内置 学习 / 旅行 / 投资 / 创作 能力清单 + 通用模板，帮用户发现「不知道要什么」
+- 访谈即产出：结论落成 `blueprint.json` 的 `input_spec`/`output_spec`/`analysis`/`interaction_model` 等字段，由 `compile_skill.py` 直接渲染进生成包的「输入 / 分析框架 / 输出规格 / 交互方式」章节
+- `compile_skill.py` 全量脚手架：产出与 house-buying 等完全同构的包（SKILL.md + agents/openai.yaml + update_self.py + references/ + evaluations/），立即可装且自带自检更新
+- 4 维评分评估：专业度 / 完整度 / 任务成功率 / 错误率，产出 `evaluations/self-eval.md`
+
+**使用方式：**
+
+对 Agent 说：
+```
+请用 skill-architect 帮我做一个买房助手
+```
+或经验沉淀：
+```
+我在房产行业干了 20 年，想把经验变成 AI 顾问
+```
+
+Agent 会先访谈、产出蓝图，再编译成包并评估。也可直接跑脚本：
+```bash
+python scripts/compile_skill.py --blueprint examples/sample-blueprint.json --out ./skills
+```
+
+**自动更新：**
+- 使用前运行 `python scripts/update_self.py --apply`
+- 自动检查并同步 GitHub 上的 `skill-architect` skill 目录
 
 ---
 

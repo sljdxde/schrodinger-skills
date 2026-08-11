@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-6-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-7-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -33,10 +33,11 @@ The self-update helper requires `python`; npm-backed skills such as Skills-Docto
 
 | Name | One-liner | Link |
 |---|---|---|
-| [House-Buying](./house-buying) | Due diligence and decision support for Chinese home purchases, including transactions, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
+| [House-Buying](./house-buying) | Due diligence and decision support for Chinese home purchases in any declared city, including transactions, price timelines, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills-Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory-Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD-Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
+| [Skill-Architect](./skill-architect) | Turns vague needs or personal/domain experience into installable AI Skills through first-principles 10-facet decision-tree interviews, blueprint compilation, and quality evaluation | [SKILL.md](./skill-architect/SKILL.md) |
 | [Personal-Knowledge-Base](./personal-knowledge-base) | A Codex + Obsidian + `ob` CLI bundle for local personal knowledge management, including `ob-llm-wiki` and `ob` | [README.md](./personal-knowledge-base/README.md) |
 
 ---
@@ -66,7 +67,10 @@ Install the complete personal-knowledge-base bundle from schrodinger-skills, inc
 Due diligence and decision support for Chinese residential property purchases. It is designed for target communities, school-district homes, area comparisons, and buy/watch decisions, with explicit evidence tracking for transaction prices, listings, school-premium comparisons, admissions policy, student sources, community demographics, and city fundamentals.
 
 **Key Features:**
-- Cross-check transaction prices, listing prices, inventory, and negotiation room
+- Nationwide coverage with user-declared cities; per-city endpoints or search queries
+- Cross-check transaction prices, listing prices, inventory, and negotiation room across Beike, Woaiwojia, Hangfang, Xiaoji, and more
+- Monthly price timelines for the same community, including peak/trough/current values and volatility
+- Anti-scraping adapters for web sources: browser-like requests, cookies/headers, optional Playwright rendering of public pages
 - Compare school-district homes with nearby non-school-district or weaker-school alternatives to quantify the education premium
 - Analyze school outcomes, admission rules, seat warnings, and student-source quality
 - Build a community demographic profile instead of relying only on price
@@ -79,8 +83,12 @@ Tell your Agent:
 ```
 Use house-buying to analyze whether Hangzhou Yaojiang Wendingyuan is worth buying for self-use plus school access under a 4M RMB budget
 ```
+Or declare another city:
+```
+Use house-buying to analyze Shanghai Zhangjiang Tangcheng Haoyuan for self-use plus school access under an 8M RMB budget, city: Shanghai
+```
 
-The Agent will verify public data first, then produce an evidence-backed report with risks, comparisons, and an actionable recommendation.
+The Agent will verify public data first, then produce an evidence-backed report with a monthly price timeline, risks, comparisons, and an actionable recommendation.
 
 **Auto-update:**
 - Run `python scripts/update_self.py --apply` before use
@@ -211,6 +219,40 @@ The Agent probes first, then downloads with the right strategy and reports the r
 **Auto-update:**
 - Run `python scripts/update_self.py --apply` before use
 - Checks and syncs the latest `mtd-download` skill folder from GitHub
+
+### [Skill-Architect](./skill-architect)
+
+A Meta Skill that turns vague needs or personal/domain experience into **installable AI Skills**. The core insight: users usually know *what problem* they want to solve, but not *what capabilities* a Skill should have — so the AI acts as product manager + domain expert and runs a **first-principles interview**, then produces a blueprint, compiles a package, and evaluates the result.
+
+**Key Features:**
+- First-principles decomposition: interviews are built around the 10 facets a Skill must define (identity, audience, goal, input, process, analysis framework, output spec, boundaries, data, interaction/quality) — no facet is skipped
+- Decision tree + question clusters: each facet is asked as a 3–6 question cluster with branching drill-downs, not one question at a time; inferable items become assumptions instead of clutter
+- Conditional branches: analysis/decision Skills must drill into the "analysis framework" (dimensions, scoring, evidence rigor, visualization); Skills with deliverables must specify the "output spec" (md / html / json / chat / multi-file, with further drill-downs on interactivity and naming)
+- Dual-path interviews: Path A (Need→Skill) + Path B (Experience→Skill), with experience uniformly mapped onto the same facet table
+- Domain knowledge library: built-in capability checklists for study / travel / investment / creation plus a generic template, to surface unknown needs
+- Interview-to-output: conclusions land in `blueprint.json` fields (`input_spec`, `output_spec`, `analysis`, `interaction_model`), which `compile_skill.py` renders directly into the generated package's Input / Analysis / Output / Interaction sections
+- `compile_skill.py` full scaffolding: produces a package with the exact same layout as house-buying (SKILL.md + agents/openai.yaml + update_self.py + references/ + evaluations/), instantly installable and self-updating
+- 4-dimension evaluation: professionalism / completeness / task success rate / error rate, written to `evaluations/self-eval.md`
+
+**Usage:**
+
+Tell your Agent:
+```
+Use skill-architect to build a house-buying assistant for me
+```
+Or for experience distillation:
+```
+I've been in real estate for 20 years; turn my experience into an AI consultant
+```
+
+The Agent interviews you, produces a blueprint, compiles a package, and evaluates it. You can also run the compiler directly:
+```bash
+python scripts/compile_skill.py --blueprint examples/sample-blueprint.json --out ./skills
+```
+
+**Auto-update:**
+- Run `python scripts/update_self.py --apply` before use
+- Checks and syncs the latest `skill-architect` skill folder from GitHub
 
 ---
 
