@@ -1,6 +1,6 @@
 # School District Workflow（学区工作流）
 
-本文件固化购房分析中「学区」与「直接给小区」两种入口的标准流程。目标是让比较时能真正拉到数据，并保证学区溢价的计算不被回迁房、预算过滤等因素污染。
+本文件固化购房分析中「学区」与「直接给小区」两种入口的标准流程。城市由用户声明，面向全国房源；比较时用真实多源数据，并保证学区溢价的计算不被回迁房、预算过滤等因素污染。
 
 配套脚本：`scripts/data_sources.py`（编排 + 取数适配，stdlib-only）。
 
@@ -10,8 +10,8 @@
 
 | 入口 | 用户给什么 | 流程 |
 |---|---|---|
-| A. 选学区 | 学区名（如"锦绣育才"）+ 预算 | 发现小区 → 区分回迁/商品房 → 按挂牌价排序 → 预算过滤 → 多源拉取 → 学区 vs 非学区比较 + 走势 |
-| B. 直接给小区 | 一个或多个小区名 | 跳过发现/排序 → 直接多源拉取 → 分析（可选补非学区盘做比较） |
+| A. 选学区 | 城市 + 学区名（如"上海某某小学"）+ 预算 | 发现小区 → 区分回迁/商品房 → 按挂牌价排序 → 预算过滤 → 多源拉取时间轴 → 学区 vs 非学区比较 + 走势 |
+| B. 直接给小区 | 城市 + 一个或多个小区名 | 跳过发现/排序 → 直接多源拉取 → 分析（可选补非学区盘做比较） |
 
 若信息不足（缺预算/城市），先按 `intake-questionnaire.md` 追问，不要直接跑。
 
@@ -21,9 +21,10 @@
 
 学区房不只看"商品房"，**回迁房/安置房**常混在同一划片内，但挂牌价更低、居住品质与流动性更弱，必须单列。
 
-- 用脚本生成发现检索式：
+- 用脚本生成发现检索式（城市必须显式传入）：
   ```bash
   python scripts/data_sources.py school --school "锦绣育才" --city 杭州
+  python scripts/data_sources.py school --school "某某小学" --city 上海
   ```
   脚本会输出 `discover_queries`（精确到"学区 对口 小区 名单 / 学区划分 / 回迁房 商品房"等）。
 - AI 代理按检索式联网，列出该学区下**全部**对口小区，并逐个判定 `housing_type`：
@@ -31,14 +32,14 @@
   - `resettlement` = 回迁房/安置房
   - `unknown` = 暂未区分
 - 判定依据：`{小区名} 回迁房 安置房`、`{小区名} 商品房 交付年份`、`小区人口与居住画像` 参考文件。
-- 把结果写成 JSON（含各小区 `avg_listing_price`、`housing_type`、`listing_count`、`district`），回填给脚本：
+- 把结果写成 JSON（含各小区 `city`、`avg_listing_price`、`housing_type`、`listing_count`、`district`，可选 `history`），回填给脚本：
   ```bash
   python scripts/data_sources.py school --input plan.json --output plan_out.json
   ```
 
 ### 步骤 2 — 按小区平均挂牌价排序
 
-脚本 `rank_by_listing_price` 对已知挂牌价的小区降序排列（回迁房因价低自然靠后），未知价排末尾。挂牌价来源优先级见 `data-source-playbook.md`（小鸡选房=挂盘主力，杭房数研=成交/挂牌双口径，贝壳=交叉验证）。
+脚本 `rank_by_listing_price` 对已知挂牌价的小区降序排列（回迁房因价低自然靠后），未知价排末尾。挂牌价来源优先级见 `data-source-playbook.md`（全国通用：贝壳/我爱我家；杭州叠加小鸡选房、杭房数研）。
 
 ### 步骤 3 — 用用户预算过滤
 
@@ -46,9 +47,11 @@
 
 > 预算过滤是「用户能看哪些」的交付物，**不参与**学区溢价计算。
 
-### 步骤 4 — 多源拉取房源信息并分析
+### 步骤 4 — 多源拉取房源时间轴并分析
 
-对预算过滤后的每个小区，脚本 `collect` 生成**每个数据源的取数计划**（小鸡选房 / 杭房数研 / 贝壳的精确检索式，或已配置的抓包 API 直拉）。AI 代理据此取数，落到 `listings` / `transactions`，再按 `school-and-community-analysis.md`、`forecasting-framework.md` 做学校/生源/人口与价格分析。
+对预算过滤后的每个小区，脚本 `collect` 生成**每个数据源的取数计划**（贝壳 / 我爱我家 / 小鸡选房 / 杭房数研的精确检索式，或已配置的 API/浏览器直拉），并要求回填月度 `history`。AI 代理据此取数，落到 `listings` / `transactions` / `history`，再按 `school-and-community-analysis.md`、`forecasting-framework.md` 做学校/生源/人口与价格分析。
+
+网页源遇到反爬时，按 `data-source-playbook.md` 的三通道处理：API → 浏览器渲染（可选 Playwright）→ 联网检索；不破解验证码、不做高频批量抓取。
 
 ### 步骤 5 — 学区 vs 周边非学区差异比较 + 后续走势
 
@@ -57,30 +60,42 @@
 - 学区商品房价均值（剔除回迁房，避免拉低）
 - 非学区均价比对盘均值
 - 学区溢价率 =（学区商品房价 − 非学区均价）/ 非学区均价
-- 回迁房单独提示，不混入溢价
+- 回迁房单独提示，不混入溢价计算
 
 随后必须回答（用 `forecasting-framework.md` 三情景）：
 
 1. **差异比较**：学区房相对周边非学区，单价/总价高多少，溢价来自学校确定性还是居住品质。
-2. **后续走势**：结合少子化（出生人口约 6 年传导到入学）、教育均衡化（多校划片/教师轮岗/学位预警）、近 12-36 个月量价动量，判断溢价**可持续 / 收窄 / 反转**，给出触发信号（如连续 N 月成交验证、政策落地）。
+2. **后续走势**：结合少子化（出生人口约 6 年传导到入学）、教育均衡化（多校划片/教师轮岗/学位预警）、近 12-36 个月月度量价动量，判断溢价**可持续 / 收窄 / 反转**，给出触发信号（如连续 N 月成交验证、政策落地）。趋势必须基于月度时间轴，不能用两个孤立时点。
 
 最终落表见 `report-template.md` 的「学区 vs 非学区差异比较」章节。
 
 ## 入口 B：直接给小区流程
 
-用户已给小区（可多个），跳过发现/排序：
+用户已给城市和小区（可多个），跳过发现/排序：
 
 ```bash
 python scripts/data_sources.py communities --communities "文鼎苑,西城年华" --city 杭州 --budget 600 --area 90
+python scripts/data_sources.py communities --communities "某小区" --city 上海 --budget 600 --area 90 --months 24
 ```
 
-脚本直接排序 + 预算过滤 + 生成多源取数计划。若用户还想要学区维度，则补一步：判定这些小区对口学校，按入口 A 的步骤 5 做学区 vs 非学区比较。
+脚本直接排序 + 预算过滤 + 生成多源取数计划（含时间轴）。若用户还想要学区维度，则补一步：判定这些小区对口学校，按入口 A 的步骤 5 做学区 vs 非学区比较。
+
+## 时间轴命令
+
+```bash
+# 全源时间轴
+python scripts/data_sources.py timeline --community 文鼎苑 --district 浦东 --city 上海 --months 24
+
+# 单源时间轴
+python scripts/data_sources.py timeline --source 贝壳 --community 文鼎苑 --city 上海 --months 36
+```
 
 ## 取数机制（重要）
 
-杭房数研、小鸡选房是**微信小程序封闭生态**，无公开网页 API。两种取数通道：
+杭房数研、小鸡选房是**微信小程序封闭生态**，无公开网页 API；贝壳、我爱我家是**网页生态**，有反爬策略。三种取数通道：
 
-1. **抓包 API（推荐）**：手机用 mitmproxy/Charles 对微信抓包，拿到小程序后端 `endpoint` + `token`，写入 `scripts/sources.json`（参考 `sources.example.json`）。脚本即脚本化直拉。
-2. **联网检索兜底（默认）**：未配置时，脚本生成精确到小程序名的检索式，由 AI 代理用 WebSearch/WebFetch 取数后回填。
+1. **抓包 / 平台 API（推荐）**：手机用 mitmproxy/Charles 抓小程序，或从浏览器 DevTools 拿网页源公开接口，将 `endpoint` + `token`/`cookie` 写入 `scripts/sources.json`（参考 `sources.example.json`）。脚本即脚本化直拉。
+2. **浏览器渲染（可选）**：配置 `browser: true` 后，脚本用浏览器化请求，必要时调用本机 Playwright 渲染公开页面。
+3. **联网检索兜底（默认）**：未配置时，脚本生成精确到数据源与城市的检索式，由 AI 代理用 WebSearch/WebFetch 取数后回填。
 
-无论哪种，取数后都要在证据台账标注来源、时间、口径（挂牌/成交）、样本量。
+无论哪种，取数后都要在证据台账标注来源、时间、口径（挂牌/成交）、样本量，并把月度时间轴一并落账。

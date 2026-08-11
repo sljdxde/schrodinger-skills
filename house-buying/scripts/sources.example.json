@@ -1,15 +1,78 @@
 {
-  "_说明": "微信小程序（杭房数研 / 小鸡选房）是封闭生态，没有公开网页 API。取数做法：在手机上用 mitmproxy / Charles 对微信抓包，拿到小程序调用后端时的 HTTPS 接口 endpoint 与登录态 token，复制本文件为 sources.json 并填入下面的值，data_sources.py 即可脚本化拉取。抓包一次、长期复用。未配置时脚本自动退回「联网检索」模式，生成精确到小程序名的检索式由 AI 代理取数。",
+  "_说明": "全国城市取数配置。小程序源（杭房数研/小鸡选房）需要抓包拿到 endpoint 与 token；网页源（贝壳/我爱我家）可配 endpoint+token/cookie，或开 browser:true 用本机 Playwright 渲染公开页面。未配置时自动退回联网检索模式。所有源都要尽量返回 history 月度时间轴（date 统一 YYYY-MM、price_per_sqm、count）。",
   "杭房数研": {
     "endpoint": "https://<抓包得到的杭房数研后端域名>/api/community/detail",
-    "token": "<抓包得到的登录态，如 Authorization: Bearer xxx 中的 xxx>"
+    "token": "<抓包得到的登录态，如 Authorization: Bearer xxx 中的 xxx>",
+    "request_interval": 0,
+    "retries": 2,
+    "cities": {
+      "杭州": {
+        "endpoint": "https://<杭州专用接口>/api/community/detail"
+      }
+    }
   },
   "小鸡选房": {
     "endpoint": "https://<抓包得到的小鸡选房后端域名>/api/search/community",
-    "token": "<抓包得到的登录态>"
+    "token": "<抓包得到的登录态>",
+    "request_interval": 0,
+    "retries": 2
   },
   "贝壳": {
+    "_说明": "全国城市网页源；优先填抓包/浏览器 DevTools 里看到的接口，或留空走检索。",
     "endpoint": "",
-    "token": ""
+    "token": "",
+    "cookie": "<可选：登录态 Cookie，分号分隔>",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      "Referer": "https://www.ke.com/",
+      "Accept-Language": "zh-CN,zh;q=0.9"
+    },
+    "browser": false,
+    "headless": true,
+    "html": true,
+    "request_interval": 1.0,
+    "retries": 2,
+    "timeout": 20,
+    "wait_until": "domcontentloaded",
+    "cities": {
+      "上海": {
+        "endpoint": "https://<上海贝壳接口或页面URL>",
+        "cookie": ""
+      },
+      "北京": {
+        "endpoint": "https://<北京贝壳接口或页面URL>",
+        "cookie": ""
+      }
+    },
+    "timeout_ms": 30000
+  },
+  "我爱我家": {
+    "_说明": "全国城市网页源；优先填公开接口，或开 browser 渲染公开页面。",
+    "endpoint": "",
+    "token": "",
+    "cookie": "<可选：登录态 Cookie>",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      "Referer": "https://www.5i5j.com/",
+      "Accept-Language": "zh-CN,zh;q=0.9"
+    },
+    "browser": false,
+    "headless": true,
+    "html": true,
+    "request_interval": 1.0,
+    "retries": 2,
+    "timeout": 20,
+    "wait_until": "domcontentloaded",
+    "cities": {
+      "上海": {
+        "endpoint": "https://<上海我爱我家接口或页面URL>",
+        "cookie": ""
+      },
+      "北京": {
+        "endpoint": "https://<北京我爱我家接口或页面URL>",
+        "cookie": ""
+      }
+    },
+    "timeout_ms": 30000
   }
 }

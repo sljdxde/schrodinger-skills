@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>南京万寿万象汇购房分析（自住+学区，预算≤300万）</title>
+<style>
+/* 橄榄手记风格（house-buying 报告，单文件自包含） */
+:root{
+  --paper:#f6f3ec; --card:#fffdf8; --ink:#2f2a24; --sub:#8a8272;
+  --olive:#5c6b3c; --olive-soft:#e8ecd9; --accent:#b45309;
+  --line:#e4ddcd; --warn:#f6e9e3; --warn-ink:#9a3412;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  line-height:1.75;font-size:15px}
+.wrap{max-width:860px;margin:0 auto;padding:32px 20px 80px}
+h1{font-family:Georgia,"Songti SC","SimSun",serif;color:var(--olive);
+  font-size:26px;margin:0 0 6px}
+h2{font-family:Georgia,"Songti SC","SimSun",serif;color:var(--olive);
+  font-size:20px;margin:40px 0 12px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+h3{font-size:16px;margin:22px 0 8px;color:var(--ink)}
+p{margin:8px 0}
+.meta{color:var(--sub);font-size:13px;margin-bottom:22px}
+.verdict{background:var(--olive-soft);border:1px solid var(--olive);
+  border-radius:14px;padding:20px 22px;margin:18px 0}
+.verdict .big{font-size:21px;font-weight:700;color:var(--olive);margin-bottom:8px}
+.kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;font-size:14px}
+.kv b{color:var(--sub);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:18px 22px;box-shadow:0 1px 4px rgba(92,107,60,.08);margin:14px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px;
+  background:var(--card);border-radius:12px;overflow:hidden}
+th{background:var(--olive-soft);font-weight:600;text-align:left}
+th,td{border:1px solid var(--line);padding:7px 10px;vertical-align:top}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.chartbox{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:14px;margin:16px 0}
+.chartbox svg{width:100%;height:auto;display:block}
+.caption{color:var(--sub);font-size:12.5px;margin-top:8px}
+.cite-ref{color:var(--olive);text-decoration:none;font-size:.85em;vertical-align:super;font-weight:600}
+.cite-ref:hover{text-decoration:underline}
+.cites a{color:var(--olive);text-decoration:underline;text-underline-offset:3px}
+.cites li{margin:4px 0;font-size:13.5px}
+.warn{background:var(--warn);border:1px solid #e5b8a4;color:var(--warn-ink);
+  border-radius:10px;padding:12px 16px;font-size:14px;margin:14px 0}
+.tag{display:inline-block;background:var(--olive-soft);color:var(--olive);
+  border-radius:6px;padding:1px 8px;font-size:12px;margin-right:6px}
+.foot{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);
+  color:var(--sub);font-size:12.5px}
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>南京·万寿万象汇 购房分析</h1>
+<div class="meta">分析日期：2026-08-11 ｜ 数据截止：2026-07 ｜ 适用前提：自住 + 学区 ｜ 产物：单份自包含 HTML（引用可点击溯源）</div>
+
+<div class="verdict">
+  <div class="big">结论：谨慎可买 —— 自住与学区双达标，但市场下行，需以价换量谈判</div>
+  <div class="kv">
+    <b>用户输入</b><span>城市=南京；目标=万寿万象汇（按 70 年住宅「万象天地·华荟花园」理解）；目的=自住+学区；预算≤300万；首付=50%；入学年份=2030（或未定，按 2030 评估）；时间窗口=36 个月</span>
+    <b>关键假设</b><span>「万象汇」是商场，住宅指万象天地系列；主标的=二手 70 年住宅华荟花园（九悦洋房二手挂牌 3.4–3.9 万/㎡ 超预算，不纳入）</span>
+    <b>仍缺信息</b><span>具体户型/楼层/面积段、月供上限（50% 首付下月供压力很小）、卖方学位是否被占用（需实地核验）</span>
+    <b>建议价格带</b><span>华荟花园 100㎡ 三房，目标 ≤2.8 万/㎡（总价 ≤280 万）；挂牌 268–318 万可谈，议价目标 5–8%</span>
+    <b>最大风险</b><span>全市下行 + 2025 年取消限售后挂牌量大增，短期仍可能阴跌（小区 2 年已跌约 16%）；学区划片以入学当年官方文件为准</span>
+    <b>下一步</b><span>实地看房 + 向晓庄小学/伯乐中学核验学位占用 + 以当年 5 月栖霞区官方施教区文件为准</span>
+  </div>
+</div>
+
+<h2>1. 楼盘定位澄清（必须先说清）</h2>
+<p>「万寿万象汇」是<b>商业综合体</b>（城北万象汇，2023-12-15 开业<a href="#cite-15" class="cite-ref">[15]</a>，万寿站 6/7 号线双地铁上盖），住宅是「万象天地」系列，需严格区分产权：</p>
+<table>
+  <tr><th>名称</th><th>产权</th><th>类型</th><th>学区/落户</th><th>预算匹配度</th></tr>
+  <tr><td><b>万象天地·四季/华荟花园</b>（本次主标的）</td><td>70 年住宅</td><td>2019–2021 建成，11 栋约 698–1120 户（平台口径不一），户型 100/119/125/140/156㎡，华发物业约 1.9 元/㎡·月，宜春街 29 号<a href="#cite-9" class="cite-ref">[9]</a><a href="#cite-10" class="cite-ref">[10]</a></td><td>可落户；晓庄小学/伯乐中学施教区<a href="#cite-1" class="cite-ref">[1]</a><a href="#cite-4" class="cite-ref">[4]</a></td><td>100㎡ 三房挂牌 268–318 万，<b>预算内可及</b></td></tr>
+  <tr><td>万象天地·九悦</td><td>70 年住宅</td><td>华发+华润洋房（8–11 层，约 892 户），2020 首开已售完，现二手流通<a href="#cite-10" class="cite-ref">[10]</a></td><td>可落户，同施教区</td><td>二手挂牌约 3.4–3.9 万/㎡，<b>超预算</b></td></tr>
+  <tr><td>华荟公寓</td><td>40 年公寓</td><td>LOFT/双钥匙 37/46/64㎡，2019 开盘约 2 万/㎡<a href="#cite-10" class="cite-ref">[10]</a></td><td><b>不可落户/统筹入学</b></td><td>便宜但<b>不满足学区诉求</b></td></tr>
+</table>
+<div class="warn">⚠️ 现场必须甄别产权：买「华荟公寓」= 无学区、难落户。本项目与「万象天地·九悦」同商圈，别混淆。</div>
+
+<h2>2. 交易与价格</h2>
+<h3>2.1 月度价格时间轴（必须）</h3>
+<p>华荟花园挂牌价有公开月度序列（第三方平台整理）：<b>2024-01 约 3.32 万 → 2025-07 约 3.32 万 → 2025-12 约 2.94 万 → 2026-07 约 2.79 万，两年累计跌约 16%</b><a href="#cite-10" class="cite-ref">[10]</a>；2026-05 安居客 28,038<a href="#cite-11" class="cite-ref">[11]</a>、2026-06 我爱我家成交口径 28,468<a href="#cite-9" class="cite-ref">[9]</a>。南京全市 2025 年二手成交均价 22,265（市区 19,881，同比 -13%）<a href="#cite-12" class="cite-ref">[12]</a>。</p>
+
+<div class="chartbox">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<rect width="720" height="300" fill="#ffffff"/>
+<text x="56" y="18" font-size="13" fill="#1f2937" font-weight="600">南京万寿·万象天地华荟花园 挂牌 vs 成交（2024-01 ~ 2026-07）</text>
+<line x1="56" y1="260.0" x2="704" y2="260.0" stroke="#eceef1" stroke-width="1"/>
+<text x="50" y="264.0" font-size="10" fill="#6b7280" text-anchor="end">2.10万</text>
+<line x1="56" y1="202.5" x2="704" y2="202.5" stroke="#eceef1" stroke-width="1"/>
+<text x="50" y="206.5" font-size="10" fill="#6b7280" text-anchor="end">2.43万</text>
+<line x1="56" y1="145.0" x2="704" y2="145.0" stroke="#eceef1" stroke-width="1"/>
+<text x="50" y="149.0" font-size="10" fill="#6b7280" text-anchor="end">2.77万</text>
+<line x1="56" y1="87.5" x2="704" y2="87.5" stroke="#eceef1" stroke-width="1"/>
+<text x="50" y="91.5" font-size="10" fill="#6b7280" text-anchor="end">3.11万</text>
+<line x1="56" y1="30.0" x2="704" y2="30.0" stroke="#eceef1" stroke-width="1"/>
+<text x="50" y="34.0" font-size="10" fill="#6b7280" text-anchor="end">3.45万</text>
+<text x="56.0" y="276" font-size="10" fill="#6b7280" text-anchor="middle">2024-01</text>
+<text x="444.8" y="276" font-size="10" fill="#6b7280" text-anchor="middle">2026-05</text>
+<text x="704.0" y="276" font-size="10" fill="#6b7280" text-anchor="middle">2026-07</text>
+<polyline points="56.0,52.3 185.6,52.3 315.2,116.7 444.8,139.8 704.0,142.2" fill="none" stroke="#2f6fed" stroke-width="2"/>
+<circle cx="56.0" cy="52.3" r="2.8" fill="#2f6fed"/>
+<circle cx="185.6" cy="52.3" r="2.8" fill="#2f6fed"/>
+<circle cx="315.2" cy="116.7" r="2.8" fill="#2f6fed"/>
+<circle cx="444.8" cy="139.8" r="2.8" fill="#2f6fed"/>
+<circle cx="704.0" cy="142.2" r="2.8" fill="#2f6fed"/>
+<polyline points="315.2,237.7 574.4,132.5" fill="none" stroke="#f5933b" stroke-width="2"/>
+<circle cx="315.2" cy="237.7" r="2.8" fill="#f5933b"/>
+<circle cx="574.4" cy="132.5" r="2.8" fill="#fff" stroke="#f5933b" stroke-width="1.4"/>
+<text x="56.0" y="44.3" font-size="9" fill="#2f6fed" text-anchor="middle">峰 3.32万</text>
+<text x="315.2" y="251.7" font-size="9" fill="#f5933b" text-anchor="middle">谷 2.23万</text>
+<rect x="56" y="288" width="10" height="10" fill="#2f6fed"/>
+<text x="70" y="297" font-size="10" fill="#374151">挂牌均价</text>
+<rect x="148" y="288" width="10" height="10" fill="#f5933b"/>
+<text x="162" y="297" font-size="10" fill="#374151">成交均价</text>
+</svg>
+<div class="caption">图：蓝=华荟花园挂牌（平台月度序列，2024-01 ~ 2026-07）；橙=华荟成交样本（空心点，样本&lt;5）+ 南京全市二手成交均价（2025 全年，参照）。峰值≈3.32 万（2024-01/2025-07 挂牌），谷值≈2.23 万（全市 2025 均价）。走势图与下方表格一致。</div>
+</div>
+
+<table>
+  <tr><th>月份</th><th>华荟挂牌均价（元/㎡）</th><th>华荟成交（元/㎡）</th><th>南京全市成交均价（元/㎡）</th><th>来源</th></tr>
+  <tr><td>2024-01</td><td class="num">33,200</td><td class="num">—</td><td class="num">—</td><td>58 序列<a href="#cite-10" class="cite-ref">[10]</a></td></tr>
+  <tr><td>2025-07</td><td class="num">33,200</td><td class="num">—</td><td class="num">—</td><td>58 序列<a href="#cite-10" class="cite-ref">[10]</a></td></tr>
+  <tr><td>2025-12</td><td class="num">29,400</td><td class="num">—</td><td class="num">22,265（全年口径）</td><td>58 序列<a href="#cite-10" class="cite-ref">[10]</a> / 克而瑞<a href="#cite-12" class="cite-ref">[12]</a></td></tr>
+  <tr><td>2026-05</td><td class="num">28,038</td><td class="num">—</td><td class="num">—</td><td>安居客<a href="#cite-11" class="cite-ref">[11]</a></td></tr>
+  <tr><td>2026-06</td><td class="num">—</td><td class="num">28,468（样本不足）</td><td class="num">—</td><td>我爱我家<a href="#cite-9" class="cite-ref">[9]</a></td></tr>
+  <tr><td>2026-07</td><td class="num">27,900</td><td class="num">—</td><td class="num">—</td><td>58 序列<a href="#cite-10" class="cite-ref">[10]</a></td></tr>
+</table>
+<ul>
+  <li><b>当前值</b>：华荟挂牌约 2.8 万/㎡，对南京全市均价（约 2.23 万）仍有约 25% 次新溢价。</li>
+  <li><b>涨跌幅</b>：近 24 个月挂牌累计 -16%；南京全市 2025 年同比 -13%<a href="#cite-12" class="cite-ref">[12]</a>。</li>
+  <li><b>波动原因</b>：全市量价齐跌 + 2025-03 取消限售后新增挂牌量大增（两月新增 4 万+ 套）<a href="#cite-13" class="cite-ref">[13]</a>，买方市场「以价换量」；华荟在售 75–91 套、挂牌率约 7–9%，换手偏活跃。</li>
+  <li><b>300 万可购</b>：100㎡ 三房挂牌 268–318 万（可及）；119㎡ 需 340–360 万（超预算）<a href="#cite-9" class="cite-ref">[9]</a>。</li>
+</ul>
+
+<h3>2.2 家庭现金流测算（首付 50%）</h3>
+<table>
+  <tr><th>方案</th><th>总价</th><th>首付 50%</th><th>贷款（30年，利率约3.0%）</th><th>月供≈</th></tr>
+  <tr><td>华荟 100㎡ @2.8万</td><td class="num">280万</td><td class="num">140万</td><td class="num">140万</td><td class="num">5,900 元</td></tr>
+  <tr><td>预算上限 300万</td><td class="num">300万</td><td class="num">150万</td><td class="num">150万</td><td class="num">6,330 元</td></tr>
+</table>
+<p>政策：南京已取消限购（2023-09 宁六条）与限售（2025-03 房七条）；商贷首套最低首付 15%、2025-05 首套利率约 3.0%<a href="#cite-13" class="cite-ref">[13]</a>。你选 50% 首付属保守稳健，抗跌能力强。</p>
+
+<h2>3. 学区梯队评级（必须）</h2>
+<table>
+  <tr><th>学校</th><th>梯队</th><th>评级依据</th><th>置信度</th></tr>
+  <tr><td>晓庄小学（对口小学）</td><td><b>第二梯队</b>（栖霞区级优质·集团校）</td><td>陶行知 1927 年创办、2018 年复校；与南京晓庄学院附属小学一体化办学，8 轨/34 班/1217 生，名特优教师占 24.4%（省特级 1 人），三年级学业检测「全区名列前茅」；短板：复校仅 8 年、无小升初出口验证、非全市知名<a href="#cite-5" class="cite-ref">[5]</a><a href="#cite-6" class="cite-ref">[6]</a></td><td>中</td></tr>
+  <tr><td>伯乐中学（对口初中）</td><td><b>第二梯队</b>（栖霞区头部公办）</td><td>江苏省示范初中；校方称连续 40 余年中考居全区第一方阵，2019 年四星高中上线率 52%、总均分超市均 19 分；近年数据未公开，民间口径普高率约 70%<b>（非官方）</b><a href="#cite-7" class="cite-ref">[7]</a><a href="#cite-8" class="cite-ref">[8]</a></td><td>中-高</td></tr>
+  <tr><td>参照：琅琊路/拉萨路/力学/北京东路小学（鼓楼/玄武）</td><td>第一梯队</td><td>全市顶尖，江苏省实验小学/模范学校、名校集团母体，升学断层领先<a href="#cite-8" class="cite-ref">[8]</a></td><td>中</td></tr>
+</table>
+<p><b>梯队结论</b>：对口「晓庄小学（二梯队）+ 伯乐中学（二梯队）」是<b>栖霞区级优质组合、全市中游偏上</b>，不是头部名校，但明显强于普通公办。若追求全市顶级学区（鼓楼「拉力琅」系），本项目不达标；若只要「区级优质公办 + 确定性高」，本项目合格。</p>
+
+<div class="chartbox">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 300" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<rect width="720" height="300" fill="#fffdf8"/>
+<text x="16" y="20" font-size="13" fill="#2f2a24" font-weight="600">学区梯队指数对比（10=一梯队 / 7=二梯队 / 5=三梯队 / 3=四梯队）</text>
+<line x1="56" y1="228.0" x2="696" y2="228.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="232.0" font-size="10" fill="#8a8272" text-anchor="end">0.00万</text>
+<line x1="56" y1="180.0" x2="696" y2="180.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="184.0" font-size="10" fill="#8a8272" text-anchor="end">0.00万</text>
+<line x1="56" y1="132.0" x2="696" y2="132.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="136.0" font-size="10" fill="#8a8272" text-anchor="end">0.00万</text>
+<line x1="56" y1="84.0" x2="696" y2="84.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="88.0" font-size="10" fill="#8a8272" text-anchor="end">0.00万</text>
+<line x1="56" y1="36.0" x2="696" y2="36.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="40.0" font-size="10" fill="#8a8272" text-anchor="end">0.00万</text>
+<rect x="104.0" y="54.6" width="117.3" height="173.4" rx="4" fill="#5c6b3c"/>
+<text x="162.7" y="48.6" font-size="10" fill="#2f2a24" text-anchor="middle">10</text>
+<text x="162.7" y="242" font-size="9" fill="#6b7280" text-anchor="middle">拉力琅（</text>
+<text x="162.7" y="256" font-size="9" fill="#6b7280" text-anchor="middle">一梯队）</text>
+<rect x="317.3" y="209.4" width="117.3" height="18.6" rx="4" fill="#6b7c4a"/>
+<text x="376.0" y="203.4" font-size="10" fill="#2f2a24" text-anchor="middle">7</text>
+<text x="376.0" y="246" font-size="10" fill="#6b7280" text-anchor="middle">晓庄小学</text>
+<rect x="530.7" y="209.4" width="117.3" height="18.6" rx="4" fill="#8a9a6a"/>
+<text x="589.3" y="203.4" font-size="10" fill="#2f2a24" text-anchor="middle">7</text>
+<text x="589.3" y="246" font-size="10" fill="#6b7280" text-anchor="middle">伯乐中学</text>
+</svg>
+<div class="caption">图：目标对口校（晓庄小学、伯乐中学，均第二梯队）与全市头部「拉力琅」系（第一梯队）的梯队指数对比。差距直观显示本项目属栖霞区级优质、非全市头部。</div>
+</div>
+<h2>4. 学区确定性</h2>
+<table>
+  <tr><th>维度</th><th>内容</th><th>来源</th><th>置信度</th></tr>
+  <tr><td>划片事实</td><td>晓庄小学施教区 2026 公告列名「华荟花园」<a href="#cite-4" class="cite-ref">[4]</a>；伯乐中学施教区 2025 文件含「万象天地」<a href="#cite-1" class="cite-ref">[1]</a>；2024–2026 三年划片一致，未查到官方学位预警 → 短期调整风险低</td><td>晓庄小学官网 / 栖霞区政府文件</td><td>高</td></tr>
+  <tr><td>学位占用</td><td>栖霞区现行「小学 6 年/初中 3 年一套房一学位」；二手房须报名前办妥产权+户口并实际居住<a href="#cite-2" class="cite-ref">[2]</a><a href="#cite-3" class="cite-ref">[3]</a></td><td>栖霞区 2025/2026 文件</td><td>高</td></tr>
+  <tr><td>政策变化</td><td>2026 年起鼓楼/玄武/秦淮/建邺取消提前落户与学籍占用限制，<b>栖霞、江宁保留</b><a href="#cite-3" class="cite-ref">[3]</a></td><td>南京晨报/招生问答</td><td>中</td></tr>
+  <tr><td>对 2030 入学</td><td>距入学约 4 年，落户要求均满足 → <b>来得及</b>；买前需确认卖方学位未占用</td><td>推算</td><td>高</td></tr>
+</table>
+
+<h2>5. 学区溢价：目标 vs 周边</h2>
+<table>
+  <tr><th>对象</th><th>学校属性</th><th>产品/楼龄</th><th>单价口径</th><th>与目标差异</th><th>置信度</th></tr>
+  <tr><td>目标：华荟花园</td><td>晓庄小学/伯乐中学（二梯队）</td><td>次新 2019–2021</td><td>约 2.8–3.0 万（挂牌）<a href="#cite-9" class="cite-ref">[9]</a><a href="#cite-11" class="cite-ref">[11]</a></td><td>—</td><td>中-高</td></tr>
+  <tr><td>招商依云华府</td><td><b>同属晓庄小学施教区</b>（2026 公告列名）<a href="#cite-4" class="cite-ref">[4]</a></td><td>2017 商品房，2824 户</td><td>约 1.95–2.4 万<a href="#cite-14" class="cite-ref">[14]</a></td><td>高约 3,200–5,100 元/㎡</td><td>高</td></tr>
+  <tr><td>青秀城</td><td>同板块划片</td><td>2018 建成，距万寿站约 500m</td><td>约 2.33 万<a href="#cite-14" class="cite-ref">[14]</a></td><td>高约 4,700–6,600 元/㎡（20–28%）</td><td>高</td></tr>
+  <tr><td>万寿花苑</td><td>同板块（动迁安置）</td><td>2013 年建</td><td>约 1.74 万<a href="#cite-14" class="cite-ref">[14]</a></td><td>高约 1.1 万/㎡（叠加动迁/房龄差）</td><td>中</td></tr>
+</table>
+<p><b>溢价拆分判断</b>：因依云华府与华荟花园<b>同属晓庄小学施教区</b>，两者价差（+3,200~5,100）属<b>次新产品 + 万象汇商业体</b>溢价，<b>非教育溢价</b>；对青秀城的 +20–28% 也主要来自产品与商业差异。教育溢价无法与房龄/物业/商业干净分拆（未查到公开分拆）→ <b>不要为「学区」单独付溢价，为「次新+地铁+商业」付溢价才是合理的</b>。</p>
+
+<h2>6. 学校生源与小区画像</h2>
+<ul>
+  <li>华荟花园约 11 栋、1048 户（我爱我家口径），在售 75–91 套（挂牌率约 7–9%，换手偏活跃）、在租约 69 套（出租率约 6–7%）<a href="#cite-9" class="cite-ref">[9]</a>。</li>
+  <li>施教区含燕语光年、燕璟和颂等次新盘集中交付，<b>2030 年前后入学高峰压力需持续关注</b>；适龄儿童无公开统计。</li>
+  <li>板块画像：迈皋桥/燕子矶交界，刚需+首改为主，教育诉求中等偏上。</li>
+</ul>
+
+<h2>7. 横向比较（同板块/同价位）</h2>
+<table>
+  <tr><th>标的</th><th>定位</th><th>单价区间</th><th>300万内选择</th><th>为什么可比</th></tr>
+  <tr><td>华荟花园（目标）</td><td>次新+双地铁+万象汇</td><td>约 2.8 万</td><td>100㎡ 三房</td><td>—</td></tr>
+  <tr><td>招商依云华府</td><td>2017 商品房，同施教区</td><td>1.95–2.4 万</td><td>约 125–150㎡</td><td><b>学区相同</b>，单价低 3,200–5,100，面积更大</td></tr>
+  <tr><td>青秀城</td><td>2018 次新</td><td>约 2.33 万</td><td>约 100–125㎡</td><td>同商圈+双地铁，单价低约 5 千</td></tr>
+  <tr><td>万寿花苑</td><td>动迁安置</td><td>约 1.74 万</td><td>面积大但品质差</td><td>同板块最低门槛，非商品房</td></tr>
+</table>
+<p><b>可比结论</b>：同样预算下，<b>招商依云华府（同施教区）性价比最高</b>——学区一样、单价更低、面积更大；华荟的溢价买的是「更次新 + 更近万象汇」。若学区优先，优先看依云华府；若在意万象汇商业零距离与新度，再选华荟。</p>
+
+<div class="chartbox">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 340" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<rect width="720" height="340" fill="#fffdf8"/>
+<text x="16" y="20" font-size="13" fill="#2f2a24" font-weight="600">同板块可比盘挂牌均价（元/㎡）</text>
+<line x1="56" y1="268.0" x2="696" y2="268.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="272.0" font-size="10" fill="#8a8272" text-anchor="end">1.61万</text>
+<line x1="56" y1="210.0" x2="696" y2="210.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="214.0" font-size="10" fill="#8a8272" text-anchor="end">1.95万</text>
+<line x1="56" y1="152.0" x2="696" y2="152.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="156.0" font-size="10" fill="#8a8272" text-anchor="end">2.29万</text>
+<line x1="56" y1="94.0" x2="696" y2="94.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="98.0" font-size="10" fill="#8a8272" text-anchor="end">2.64万</text>
+<line x1="56" y1="36.0" x2="696" y2="36.0" stroke="#e4ddcd" stroke-width="1"/>
+<text x="48" y="40.0" font-size="10" fill="#8a8272" text-anchor="end">2.98万</text>
+<rect x="92.0" y="58.5" width="88.0" height="209.5" rx="4" fill="#5c6b3c"/>
+<text x="136.0" y="52.5" font-size="10" fill="#2f2a24" text-anchor="middle">2.85万</text>
+<text x="136.0" y="286" font-size="10" fill="#6b7280" text-anchor="middle">华荟花园</text>
+<rect x="252.0" y="146.1" width="88.0" height="121.9" rx="4" fill="#6b7c4a"/>
+<text x="296.0" y="140.1" font-size="10" fill="#2f2a24" text-anchor="middle">2.33万</text>
+<text x="296.0" y="286" font-size="10" fill="#6b7280" text-anchor="middle">青秀城</text>
+<rect x="412.0" y="172.2" width="88.0" height="95.8" rx="4" fill="#8a9a6a"/>
+<text x="456.0" y="166.2" font-size="10" fill="#2f2a24" text-anchor="middle">2.18万</text>
+<text x="456.0" y="286" font-size="10" fill="#6b7280" text-anchor="middle">依云华府</text>
+<rect x="572.0" y="245.5" width="88.0" height="22.5" rx="4" fill="#a8b38a"/>
+<text x="616.0" y="239.5" font-size="10" fill="#2f2a24" text-anchor="middle">1.74万</text>
+<text x="616.0" y="286" font-size="10" fill="#6b7280" text-anchor="middle">万寿花苑</text>
+</svg>
+<div class="caption">图：同板块可比盘挂牌均价对比（元/㎡）。华荟花园比同施教区的依云华府高约 3,200–5,100 元/㎡、比青秀城高约 5 千，价差主要来自次新+万象汇商业，而非教育溢价（见 §5/§9）。</div>
+</div>
+<h2>8. 价格预期（三情景）</h2>
+<table>
+  <tr><th>情景</th><th>6–12 个月</th><th>1–3 年</th><th>3–10 年</th><th>置信度</th></tr>
+  <tr><td>基准（大盘弱势横盘）</td><td>挂牌 -3%~0%，议价空间维持高位</td><td>跟随南京大盘 -5%~0%</td><td>次新地铁盘随板块成熟企稳</td><td>中</td></tr>
+  <tr><td>乐观（政策托底+城北成熟）</td><td>止跌企稳</td><td>+0~5%</td><td>跑赢板块老房/安置房</td><td>低</td></tr>
+  <tr><td>悲观（库存去化慢+少子化）</td><td>-3%~-8%</td><td>-10%~-15%</td><td>学区属性弱化，依赖居住价值托底</td><td>中</td></tr>
+</table>
+<p>动量：小区 2 年已跌 16%、全市广义库存出清约 126 个月<a href="#cite-12" class="cite-ref">[12]</a> → <b>短期不追高</b>，挂牌量充裕（限售解除后大增）<a href="#cite-13" class="cite-ref">[13]</a>，买方有充足议价筹码。</p>
+
+<div class="chartbox">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 320" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+<rect width="720" height="320" fill="#fffdf8"/>
+<text x="16" y="20" font-size="13" fill="#2f2a24" font-weight="600">三情景·1–3 年房价变动区间（%，中枢=圆点）</text>
+<line x1="498.5" y1="38" x2="498.5" y2="270" stroke="#9a3412" stroke-width="1" stroke-dasharray="3,3"/>
+<line x1="72.0" y1="38" x2="72.0" y2="270" stroke="#e4ddcd" stroke-width="1"/>
+<text x="72.0" y="284" font-size="10" fill="#8a8272" text-anchor="middle">-18%</text>
+<line x1="226.0" y1="38" x2="226.0" y2="270" stroke="#e4ddcd" stroke-width="1"/>
+<text x="226.0" y="284" font-size="10" fill="#8a8272" text-anchor="middle">-12%</text>
+<line x1="380.0" y1="38" x2="380.0" y2="270" stroke="#e4ddcd" stroke-width="1"/>
+<text x="380.0" y="284" font-size="10" fill="#8a8272" text-anchor="middle">-5%</text>
+<line x1="534.0" y1="38" x2="534.0" y2="270" stroke="#e4ddcd" stroke-width="1"/>
+<text x="534.0" y="284" font-size="10" fill="#8a8272" text-anchor="middle">2%</text>
+<line x1="688.0" y1="38" x2="688.0" y2="270" stroke="#e4ddcd" stroke-width="1"/>
+<text x="688.0" y="284" font-size="10" fill="#8a8272" text-anchor="middle">8%</text>
+<line x1="498.5" y1="76.7" x2="616.9" y2="76.7" stroke="#5c6b3c" stroke-width="6" stroke-linecap="round"/>
+<circle cx="498.5" cy="76.7" r="3" fill="#5c6b3c"/>
+<circle cx="616.9" cy="76.7" r="3" fill="#5c6b3c"/>
+<circle cx="557.7" cy="76.7" r="4" fill="#fff" stroke="#5c6b3c" stroke-width="2"/>
+<text x="557.7" y="66.7" font-size="9" fill="#5c6b3c" text-anchor="middle">2%</text>
+<text x="64" y="80.7" font-size="11" fill="#2f2a24" text-anchor="end" font-weight="600">乐观</text>
+<line x1="380.0" y1="154.0" x2="498.5" y2="154.0" stroke="#8a9a6a" stroke-width="6" stroke-linecap="round"/>
+<circle cx="380.0" cy="154.0" r="3" fill="#8a9a6a"/>
+<circle cx="498.5" cy="154.0" r="3" fill="#8a9a6a"/>
+<circle cx="439.2" cy="154.0" r="4" fill="#fff" stroke="#8a9a6a" stroke-width="2"/>
+<text x="439.2" y="144.0" font-size="9" fill="#8a9a6a" text-anchor="middle">-2%</text>
+<text x="64" y="158.0" font-size="11" fill="#2f2a24" text-anchor="end" font-weight="600">基准</text>
+<line x1="143.1" y1="231.3" x2="261.5" y2="231.3" stroke="#b45309" stroke-width="6" stroke-linecap="round"/>
+<circle cx="143.1" cy="231.3" r="3" fill="#b45309"/>
+<circle cx="261.5" cy="231.3" r="3" fill="#b45309"/>
+<circle cx="202.3" cy="231.3" r="4" fill="#fff" stroke="#b45309" stroke-width="2"/>
+<text x="202.3" y="221.3" font-size="9" fill="#b45309" text-anchor="middle">-12%</text>
+<text x="64" y="235.3" font-size="11" fill="#2f2a24" text-anchor="end" font-weight="600">悲观</text>
+</svg>
+<div class="caption">图：三情景下 1–3 年房价变动区间（红色虚线=0%）。基准中枢约 -2.5%、乐观 +2.5%、悲观 -12.5%；短期买方占优，不宜追高（见 §8 表格）。</div>
+</div>
+<h2>9. 学区 vs 非学区差异比较与后续走势（专章）</h2>
+<table>
+  <tr><th>维度</th><th>目标（华荟花园，商品房口径）</th><th>同施教区可比（依云华府）</th><th>差值</th><th>置信度</th></tr>
+  <tr><td>平均挂牌单价（元/㎡）</td><td class="num">约 28,000–30,000</td><td class="num">19,500–24,000</td><td>高 3,200–5,100</td><td>中-高</td></tr>
+  <tr><td>学区溢价率（纯教育部分）</td><td>未查到公开分拆</td><td>—</td><td>估计有限（学区相同）</td><td>低</td></tr>
+  <tr><td>溢价主要来源</td><td>次新品质+双地铁+万象汇商业 &gt; 学校</td><td>居住价值为主</td><td>—</td><td>中</td></tr>
+</table>
+<p><b>后续走势</b>：</p>
+<ol>
+  <li><b>溢价可持续性</b>：本项目「学区溢价」本就极薄（同施教区有更低价竞品），价差主体是居住与商业溢价，可持续性中等。</li>
+  <li><b>驱动变量</b>：少子化约 6 年传导至小学入学，2030 年前后适龄儿童减少对「学区属性」普遍压制；教育均衡化（多校划片、教师轮岗）若推进将进一步摊薄学校确定性溢价。对第二梯队学校的影响：<b>相对头部更稳（本来溢价就低，无泡沫可挤）</b>。</li>
+  <li><b>触发信号</b>：连续 2–3 个月板块成交量恢复；议价空间收窄；出现华荟 ≤2.6 万/㎡ 或依云华府 ≤2.2 万/㎡ 的同户型成交；栖霞区划片调整公告。</li>
+  <li><b>结论</b>：1–3 年该项目学区相对价值预计平稳（置信度中），无强下跌逻辑也无上涨想象；价格走向主要由南京大盘决定。</li>
+</ol>
+
+<h2>10. 风险清单</h2>
+<ul>
+  <li><b>市场</b>：全市量价齐跌、广义库存出清约 126 个月；限售取消后挂牌激增，短期仍有 -3%~-8% 下探空间<a href="#cite-12" class="cite-ref">[12]</a><a href="#cite-13" class="cite-ref">[13]</a>。</li>
+  <li><b>学区</b>：第二梯队非全市头部；划片以入学当年文件为准（2024–2026 三年一致，风险中低）；2030 年前后施教区次新盘集中交付，入学高峰压力待观察。</li>
+  <li><b>学位占用</b>：栖霞区保留小学 6 年/初中 3 年一学位，买前必须核验卖方学位未占用<a href="#cite-2" class="cite-ref">[2]</a><a href="#cite-3" class="cite-ref">[3]</a>。</li>
+  <li><b>产权混淆</b>：华荟公寓（40 年）不可落户，同案名易混淆，现场必须甄别。</li>
+  <li><b>数据</b>：华荟月度序列来自第三方平台整理（58/安居客），非网签官方口径；伯乐中学升学数据 2019 年后未公开。</li>
+</ul>
+
+<h2>11. 操作建议</h2>
+<p><b>买入条件</b>：华荟 100㎡ 同户型 ≤2.8 万/㎡（总价 ≤280 万），已核验 70 年产权可落户、施教区与当年官方文件一致、卖方学位未占用。</p>
+<p><b>谈判抓手</b>：① 同施教区依云华府单价低 3,200–5,100 元/㎡（同学区！）；② 全市下行+限售解除后挂牌量大；③ 小区挂牌率 7–9% 竞争激烈 → 议价目标 5–8%，要求业主出示最近真实成交记录。</p>
+<p><b>放弃条件</b>：出现华荟同户型成交持续 &gt;3.0 万/㎡（追高无安全边际）；划片出现不利调整；确认房源为 40 年公寓；卖方学位已占用且无法腾退。</p>
+<p><b>替代方案</b>：① <b>招商依云华府（同施教区、性价比更高）</b>；② 青秀城；③ 若追求全市顶级学区，同预算转看鼓楼/玄武头部学区小户型，再对比总价与居住条件。</p>
+
+<h2>12. 评分表</h2>
+<table>
+  <tr><th>维度</th><th>权重</th><th>评分</th><th>说明</th></tr>
+  <tr><td>居住品质</td><td class="num">20%</td><td class="num">8</td><td>次新、双地铁、万象汇商业、华发物业</td></tr>
+  <tr><td>学校确定性</td><td class="num">20%</td><td class="num">8</td><td>三年划片一致、官方文件可核验、无预警；栖霞保留学位占用规则</td></tr>
+  <tr><td>学校质量与生源</td><td class="num">20%</td><td class="num">6</td><td>第二梯队区级优质；复校 8 年无出口验证、入学高峰压力待观察</td></tr>
+  <tr><td>市场流动性</td><td class="num">15%</td><td class="num">6</td><td>挂牌率 7–9% 换手活跃，但全市下行</td></tr>
+  <tr><td>价格安全边际</td><td class="num">15%</td><td class="num">5</td><td>已跌 16% 但趋势未止；同施教区有更低价竞品</td></tr>
+  <tr><td>长期人口与供需</td><td class="num">10%</td><td class="num">6</td><td>少子化压制学区需求，城北成熟度对冲</td></tr>
+  <tr><td><b>加权总分</b></td><td class="num">100%</td><td class="num"><b>6.7</b></td><td>6–8 区间：有支撑但需价格安全边际 → <b>谨慎可买</b></td></tr>
+</table>
+
+<h2>参考资料（点击可查看原文）</h2>
+<ol class="cites">
+<li id="cite-1"><a href="https://www.njqxq.gov.cn/qxqrmzf/202505/P020250516623633494215.docx" target="_blank" rel="noopener">栖霞区2025公办初中施教区范围（伯乐中学含万象天地，docx）</a></li>
+<li id="cite-2"><a href="https://www.njqxq.gov.cn/qxqrmzf/202505/t20250516_5564170.html" target="_blank" rel="noopener">栖霞区2025初中招生实施办法（学位占用/落户规则）</a></li>
+<li id="cite-3"><a href="https://www.njqxq.gov.cn/qxqrmzf/202605/t20260518_5842097.html" target="_blank" rel="noopener">栖霞区2026义务教育招生问答</a></li>
+<li id="cite-4"><a href="http://www.njsxzxx.cn/id365775.html" target="_blank" rel="noopener">晓庄小学2026新生招生公告（施教区含华荟花园）</a></li>
+<li id="cite-5"><a href="http://www.njsxzxx.cn/id333495.html" target="_blank" rel="noopener">晓庄小学素质教育督导自评报告</a></li>
+<li id="cite-6"><a href="https://www.njqxq.gov.cn/qxqrmzf/202410/t20241014_4785159.html" target="_blank" rel="noopener">栖霞区政府对晓庄小学综合督导报告</a></li>
+<li id="cite-7"><a href="http://njblzx.site.qxteacher.com/id9077.html" target="_blank" rel="noopener">伯乐中学官网简介</a></li>
+<li id="cite-8"><a href="https://www.sohu.com/a/392976683_756476" target="_blank" rel="noopener">伯乐中学2019中考数据（校方发文，搜狐）</a></li>
+<li id="cite-9"><a href="https://nj.5i5j.com/xq_news/200011958.html" target="_blank" rel="noopener">我爱我家·华荟花园小区页（房价/在售/在租）</a></li>
+<li id="cite-10"><a href="https://nj.58.com/xinfang/xq104713802-fangjia.html" target="_blank" rel="noopener">58同城·华荟花园房价月度走势</a></li>
+<li id="cite-11"><a href="https://m.anjuke.com/nj/community/1631284/" target="_blank" rel="noopener">安居客·华荟花园小区页</a></li>
+<li id="cite-12"><a href="https://finance.sina.cn/2026-03-18/detail-inhrkwsv9350119.d.html" target="_blank" rel="noopener">克而瑞/新浪财经·2025年南京房地产市场分析</a></li>
+<li id="cite-13"><a href="https://www.nanjing.gov.cn/xxgkn/jytabljggk/2025njytabl/shirddbjy/202512/t20251205_5706163.html" target="_blank" rel="noopener">南京市政府·房七条/首付15%政策答复</a></li>
+<li id="cite-14"><a href="https://m.ke.com/nj/xiaoqu/1413985091455763/" target="_blank" rel="noopener">贝壳·万寿板块房价（青秀城/万寿花苑/依云华府）</a></li>
+<li id="cite-15"><a href="https://www.xdkb.net/rd/450144" target="_blank" rel="noopener">现代快报·城北万象汇2023.12.15开业</a></li>
+</ol>
+
+<div class="foot">
+本报告由 house-buying skill 自动生成（2026-08-11，数据截止 2026-07），不构成投资建议。学区划片以入学当年官方文件为准；建议结合贷款、税费、家庭现金流与实地看房后再决策。
+</div>
+
+</div>
+</body>
+</html>
