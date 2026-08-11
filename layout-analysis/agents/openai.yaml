@@ -1,0 +1,4 @@
+interface:
+  display_name: "Layout Analysis"
+  short_description: "Use when the user wants a floor-plan (户型) analysis of a residential property — accepts a property web link, a floor-plan image, or manually filled layout data; evaluates space utilization, layout flow, orientation/lighting/ventilation, privacy, and renovation potential, and produces a scored full report with pros/cons and fit-for-whom."
+  default_prompt: "Use $layout-analysis to help the user with the declared task."
