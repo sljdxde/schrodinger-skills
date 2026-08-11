@@ -18,6 +18,9 @@
     - Range 内容非零校验：部分国产 CDN 声称支持 Range 且返回 206，但 body 是全
       零字节。探测阶段实测一块数据，若 >95% 为零则判定该 CDN 的 Range 实现有
       缺陷，自动退化为单线程整文件下载
+    - 抗 WAF / 限流自动回退：探测阶段若命中 WAF/限流类响应(如 418/429/401/403/503)，
+      或分块下载时检测到服务器拒绝并发(Range 请求被拦)，立即停止并发并自动改用
+      单线程整文件下载，避免对 WAF 反复重试放大封禁（详见 references/troubleshooting.md 坑七）
     - 断点续传(--resume)：多线程模式下跳过已完成的块(进度记录在 <输出>.mtd-progress)；
       单线程模式下用 curl -C - 续传循环(--max-time 600 + 自动重连)，专门兜底
       不稳定 CDN 的断流问题
@@ -34,9 +37,11 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -51,6 +56,14 @@ RANGE_PROBE_LEN = 16384              # Range 内容非零探测长度
 RANGE_ZERO_RATIO = 0.05              # 非零字节占比低于此值(即 >95% 为零)判定 CDN 缺陷
 PROGRESS_SUFFIX = ".mtd-progress"    # 断点续传进度文件后缀
 
+# WAF / 限流 / 鉴权拦截类响应码：命中即说明服务器在主动拒绝并发或 Range，
+# 应直接改用单线程整文件下载，避免反复重试放大封禁（如华为云 CloudWAF 返回 418 直接拉黑 IP）。
+HTTP_HOSTILE = {401, 403, 407, 418, 429, 503}
+# 网关/瞬态类响应码：可重试，持续失败再回退单线程。
+HTTP_TRANSIENT = {408, 500, 502, 504, 509,
+                  520, 521, 522, 523, 524, 525, 526, 527, 530}
+RANGE_BROKEN = -2                    # 哨兵：服务器无视 Range，返回远超本块的内容
+
 
 def _have_curl() -> bool:
     return shutil.which("curl") is not None
@@ -58,6 +71,24 @@ def _have_curl() -> bool:
 
 def _have_xattr() -> bool:
     return sys.platform == "darwin" and shutil.which("xattr") is not None
+
+
+def _parse_status(hdr_path) -> int:
+    """从 curl -D 写出的响应头文件里取最终 HTTP 状态码。
+
+    带 -L 时文件里会有每一跳的响应头，取最后一行 HTTP 状态（即最终响应）。
+    网络错误 / 无头文件时返回 -1。
+    """
+    try:
+        text = Path(hdr_path).read_text(errors="replace")
+    except Exception:
+        return -1
+    code = -1
+    for line in text.splitlines():
+        m = re.match(r"^HTTP/\S+\s+(\d{3})", line, re.IGNORECASE)
+        if m:
+            code = int(m.group(1))
+    return code
 
 
 class Bar:
@@ -103,26 +134,46 @@ class Bar:
 
 
 def get_remote_info(url):
-    """通过 curl 获取文件大小和是否支持分段下载。
+    """通过 curl 获取文件大小、是否支持分段下载、以及是否存在 WAF/限流特征。
 
-    返回 (size, supports_range)。探测统一使用原始 URL + -L 跟随重定向，
-    避免依赖一次性的 CDN 鉴权 URL。
+    返回 (size, supports_range, hostile)。探测统一使用原始 URL + -L 跟随重定向，
+    避免依赖一次性的 CDN 鉴权 URL。hostile 为 True 表示已明确命中 WAF/限流类响应，
+    上层应直接走单线程下载，避免对服务器发起并发 Range 请求而被封。
     """
     result = subprocess.run(
         ["curl", "-sIL", "--max-time", "15", "-o", "/dev/null",
-         "-w", "SIZE:%header{content-length}\nRANGE:%header{accept-ranges}\nCODE:%{response_code}",
+         "-w", "SIZE:%{size_download}\nCL:%header{content-length}\n"
+               "RANGE:%header{accept-ranges}\nCODE:%{response_code}",
          url],
         capture_output=True, text=True, timeout=20)
     size = 0
     supports_range = False
+    hostile = False
+    code = -1
     for line in result.stdout.strip().split("\n"):
         if line.startswith("SIZE:"):
             try:
                 size = int(line.split(":", 1)[1])
             except ValueError:
                 pass
+        elif line.startswith("CL:"):
+            if size == 0:
+                try:
+                    size = int(line.split(":", 1)[1])
+                except ValueError:
+                    pass
         elif line.startswith("RANGE:"):
             supports_range = "bytes" in line.lower()
+        elif line.startswith("CODE:"):
+            try:
+                code = int(line.split(":", 1)[1])
+            except ValueError:
+                code = -1
+
+    # HEAD 直接命中明确的 WAF/限流码(418/429)：直接判 hostile，不再发任何探测请求，
+    # 避免对 WAF 发起后续 Range 请求触发 IP 封禁。
+    if code in (418, 429):
+        return size, False, True
 
     if size and supports_range:
         # 第一步稳健性: 很多服务器响应头写 accept-ranges: bytes，但对 Range 请求
@@ -134,7 +185,10 @@ def get_remote_info(url):
             ["curl", "-sL", "-o", "/dev/null", "--max-time", "15",
              "-r", "0-0", "-w", "%{http_code}", url],
             capture_output=True, text=True, timeout=20)
-        if probe.stdout.strip() != "206":
+        pcode = probe.stdout.strip()
+        if pcode != "206":
+            if pcode.isdigit() and int(pcode) in HTTP_HOSTILE:
+                hostile = True
             supports_range = False
 
         # 第二步稳健性(针对国产 CDN 缺陷): 部分 CDN 返回 206 但 body 全是零字节。
@@ -143,7 +197,7 @@ def get_remote_info(url):
         if supports_range and not _range_content_ok(url, size):
             supports_range = False
 
-    return size, supports_range
+    return size, supports_range, hostile
 
 
 def _range_content_ok(url, total_size) -> bool:
@@ -201,19 +255,28 @@ def _range_content_ok(url, total_size) -> bool:
 
 
 def _download_block(url, start, end, fd, max_retry):
-    """下载单个固定小块 [start, end]，块内独立重试，成功返回 True。
+    """下载单个固定小块 [start, end]。返回 (ok, code)。
+
+    code 为服务器最终 HTTP 状态码(解析自 -D 响应头)；网络错误为 -1；
+    服务器无视 Range 返回越界内容为 RANGE_BROKEN(-2)。
 
     关键稳健性:
-    - 每个块都用「原始 URL + curl -Lf」独立重定向，规避 CDN 鉴权 URL 过期。
+    - 每个块都用「原始 URL + curl -L」独立重定向，规避 CDN 鉴权 URL 过期。
     - 精确读取本块字节数(need)，用 os.pwrite 按绝对偏移写，排空多余的响应体，
       避免越界覆盖其它块。
     - 探测阶段已校验非全零，流式写入安全；重试时重新整块覆盖同一偏移即可。
+    - 命中 WAF/限流类码(HTTP_HOSTILE)立即返回，不再块内重试——
+      由上层统一决策是否回退单线程，避免对 WAF 反复重试放大封禁。
     """
     need = end - start + 1
     for attempt in range(max_retry):
+        hdr_name = None
         try:
+            fd_h, hdr_name = tempfile.mkstemp(suffix=".hdr", prefix="mtd_")
+            os.close(fd_h)
             proc = subprocess.Popen(
-                ["curl", "-sLf", "--max-time", "60", "-r", f"{start}-{end}", url],
+                ["curl", "-sL", "-D", hdr_name, "-o", "-", "--max-time", "60",
+                 "-r", f"{start}-{end}", url],
                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
             pos = start
             got = 0
@@ -228,13 +291,24 @@ def _download_block(url, start, end, fd, max_retry):
             while proc.stdout.read(65536):
                 pass
             ret = proc.wait()
+            code = _parse_status(hdr_name)
             if ret == 0 and got == need:
-                return True
+                return True, code
+            if code in HTTP_HOSTILE:
+                return False, code          # 立刻上报，停止重试
+            if got > need * 4:
+                return False, RANGE_BROKEN  # 撒谎 Range：返回了远超本段的内容
+            # 其余(transient / 网络错 / 其它)按指数退避重试
         except Exception:
             pass
-        # 指数退避后重试（覆盖重下同一偏移，安全）
+        finally:
+            if hdr_name and os.path.exists(hdr_name):
+                try:
+                    os.unlink(hdr_name)
+                except OSError:
+                    pass
         time.sleep(min(2 ** attempt, 8))
-    return False
+    return False, -1
 
 
 def _save_progress(progress_file: Path, done_set, total_chunks):
@@ -248,7 +322,12 @@ def _save_progress(progress_file: Path, done_set, total_chunks):
 
 
 def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, resume):
-    """多线程固定小分块下载 + 块级重试容错 + 断点续传。"""
+    """多线程固定小分块下载 + 块级重试容错 + 断点续传。
+
+    稳定性增强：分块下载时若检测到 WAF/限流/鉴权拦截(HTTP_HOSTILE)或服务端
+    无视 Range(RANGE_BROKEN)，立即停止并发并自动回退单线程整文件下载；
+    仅瞬时错误则先单线程补下失败块，仍失败再回退单线程。
+    """
     chunks = []
     pos = 0
     cid = 0
@@ -292,6 +371,9 @@ def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, r
     printer.start()
 
     errors = []
+    failed_chunks = []
+    saw_hostile = None          # 首个 hostile 码（None 表示未命中）
+    saw_range_broken = False
     prog_lock = threading.Lock()
     try:
         with ThreadPoolExecutor(max_workers=threads) as pool:
@@ -302,44 +384,106 @@ def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, r
                 futures[pool.submit(_download_block, url, s, e, fd, max_retry)] = (cid, s, e)
             for fut in as_completed(futures):
                 cid, s, e = futures[fut]
-                if fut.result():
+                ok, code = fut.result()
+                if ok:
                     bar.add(e - s + 1)
                     with prog_lock:
                         done.add(cid)
                         _save_progress(progress_file, done, total_chunks)
                 else:
-                    errors.append(f"  分块{cid}({s}-{e}) 重试{max_retry}次仍失败")
+                    errors.append(f"  分块{cid}({s}-{e}) 失败(code={code})")
+                    failed_chunks.append((cid, s, e))
+                    if code in HTTP_HOSTILE:
+                        saw_hostile = code
+                    elif code == RANGE_BROKEN:
+                        saw_range_broken = True
+                    # 命中 WAF/限流：立刻取消其余未开始任务，停止对 WAF 施压
+                    if saw_hostile is not None:
+                        for f2 in futures:
+                            if f2 is not fut:
+                                f2.cancel()
+                        break
     finally:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
         bar.alive = False
         printer.join(timeout=1)
 
-    if errors:
-        for e in errors:
-            sys.stderr.write(e + "\n")
+    if not failed_chunks:
         try:
-            out_path.unlink()
+            os.close(fd)
         except OSError:
             pass
         try:
             progress_file.unlink()
         except OSError:
             pass
-        sys.stderr.write("  下载未完成，已删除不完整的文件\n")
-        return False
+        if out_path.stat().st_size != total_size:
+            sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
+            return False
+        sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
+        return True
 
+    # 需要回退到单线程的情况
+    if saw_hostile is not None:
+        sys.stderr.write(
+            f"  ⚠ 检测到服务器拒绝并发(WAF/限流, HTTP {saw_hostile})，"
+            f"自动切换单线程下载避免被封\n")
+    elif saw_range_broken:
+        sys.stderr.write(
+            "  ⚠ 检测到服务器无视 Range(返回越界内容)，自动切换单线程下载\n")
+    else:
+        # 仅瞬时失败：已完成的块保留，先尝试单线程逐个补下失败块
+        sys.stderr.write(
+            f"  ⚠ {len(failed_chunks)} 个分块持续失败，尝试单线程补下\n")
+        refill_all_ok = True
+        for cid, s, e in failed_chunks:
+            ok, _ = _download_block(url, s, e, fd, max_retry)
+            if ok:
+                bar.add(e - s + 1)
+                with prog_lock:
+                    done.add(cid)
+                    _save_progress(progress_file, done, total_chunks)
+            else:
+                refill_all_ok = False
+        if refill_all_ok:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                progress_file.unlink()
+            except OSError:
+                pass
+            if out_path.stat().st_size != total_size:
+                sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
+                return False
+            sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
+            return True
+        sys.stderr.write("  ⚠ 单线程补下仍失败，回退整文件单线程下载\n")
+
+    # —— 回退：整文件单线程流式下载（覆盖半成品）——
+    try:
+        os.close(fd)
+    except OSError:
+        pass
+    try:
+        out_path.unlink()
+    except OSError:
+        pass
     try:
         progress_file.unlink()
     except OSError:
         pass
-    if out_path.stat().st_size != total_size:
-        sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
-        return False
-    sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
-    return True
+    fb_bar = Bar(total_size, out_path.name)
+    fb_printer = threading.Thread(target=fb_bar.print_thread, daemon=True)
+    fb_printer.start()
+    try:
+        ok = _download_single(url, out_path, total_size, False, fb_bar)
+    finally:
+        fb_bar.alive = False
+        fb_printer.join(timeout=1)
+    if not ok:
+        sys.stderr.write("  单线程回退下载也失败，已删除不完整的文件\n")
+    return ok
 
 
 def _curl_stream(url, out_path, total_size, bar):
@@ -377,7 +521,7 @@ def _curl_stream(url, out_path, total_size, bar):
 
 
 def _download_single(url, out_path, total_size, resume, bar):
-    """单线程路径：不支持 Range / 文件过小 / 未知大小 / 强制单线程。
+    """单线程路径：不支持 Range / 文件过小 / 未知大小 / 强制单线程 / 多线程回退。
 
     支持 --resume 续传循环（curl -C - + --max-time 600 + 自动重连）。
     """
@@ -458,12 +602,14 @@ def download(url, out_name=None, threads=THREADS, chunk_mb=CHUNK_MB,
     # 1. 探测
     sys.stderr.write("  正在探测服务器... ")
     sys.stderr.flush()
-    total_size, supports_range = get_remote_info(url)
+    total_size, supports_range, hostile = get_remote_info(url)
     if total_size == 0:
         sys.stderr.write("⚠ 无法获取文件大小，改用单线程流式下载\n")
     else:
-        mode = "多线程分段" if (supports_range and total_size > PART_THRESHOLD) else "单线程"
+        mode = "多线程分段" if (supports_range and total_size > PART_THRESHOLD and not hostile) else "单线程"
         sys.stderr.write(f"OK ({total_size/1024/1024:.0f}MB, {mode})\n")
+        if hostile:
+            sys.stderr.write("  ⚠ 探测到 WAF/限流特征，将使用单线程下载\n")
 
     # 2. 文件名
     if not out_name:
@@ -496,7 +642,7 @@ def download(url, out_name=None, threads=THREADS, chunk_mb=CHUNK_MB,
 
     # 4. 多线程 or 单线程
     use_multi = (total_size > 0 and supports_range
-                 and total_size > PART_THRESHOLD and not force_single)
+                 and total_size > PART_THRESHOLD and not force_single and not hostile)
     if use_multi:
         ok = _download_multi(url, out_path, total_size, threads,
                              chunk_mb * 1024 * 1024, max_retry, resume)

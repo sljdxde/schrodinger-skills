@@ -1,6 +1,6 @@
 ---
 name: mtd-download
-description: Use this skill when downloading a large file over HTTP/HTTPS and a single connection is too slow. Multi-threaded range-based downloader (curl engine) that auto-detects server Range support, falls back to single-threaded streaming when Range is unavailable or file size is unknown, shows live progress/speed/ETA, and requires no pip dependencies.
+description: Use this skill when downloading a large file over HTTP/HTTPS and a single connection is too slow. Multi-threaded range-based downloader (curl engine) that auto-detects server Range support, falls back to single-threaded streaming when Range is unavailable / file size is unknown / or the server blocks concurrency (WAF 418, rate-limit 429, 401/403/503), shows live progress/speed/ETA, and requires no pip dependencies.
 ---
 
 # MTD Download
@@ -14,6 +14,7 @@ description: Use this skill when downloading a large file over HTTP/HTTPS and a 
 - **每个线程独立重定向，规避 CDN 鉴权过期**：多线程分块时每个线程都用「原始 URL + curl -L」独立跟随 CDN 重定向，不去共用探测阶段拿到的、带 `Expires/Signature` 的一次性鉴权 URL，避免部分线程被 CDN 拒绝、把 HTML 错误页当文件数据写入。
 - **Range 内容非零校验**：部分国产 CDN 声称支持 Range 且返回 206，但 body 全是零字节。探测阶段实测下载一块数据（优先文件中部），若 >95% 为零则判定该 CDN 的 Range 实现有缺陷，自动退化为单线程整文件下载。
 - **只写自己的区间**：多线程用 `os.pwrite` 按绝对偏移写，即使服务器无视 `Range` 返回了整文件，也只保留本分块该有的那一段，绝不会越界覆盖别人。
+- **抗 WAF / 限流，自动回退单线程**：探测阶段若命中 WAF/限流类响应（HTTP 418/429，以及 401/403/407/503），或分块下载时检测到服务器拒绝并发（Range 请求被拦、返回越界内容），立即停止并发并自动改用单线程整文件下载，避免对 WAF 反复重试放大封禁（如华为云 CloudWAF 返回 418 直接拉黑 IP）。纯瞬时错误（网络抖动、5xx 网关）则先单线程补下失败块，仍失败再回退单线程。
 - **断点续传（--resume）**：多线程模式下把已完成块记录在 `<输出>.mtd-progress`，中断后重跑 `--resume` 只补下未完成块；单线程模式下用 `curl -C -` 续传循环（`--max-time 600` + 自动重连），专门兜底不稳定 CDN 的断流。输出文件已存在时默认报错，需显式 `--resume` 或 `--overwrite`。
 - **不留损坏文件**：多线程任一分块失败（或单线程 curl 返回非 0 / 大小不符），直接删掉不完整的输出，而不是默默留一个坏文件。
 - **进度走 stderr**：下载进度、日志全部写 stderr，stdout 保持干净，方便在脚本里管道复用。
@@ -85,7 +86,7 @@ python scripts/mtd.py <URL> --no-clear-quarantine
 ## 行为说明
 
 - **探测阶段**：打印文件大小、是否支持分段。
-- **多线程路径**（支持 Range 且 > 4MB）：预分配文件 → 切成固定 5MB 小块（可 `--chunk` 调整）→ 线程池消费任务队列，每块独立 `-L` 跟随重定向、独立下载、独立重试（默认 5 次，`--max-retry` 可调）→ 块级容错（单块失败不影响其它块）→ 合并校验大小。小分块设计从源头规避「单连接限速 + 大块 Range 挂死」型 CDN 的卡死。
+- **多线程路径**（支持 Range 且 > 4MB 且探测未命中 WAF/限流）：预分配文件 → 切成固定 5MB 小块（可 `--chunk` 调整）→ 线程池消费任务队列，每块独立 `-L` 跟随重定向、独立下载、独立重试（默认 5 次，`--max-retry` 可调）→ 块级容错（单块失败不影响其它块）→ 合并校验大小。小分块设计从源头规避「单连接限速 + 大块 Range 挂死」型 CDN 的卡死。**稳定性增强**：分块下载时若命中 WAF/限流（HTTP 418/429/401/403/407/503）或服务器无视 Range（返回越界内容），立即中止并发并自动回退单线程整文件下载；仅瞬时错误则先单线程补下失败块，仍失败再回退。绝不会像旧版那样对 WAF 反复重试放大封禁。
 - **单线程路径**（不支持 Range / 文件 ≤ 4MB / 拿不到大小 / `--single`）：直接流式下载；拿不到大小时进度条显示 `??%`。
 - **断点续传（`--resume`）**：多线程模式把已完成块记录在 `<输出>.mtd-progress`，重跑时跳过已完成块只补剩余；单线程模式用 `curl -C -` 续传循环（`--max-time 600` + 自动重连）兜底断流。输出文件已存在时默认报错，需显式 `--resume` 或 `--overwrite`。
 - **重试**：每个小块失败自动重试（默认 5 次，指数退避），全部块重试完仍失败才整体失败。
