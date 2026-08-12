@@ -104,17 +104,24 @@ def remote_version_url() -> str:
     )
 
 
-def fetch_remote_version(timeout: int = 20) -> tuple[int, int, int] | None:
-    """小流量拉取远端版本文件并解析版本；任何失败都返回 None（回退 manifest）。"""
-    try:
-        with urllib.request.urlopen(remote_version_url(), timeout=timeout) as response:
-            text = response.read().decode("utf-8", errors="replace")
-    except Exception:
-        return None
-    if VERSION_FILE:
-        return parse_semver(text)
-    raw = extract_version_from_skill_md(text)
-    return parse_semver(raw) if raw else None
+def fetch_remote_version(timeout: int = 20, retries: int = 1) -> tuple[int, int, int] | None:
+    """小流量拉取远端版本文件并解析版本；任何失败都返回 None（回退 manifest）。
+
+    代理/网络抖动的场景下做一次重试，尽量让开销更小的版本优先路径生效，
+    避免直接退回需要下载整个仓库压缩包的清单比对。
+    """
+    last_error: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(remote_version_url(), timeout=timeout) as response:
+                text = response.read().decode("utf-8", errors="replace")
+            if VERSION_FILE:
+                return parse_semver(text)
+            raw = extract_version_from_skill_md(text)
+            return parse_semver(raw) if raw else None
+        except Exception as exc:  # noqa: BLE001 - any failure → fall back
+            last_error = exc
+    return None
 
 
 def version_relation(local: tuple[int, int, int], remote: tuple[int, int, int]) -> str:
@@ -336,9 +343,21 @@ def check_status() -> dict[str, object]:
         return status
 
     # Legacy fallback: full manifest comparison (keeps old skills/remotes working).
-    with tempfile.TemporaryDirectory(prefix=f"{SKILL_NAME}-remote-") as tmp_name:
-        remote_skill = download_remote_skill(Path(tmp_name))
-        comparison = compare_manifests(manifest(skill_dir), manifest(remote_skill))
+    # Network failures here must degrade gracefully instead of crashing the CLI.
+    try:
+        with tempfile.TemporaryDirectory(prefix=f"{SKILL_NAME}-remote-") as tmp_name:
+            remote_skill = download_remote_skill(Path(tmp_name))
+            comparison = compare_manifests(manifest(skill_dir), manifest(remote_skill))
+    except Exception as exc:  # noqa: BLE001 - degrade gracefully on network/IO errors
+        status["skill_update"] = {
+            "method": "error",
+            "error": f"manifest fallback failed: {type(exc).__name__}: {exc}",
+            "update_available": None,
+            "local_version": format_semver(local_version) if local_version else None,
+            "remote_version": format_semver(remote_version) if remote_version else None,
+            "note": "could not reach remote or parse remote skill; re-run later or check network",
+        }
+        return status
     comparison["method"] = "manifest"
     comparison["local_version"] = format_semver(local_version) if local_version else None
     comparison["remote_version"] = format_semver(remote_version) if remote_version else None
