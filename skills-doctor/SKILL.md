@@ -1,6 +1,7 @@
 ---
 name: skills-doctor
 description: Use this skill when diagnosing, auditing, or fixing AI agent skills. Detects risks, conflicts, duplicates, zombies, and generates fix prompts. Supports Claude Code, Codex, Cursor, OpenCode etc.
+version: 1.0.0
 ---
 
 # Skills Doctor

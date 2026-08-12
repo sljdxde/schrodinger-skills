@@ -84,6 +84,10 @@ def validate(bp: dict) -> None:
     if criteria is not None and not isinstance(criteria, list):
         raise ValueError("blueprint 'evaluation_criteria' must be a list")
 
+    version = bp.get("version")
+    if version is not None and not re.match(r"^\d+\.\d+(\.\d+)?$", str(version).strip()):
+        raise ValueError(f"blueprint 'version' must look like semver (e.g. 0.1.0), got {version!r}")
+
 
 def _bullet(items) -> str:
     return "\n".join(f"- {str(i).strip()}" for i in items if str(i).strip())
@@ -258,7 +262,8 @@ def render_skill_md(bp: dict, name: str, display_name: str) -> str:
     elif isinstance(data_sources, str) and data_sources.strip():
         sections += ["", f"**外部数据与凭证（F8）：** {data_sources.strip()}", ""]
 
-    frontmatter = f"---\nname: {name}\ndescription: {bp['description']}\n---"
+    version = str(bp.get("version") or "0.1.0").strip()
+    frontmatter = f"---\nname: {name}\ndescription: {bp['description']}\nversion: {version}\n---"
     return frontmatter + "\n\n" + "\n".join(sections).rstrip() + "\n"
 
 

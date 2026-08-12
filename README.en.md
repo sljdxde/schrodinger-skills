@@ -25,6 +25,8 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 Skills in this repository that provide self-update support can compare their local folder with the latest GitHub copy, back up and sync themselves when needed, and update backing tool packages when the skill depends on one. Bundles also provide an explicit installation entry point.
 
+Self-update uses **semantic versioning**: each skill declares a `version` in its `SKILL.md` frontmatter (bundles use a root-level `VERSION` file). The updater compares the remote version first and downloads nothing when versions match; if either side lacks a version it falls back to the legacy file-manifest comparison, so old scripts and old installs stay fully compatible. Rules are in [docs/versioning.md](./docs/versioning.md).
+
 The self-update helper requires `python`; npm-backed skills such as Skills-Doctor also require `npm` for package updates.
 
 ---

@@ -1,6 +1,7 @@
 ---
 name: house-buying
 description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations.
+version: 1.0.0
 ---
 
 # House Buying

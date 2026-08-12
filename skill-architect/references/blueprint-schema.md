@@ -21,6 +21,7 @@
 
   // 可选
   "display_name": "Travel Assistant",      // SKILL.md 标题与 openai.yaml display_name；缺省用 name
+  "version": "0.1.0",                      // SKILL.md frontmatter 的语义化版本；缺省 0.1.0。后续每次修改用 tools/bump_version.py 递增（规则见 docs/versioning.md）
   "intro": "一句话介绍这个 skill 的定位。",
   "trigger": "当用户想规划旅行时使用本 skill……",
   "audience": "自由行用户，多为规划经验有限的小白到进阶。", // F1：使用者画像与水平
@@ -74,6 +75,7 @@
 | `boundaries` | 必填对象，且 `include`/`exclude` 都是数组 |
 | `references[]` | 每个元素只允许 `title` / `outline` 两个键，`title` 必填 |
 | `evaluation_criteria` | 若提供必须是数组 |
+| `version` | 可选，须形如 `X.Y.Z`（或 `X.Y`）；缺省生成 `0.1.0`，写入 SKILL.md frontmatter |
 | `input_spec` / `output_spec` / `analysis` / `interaction_model` / `audience` / `data_sources` | 均为可选对象/字符串；字段宽松接受，不影响校验通过 |
 
 任何一条不满足，脚本报错退出（exit 1），不会生成半成品。可选字段若提供，会被 `compile_skill.py` 渲染成 SKILL.md 的对应章节（见下）。

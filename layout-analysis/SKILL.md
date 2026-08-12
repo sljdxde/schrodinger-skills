@@ -1,6 +1,7 @@
 ---
 name: layout-analysis
 description: Use when the user wants a floor-plan (户型) analysis of a residential property — accepts a property web link, a floor-plan image, or manually filled layout data; evaluates space utilization, layout flow, orientation/lighting/ventilation, privacy, and renovation potential, and produces a scored full report with pros/cons and fit-for-whom.
+version: 1.0.0
 ---
 
 # Layout Analysis

@@ -1,6 +1,7 @@
 {
   "name": "travel-assistant",
   "display_name": "Travel Assistant",
+  "version": "0.1.0",
   "description": "Use when the user wants to plan a trip — builds day-by-day itineraries, allocates budget across transport/board/tickets/dining, picks hotels by location/price/rating trade-offs, and flags visa/insurance/weather risks.",
   "intro": "面向自由行的旅行规划助手：把天数、预算、偏好落成可执行的行程单，并主动提示预算与风险缺口。",
   "trigger": "当用户想规划一次旅行（说清目的地、天数、预算或偏好）时使用本 skill。",

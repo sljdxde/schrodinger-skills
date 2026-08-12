@@ -23,6 +23,8 @@
 
 本仓库中提供自检更新机制的 skill 会在运行时检查 GitHub 上对应目录是否更新，必要时备份并同步本地 skill；带外部工具依赖的 skill 还会检查对应工具包版本。组合包会额外提供明确的安装入口。
 
+自更新走**语义化版本号**：每个 skill 在 `SKILL.md` frontmatter 声明 `version`（组合包用根目录 `VERSION` 文件），更新脚本优先比对远端版本号，版本一致不下载任何内容；任一侧没有版本号时自动回退到旧的文件清单比对，老脚本与老安装完全兼容。规则见 [docs/versioning.md](./docs/versioning.md)。
+
 自检更新需要本机可运行 `python`；`Skills-Doctor` 的 npm 包自动更新还需要本机可运行 `npm`。
 
 ---

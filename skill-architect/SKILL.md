@@ -1,6 +1,7 @@
 ---
 name: skill-architect
 description: Use when the user wants to turn a vague need or personal/domain experience into a working, installable AI Agent Skill — runs a comprehensive first-principles interview (10 facets: identity, audience, goal, input, process, analysis framework, output spec, boundaries, knowledge, interaction/quality) as a decision tree with question clusters, produces a Skill Blueprint, compiles it into a schrodinger-skills package (SKILL.md + agents/openai.yaml + scripts/update_self.py + references/), and evaluates the result with a 4-dimension rubric.
+version: 1.0.0
 ---
 
 # Skill Architect
@@ -70,6 +71,7 @@ python scripts/update_self.py --apply
 每次完整产出 Skill 至少覆盖：
 
 - 是否有清晰的 `name`（小写连字符）与英文 `description`（以 "Use when..." 起头，写明触发条件）。
+- 是否有 `version`（语义化版本，新 skill 默认 `0.1.0`；后续每次修改必须用 `tools/bump_version.py` 递增，规则见仓库 `docs/versioning.md`）。
 - 是否有 3–8 条明确能力（capabilities），每条可独立验证。
 - 是否同时写了「包含」与「不包含」边界。
 - **是否有 `input_spec`**：输入渠道、必填/选填、格式、缺失行为。

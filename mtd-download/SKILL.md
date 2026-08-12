@@ -1,6 +1,7 @@
 ---
 name: mtd-download
 description: Use this skill when downloading a large file over HTTP/HTTPS and a single connection is too slow. Multi-threaded range-based downloader (curl engine) that auto-detects server Range support, falls back to single-threaded streaming when Range is unavailable / file size is unknown / or the server blocks concurrency (WAF 418, rate-limit 429, 401/403/503), shows live progress/speed/ETA, and requires no pip dependencies.
+version: 1.0.0
 ---
 
 # MTD Download
