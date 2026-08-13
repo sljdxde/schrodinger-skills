@@ -41,6 +41,9 @@ ICONS = {
     "check": '<path d="M20 6 9 17l-5-5"/>',
     "x": '<path d="M18 6 6 18"/><path d="M6 6l12 12"/>',
     "flame": '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+    "lightbulb": '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>',
+    "layers": '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
+    "repeat": '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
 }
 
 
@@ -55,11 +58,35 @@ def icon(name: str, size: int = 18, cls: str = "") -> str:
     )
 
 
-
-
 # ---------------------------------------------------------------------------
 # Concept card / quiz / review rendering
 # ---------------------------------------------------------------------------
+def build_feynman_answer(c: dict) -> str:
+    """Standard explanation shown when the learner clicks '复述 / 看标准讲解'.
+
+    Prefers an explicit ``feynman_answer`` field; otherwise composes a
+    reference from the card's own back-face + plain points + analogy so that
+    packages built before this field existed still get a useful answer.
+    """
+    fa = c.get("feynman_answer")
+    if fa:
+        return f"<p>{html.escape(str(fa))}</p>"
+    parts: list[str] = []
+    back = html.escape(str(c.get("card_back", "")))
+    if back:
+        parts.append(f"<p>{back}</p>")
+    plain = c.get("plain") or []
+    if isinstance(plain, str):
+        plain = [plain]
+    if plain:
+        items = "".join(f"<li>{html.escape(str(p))}</li>" for p in plain)
+        parts.append(f"<ul class='plain'>{items}</ul>")
+    story = html.escape(str(c.get("story", "")))
+    if story:
+        parts.append(f"<p class='fa-story'><strong>类比：</strong>{story}</p>")
+    return "\n".join(parts) or "<p>（暂无标准讲解，参考卡片背面要点）</p>"
+
+
 def render_cards(concepts: list[dict]) -> str:
     out = []
     for i, c in enumerate(concepts):
@@ -91,21 +118,35 @@ def render_cards(concepts: list[dict]) -> str:
             f'<div class="websource">{icon("link", 12)} <span>{web_source}</span></div>'
             if web_source else ""
         )
-        feynman_block = (
-            f'<div class="feynman"><span class="tag">费曼</span>{feynman}'
-            f'<span class="feynman-check" role="button" tabindex="0" '
-            f'onkeydown="if(event.key===\'Enter\'||event.key===\' \')this.click()">'
-            f'<span class="fchk-box">{icon("square", 14)}</span>'
-            f'<span class="fchk-label">我用大白话讲了一遍</span></span></div>'
-            if feynman else ""
-        )
+        # Feynman module: a "retell" button reveals the standard answer panel,
+        # then a separate "I checked it" toggle records progress (XP + sync).
+        feynman_block = ""
+        if feynman:
+            ans_html = build_feynman_answer(c)
+            feynman_block = (
+                f'<div class="feynman">'
+                f'<span class="tag feynman-tag">费曼复述</span>'
+                f'<div class="feynman-prompt">{feynman}</div>'
+                f'<button class="feynman-retell" type="button" '
+                f'onclick="onFeynmanRetell(this)">'
+                f'{icon("pen-line", 15)} <span>复述 / 看标准讲解</span></button>'
+                f'<div class="feynman-answer" hidden>'
+                f'<div class="fa-title">{icon("check", 14)} 标准讲解（对照自评）</div>'
+                f'<div class="fa-body">{ans_html}</div></div>'
+                f'<span class="feynman-check" role="button" tabindex="0" '
+                f'onclick="onFeynmanCheck(this)" '
+                f'onkeydown="if(event.key===\'Enter\'||event.key===\' \')onFeynmanCheck(this)">'
+                f'<span class="fchk-box">{icon("square", 14)}</span>'
+                f'<span class="fchk-label">我已对照核对</span></span>'
+                f'</div>'
+            )
         visual_block = f'<div class="visual">{svg}</div>' if svg else ""
         out.append(
             f"""
 <div class="card" id="card-{i}">
   <div class="card-head"><span class="card-no">{i+1}</span><h3>{term}</h3></div>
-  <div class="flip" onclick="this.classList.toggle('flipped')" role="button" tabindex="0"
-       onkeydown="if(event.key==='Enter'||event.key===' ')this.classList.toggle('flipped')">
+  <div class="flip" onclick="onFlip(this)" role="button" tabindex="0"
+       onkeydown="if(event.key==='Enter'||event.key===' ')onFlip(this)">
     <div class="flip-inner">
       <div class="flip-front"><div class="q-label">先想想</div><div class="q-text">{front}</div>
         <div class="flip-hint">点击翻看答案</div></div>
@@ -154,7 +195,7 @@ def render_quiz(quiz: dict | None) -> str:
         f'<div class="quiz" data-qid="{qid}">'
         f'<div class="quiz-q"><span class="tag quiz-tag">自测</span>{q}</div>'
         f'<div class="quiz-body">{body}</div>'
-        f'<button class="quiz-check" type="button">检查</button>'
+        f'<button class="quiz-check" type="button" onclick="checkQuiz(this)">检查</button>'
         f'<div class="quiz-feedback" hidden></div>'
         f'<div class="quiz-explain" hidden>解析：{explain}</div>'
         f"</div>"
@@ -163,7 +204,6 @@ def render_quiz(quiz: dict | None) -> str:
 
 def render_review(concepts: list[dict], review: list[dict]) -> str:
     rows = []
-    # map concept_id -> term
     term_by_id = {c.get("id"): c.get("term", "") for c in concepts}
     for r in review:
         cid = r.get("concept_id", "")
@@ -174,14 +214,14 @@ def render_review(concepts: list[dict], review: list[dict]) -> str:
             intervals = [1, 6, 16, 40]
         first = intervals[0] if intervals else 1
         btns = "".join(
-            f'<button type="button" class="rate" data-q="{q}">{q}</button>'
+            f'<button type="button" class="rate" data-q="{q}" onclick="rate(this)">{q}</button>'
             for q in range(0, 6)
         )
         rows.append(
             f"""<tr data-ef="{ef}" data-n="0" data-last="{first}">
   <td class="rv-term">{term}</td>
   <td class="rv-next">+{first} 天</td>
-  <td class="rv-rate">评分 {btns}</td>
+  <td class="rv-rate">{btns}</td>
 </tr>"""
         )
     return (
@@ -249,7 +289,6 @@ def compute_gamification(data: dict) -> dict:
     if user.get("xp_rules"):
         gam["xp_rules"] = user["xp_rules"]
     if user.get("badges"):
-        # 追加式合并：默认勋章保留，用户提供同 id 覆盖、新 id 追加
         by_id = {b["id"]: b for b in gam["badges"]}
         for b in user["badges"]:
             by_id[b["id"]] = b
@@ -259,6 +298,7 @@ def compute_gamification(data: dict) -> dict:
     quiz_total = sum(1 for c in concepts if c.get("quiz"))
     feynman_total = sum(1 for c in concepts if c.get("feynman"))
     review_total = len(data.get("review_schedule", []))
+    cards_total = len(concepts)
     has_web = any(str(c.get("web_source", "")).strip() for c in concepts)
 
     filtered = []
@@ -273,6 +313,7 @@ def compute_gamification(data: dict) -> dict:
         filtered.append(b)
     gam["badges"] = filtered
     gam["_totals"] = {
+        "cards_total": cards_total,
         "quiz_total": quiz_total,
         "feynman_total": feynman_total,
         "review_total": review_total,
@@ -285,13 +326,42 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
     """Return (honor_bar_html, hall_of_fame_html, pkg_json_string)."""
     totals = gam.get("_totals", {})
     first_level = gam["levels"][0]["title"] if gam["levels"] else "初心学徒"
+
+    # Mini badge strip (lives inside the sticky honor bar, updates live)
+    mini = []
+    for b in gam["badges"]:
+        mini.append(
+            f'<span class="hb-mini locked" id="hb-badge-{b["id"]}" '
+            f'title="{html.escape(b["name"])}：{html.escape(b["desc"])}">'
+            f'{icon(str(b.get("icon", "medal")), 16)}</span>'
+        )
+    mini_html = "".join(mini)
+
     honor_bar = f"""
 <div class="honor-bar" id="honorBar">
-  <div class="hb-level"><span class="hb-badge">{icon('award', 18)}</span><span id="hbLevelName">{html.escape(first_level)}</span>
-    <span class="hb-lv" id="hbLevelNo">Lv.1</span></div>
-  <div class="hb-xp"><div class="hb-xp-track"><div class="hb-xp-fill" id="hbXpFill"></div></div>
-    <span class="hb-xp-text" id="hbXpText">0 XP</span></div>
-  <div class="hb-streak"><span id="hbStreakIcon">{icon('flame', 16)}</span><span id="hbStreak">0</span> 天连续</div>
+  <div class="hb-left">
+    <div class="hb-level">
+      <span class="hb-badge">{icon('award', 18)}</span>
+      <div class="hb-lv-text"><span id="hbLevelName">{html.escape(first_level)}</span>
+        <span class="hb-lv" id="hbLevelNo">Lv.1</span></div>
+    </div>
+    <div class="hb-xp">
+      <div class="hb-xp-track"><div class="hb-xp-fill" id="hbXpFill"></div></div>
+      <span class="hb-xp-text" id="hbXpText">0 XP</span>
+    </div>
+  </div>
+  <div class="hb-stats">
+    <div class="hb-stat"><span id="hbDoneCards">0/0</span><span class="hb-stat-label">卡片</span></div>
+    <div class="hb-stat"><span id="hbDoneQuiz">0/0</span><span class="hb-stat-label">自测</span></div>
+    <div class="hb-stat"><span id="hbDoneReview">0/0</span><span class="hb-stat-label">复习</span></div>
+    <div class="hb-stat"><span id="hbDoneFeynman">0/0</span><span class="hb-stat-label">费曼</span></div>
+    <div class="hb-stat"><span class="hb-streak" id="hbStreakIcon">{icon('flame', 16)}</span>'
+        f'<span id="hbStreak">0</span><span class="hb-stat-label">天连续</span></div>
+    <div class="hb-stat"><span id="hbBadgeCount">0/{len(gam["badges"])}</span>'
+        f'<span class="hb-stat-label">勋章</span></div>
+  </div>
+  <div class="hb-badges" title="已解锁勋章（实时同步）">{mini_html}</div>
+  <div class="hb-progress"><div class="hb-progress-fill" id="hbProgressFill"></div></div>
 </div>"""
 
     cards = []
@@ -308,9 +378,10 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
         )
     hall = (
         '<div class="hall"><div class="hall-head">' + icon("trophy", 20)
-        + '<span class="hall-title">荣誉殿堂</span></div>'
+        + '<span class="hall-title">荣誉殿堂 · 徽章图鉴</span></div>'
         '<div class="badge-grid">' + "".join(cards) + "</div>"
-        '<div class="hall-hint">悬停每枚勋章看「如何获得」；进度自动存在本学习包（浏览器本地）。</div>'
+        '<div class="hall-hint">悬停每枚勋章看「如何获得」；进度自动存在本学习包（浏览器本地）。'
+        '完成上方任意操作，顶部荣誉墙会实时刷新。</div>'
         "</div>"
     )
     pkg = {
@@ -331,102 +402,196 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
 # ---------------------------------------------------------------------------
 # HTML document
 # ---------------------------------------------------------------------------
-# ---------------------------------------------------------------------------
-# Theme system. Two intentional visual directions, both fully offline
-# (system font stacks only — no web-font CDNs). Selected via --theme.
-#   editorial : warm paper + ink + serif display headlines + soft shadow + gold
-#   swiss     : near-white + ink + single IKB accent + all-sans + right angles
+# Unified design system. CSS_COMMON carries the DEFAULT (Claude Design) palette
+# plus all structural/component styling. Theme variants (editorial / swiss)
+# only override CSS custom properties (and a few flourishes), so every new
+# component — sticky honor bar, feynman answer panel, live counters — works in
+# all three themes without duplicated rules.
 # ---------------------------------------------------------------------------
 CSS_COMMON = """
 :root{
+  /* ---- Claude Design default palette (warm ivory + clay accent) ---- */
+  --paper:#FBFAF7; --paper-2:#F4F0E9; --card:#FFFFFF;
+  --ink:#211E1A; --ink-2:#3A352F; --muted:#7B766C;
+  --line:#ECE6DB; --line-2:#DBD2C3;
+  --accent:#D2693E; --accent-soft:#FBEDE6; --accent-deep:#A8472A;
+  --good:#3E8E5A; --bad:#C0492F; --warn:#C5791F; --gold:#C99A3F;
+  --grad-accent:linear-gradient(135deg,#E8915F,#D2693E);
+  --grad-good:linear-gradient(135deg,#5BB47A,#3E8E5A);
+  --ring:rgba(210,105,62,.32);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Songti SC","Noto Serif SC","Source Han Serif SC",serif;
+  --sans:system-ui,-apple-system,"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+
+  /* ---- type scale ---- */
   --fs-h1:clamp(2.1rem,1.2rem + 3.4vw,3.1rem);
   --fs-h2:clamp(1.25rem,1.05rem + .9vw,1.6rem);
   --fs-lead:1.18rem; --fs-base:1rem; --fs-sm:.875rem; --fs-xs:.78rem;
   --lh:1.65; --measure:66ch;
-  --r-card:14px; --r-sm:10px; --r-pill:999px;
-  --shadow-sm:0 1px 2px rgba(0,0,0,.04),0 2px 6px rgba(0,0,0,.04);
-  --shadow-md:0 6px 20px rgba(0,0,0,.07),0 2px 6px rgba(0,0,0,.05);
+  --r-card:16px; --r-sm:12px; --r-pill:999px;
+  --shadow-sm:0 1px 2px rgba(33,30,26,.04),0 2px 8px rgba(33,30,26,.05);
+  --shadow-md:0 10px 30px rgba(33,30,26,.09),0 4px 10px rgba(33,30,26,.05);
+  --shadow-lg:0 18px 50px rgba(33,30,26,.14);
 }
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
 body{margin:0;line-height:var(--lh);font-size:var(--fs-base);
+  background:var(--paper);color:var(--ink);font-family:var(--sans);
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-.wrap{max-width:940px;margin:0 auto;padding:40px 22px 100px}
+.wrap{max-width:960px;margin:0 auto;padding:40px 22px 110px}
 .muted{color:var(--muted);font-size:var(--fs-sm);line-height:1.5}
+:focus-visible{outline:3px solid var(--ring);outline-offset:2px;border-radius:6px}
 
 /* masthead */
 header.pkg{margin-bottom:8px}
-header.pkg h1{margin:0 0 10px;font-size:var(--fs-h1);line-height:1.08;letter-spacing:-.015em}
-header.pkg .meta{font-size:var(--fs-sm);line-height:1.5}
-.offline{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:var(--fs-xs);font-weight:600}
+header.pkg h1{margin:0 0 10px;font-size:var(--fs-h1);line-height:1.08;letter-spacing:-.015em;
+  font-family:var(--serif);font-weight:600;color:var(--ink)}
+header.pkg .meta{font-size:var(--fs-sm);line-height:1.5;color:var(--muted)}
+header.pkg:after{content:"";display:block;width:50px;height:3px;border-radius:2px;background:var(--grad-accent);margin-top:16px}
+.offline{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:var(--fs-xs);font-weight:600;
+  border:1px solid var(--line-2);color:var(--muted);padding:5px 12px;border-radius:var(--r-pill);background:var(--card)}
 .offline svg{display:block}
 
 /* sections */
-section{margin-bottom:30px}
-section h2{margin:0 0 18px;font-size:var(--fs-h2);font-weight:700;display:flex;align-items:center;gap:11px}
-section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-pill);font-weight:700;letter-spacing:.04em}
+section{margin-bottom:30px;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-card);padding:26px 28px;box-shadow:var(--shadow-sm)}
+section h2{margin:0 0 18px;font-size:var(--fs-h2);font-weight:700;display:flex;align-items:center;gap:11px;
+  font-family:var(--serif);font-weight:600}
+section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-pill);font-weight:700;
+  letter-spacing:.04em;background:var(--accent-soft);color:var(--accent)}
 .narrative p{font-size:var(--fs-lead);margin:0;line-height:1.7;max-width:var(--measure)}
 
-/* honor strip */
-.honor-bar{display:flex;flex-wrap:wrap;gap:16px;align-items:center;margin:0 0 30px;padding:16px 20px}
-.hb-level{display:flex;align-items:center;gap:9px;font-weight:800;font-size:15px}
-.hb-badge{display:flex;align-items:center;justify-content:center;width:34px;height:34px}
-.hb-badge svg{display:block}
-.hb-lv{padding:2px 10px;border-radius:var(--r-pill);font-size:var(--fs-xs);font-weight:700}
-.hb-xp{flex:1;min-width:170px;display:flex;align-items:center;gap:10px}
-.hb-xp-track{flex:1;height:11px;border-radius:var(--r-pill);overflow:hidden}
-.hb-xp-fill{height:100%;width:0;transition:width .5s cubic-bezier(.16,1,.3,1)}
-.hb-xp-text{font-size:var(--fs-xs);white-space:nowrap;font-weight:600}
-.hb-streak{display:flex;align-items:center;gap:6px;font-weight:800;font-size:14px}
-#hbStreakIcon{display:flex;align-items:center}
+/* ============ sticky honor wall ============ */
+.honor-bar{position:sticky;top:10px;z-index:40;display:flex;flex-wrap:wrap;gap:14px 20px;align-items:center;
+  margin:0 0 30px;padding:14px 18px;border-radius:18px;
+  background:rgba(251,250,247,.82);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  border:1px solid var(--line);box-shadow:var(--shadow-md);overflow:hidden}
+.hb-left{flex:1;min-width:250px;display:flex;flex-direction:column;gap:9px}
+.hb-level{display:flex;align-items:center;gap:10px}
+.hb-badge{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:11px;
+  background:var(--grad-accent);color:#fff;box-shadow:0 4px 12px var(--ring)}
+.hb-lv-text{display:flex;flex-direction:column;line-height:1.15}
+#hbLevelName{font-weight:800;font-size:15px;color:var(--ink)}
+.hb-lv{font-size:11px;color:var(--muted);font-weight:700;margin-top:1px}
+.hb-xp{display:flex;align-items:center;gap:11px}
+.hb-xp-track{flex:1;height:11px;border-radius:var(--r-pill);background:var(--line);overflow:hidden;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.06)}
+.hb-xp-fill{height:100%;width:0;background:var(--grad-accent);border-radius:var(--r-pill);
+  transition:width .6s cubic-bezier(.16,1,.3,1);box-shadow:0 0 12px var(--ring)}
+.hb-xp-text{font-size:12px;font-weight:700;white-space:nowrap;color:var(--ink-2)}
+.hb-stats{display:flex;gap:8px;flex-wrap:wrap}
+.hb-stat{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:56px;
+  padding:6px 11px;border-radius:13px;background:var(--card);border:1px solid var(--line);
+  box-shadow:var(--shadow-sm);transition:transform .2s,box-shadow .2s}
+.hb-stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.hb-stat>span:not(.hb-stat-label){font-weight:800;font-size:15px;color:var(--ink);display:flex;align-items:center;gap:3px}
+.hb-streak{color:var(--accent)}
+#hbStreakIcon{display:inline-flex;align-items:center}
 #hbStreakIcon svg{display:block}
+.hb-stat-label{font-size:10px;color:var(--muted);margin-top:3px;letter-spacing:.02em}
+.hb-badges{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.hb-mini{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--paper-2);color:var(--muted);border:1px solid var(--line);transition:all .3s}
+.hb-mini.unlocked{background:var(--grad-accent);color:#fff;border-color:transparent;box-shadow:0 3px 10px var(--ring);
+  animation:pop .55s cubic-bezier(.34,1.4,.5,1)}
+.hb-progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--line);overflow:hidden}
+.hb-progress-fill{height:100%;width:0;background:var(--grad-accent);
+  transition:width .6s cubic-bezier(.16,1,.3,1);box-shadow:0 0 8px var(--ring)}
+
+/* hall of fame */
 .hall-head{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:800;margin-bottom:14px}
-.hall-head svg{display:block}
+.hall-head svg{display:block;color:var(--accent)}
 .badge-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:14px}
-.badge-card{position:relative;cursor:default;transition:transform .22s,box-shadow .22s,border-color .22s}
+.badge-card{position:relative;cursor:default;transition:transform .22s,box-shadow .22s,border-color .22s;
+  border:1px solid var(--line);border-radius:var(--r-card);padding:16px 10px;text-align:center;background:var(--card)}
+.badge-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
 .bc-svg{display:block}
-.bc-name{font-weight:700;font-size:14px;margin-top:10px}
+.bc-icon{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto;border-radius:50%;
+  background:var(--accent-soft);color:var(--accent);transition:all .25s}
+.badge-card.locked{filter:grayscale(.85);opacity:.42}
+.badge-card.locked .bc-icon{background:var(--paper-2);color:var(--muted)}
+.badge-card.unlocked{border-color:var(--accent);box-shadow:var(--shadow-md)}
+.badge-card.unlocked .bc-icon{background:var(--grad-accent);color:#fff;box-shadow:0 4px 14px var(--ring)}
+.bc-check{position:absolute;top:8px;right:10px;display:none;color:var(--good)}
+.badge-card.unlocked .bc-check{display:flex}
+.bc-name{font-weight:700;font-size:14px;margin-top:10px;color:var(--ink)}
 .bc-desc{font-size:11px;margin-top:4px;line-height:1.4;color:var(--muted)}
-.badge-card.just-unlocked{animation:pop .55s cubic-bezier(.34,1.4,.5,1)}
-@keyframes pop{0%{transform:scale(.75);opacity:0}60%{transform:scale(1.1);opacity:1}100%{transform:scale(1)}}
+.badge-card.just-unlocked{animation:pop .6s cubic-bezier(.34,1.4,.5,1)}
 .hall-hint{font-size:var(--fs-xs);margin-top:16px;color:var(--muted)}
 
 /* concept card */
-.card{margin-bottom:20px}
+.card{margin-bottom:22px;border:1px solid var(--line);border-radius:var(--r-card);
+  padding:18px 20px;background:var(--card);box-shadow:var(--shadow-sm);transition:box-shadow .2s,transform .2s}
+.card:hover{box-shadow:var(--shadow-md)}
 .card-head{display:flex;align-items:center;gap:11px;margin-bottom:13px}
-.card-no{width:27px;height:27px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800}
-.card-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.01em}
+.card-no{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;
+  background:var(--accent);color:#fff;border-radius:10px}
+.card-head h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.01em;color:var(--ink)}
 
 /* flip */
-.flip{perspective:1200px;cursor:pointer;outline:none}
-.flip-inner{position:relative;transition:transform .55s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;min-height:120px}
+.flip{perspective:1400px;cursor:pointer;outline:none}
+.flip-inner{position:relative;transition:transform .6s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;min-height:120px}
 .flip.flipped .flip-inner{transform:rotateY(180deg)}
-.flip-front,.flip-back{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;padding:17px 19px}
-.flip-front{overflow:hidden}
-.flip-back{transform:rotateY(180deg);overflow:auto}
+.flip-front,.flip-back{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  padding:17px 19px;border-radius:var(--r-sm)}
+.flip-front{overflow:hidden;background:var(--accent-soft);border:1px solid var(--line)}
+.flip-back{transform:rotateY(180deg);overflow:auto;background:var(--card);border:1px solid var(--accent);
+  box-shadow:inset 0 0 0 1px var(--accent-soft)}
 .q-label,.a-label{font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:700;color:var(--muted)}
-.q-text{font-size:17px;font-weight:700;margin-top:5px;line-height:1.5}
+.q-text{font-size:17px;font-weight:700;margin-top:5px;line-height:1.5;color:var(--ink)}
 .flip-hint{position:absolute;bottom:11px;right:14px;font-size:11px;color:var(--muted)}
-.a-text{font-size:15px;margin-top:5px;line-height:1.6}
+.a-text{font-size:15px;margin-top:5px;line-height:1.6;color:var(--ink-2)}
 .plain{margin:11px 0 0;padding-left:19px}
 .plain li{margin:4px 0}
-.tag{display:inline-block;font-size:11px;padding:2px 8px;margin-right:7px;font-weight:700}
-.story,.mnemonic,.feynman{margin-top:11px;padding:10px 13px;font-size:14px;line-height:1.55}
-.websource{margin-top:9px;font-size:12px;display:flex;align-items:center;gap:5px}
+.tag{display:inline-flex;align-items:center;font-size:11px;padding:3px 9px;margin-right:7px;font-weight:700;
+  background:var(--accent-soft);color:var(--accent);border-radius:var(--r-pill)}
+.story,.mnemonic,.feynman{margin-top:12px;padding:12px 14px;font-size:14px;line-height:1.55;border-radius:var(--r-sm)}
+.websource{margin-top:9px;font-size:12px;display:flex;align-items:center;gap:5px;color:var(--muted)}
 .websource svg{flex-shrink:0;display:block}
 .visual{margin-top:13px}
 .visual svg{max-width:100%;height:auto}
 
+/* feynman module */
+.feynman{background:#F1F7F2;border-left:3px solid var(--good)}
+.feynman-tag{background:#E4F1E8;color:var(--good)}
+.feynman-prompt{font-size:14px;line-height:1.6;margin:8px 0 12px;color:var(--ink-2)}
+.feynman-retell{display:inline-flex;align-items:center;gap:7px;background:var(--grad-good);color:#fff;border:0;
+  padding:9px 16px;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;
+  transition:transform .12s,box-shadow .15s,filter .15s;box-shadow:0 4px 12px rgba(62,142,90,.3)}
+.feynman-retell:hover{filter:brightness(1.05);box-shadow:0 6px 16px rgba(62,142,90,.4)}
+.feynman-retell:active{transform:scale(.97)}
+.feynman-retell.active{background:var(--good)}
+.feynman-answer{margin-top:12px;padding:14px 16px;border-radius:var(--r-sm);background:var(--card);
+  border:1px solid var(--line);box-shadow:var(--shadow-sm);animation:fadeUp .35s ease}
+.feynman-answer[hidden]{display:none}
+.fa-title{font-size:12px;font-weight:800;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;
+  margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.fa-body{font-size:14px;line-height:1.65;color:var(--ink-2)}
+.fa-body .plain{margin:8px 0 0;padding-left:18px}
+.fa-story{margin-top:10px;color:var(--ink)}
+.feynman-check{margin-top:13px;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;
+  cursor:pointer;user-select:none;background:var(--card);border:1.5px solid var(--good);color:#2F7A53;
+  border-radius:11px;padding:8px 14px;transition:all .15s}
+.feynman-check:hover{background:#EAF4EE}
+.feynman-check.done{background:var(--good);border-color:var(--good);color:#fff}
+.feynman-check.done .fchk-box{color:#fff}
+
 /* quiz */
-.quiz{margin-top:13px;padding:14px 15px}
-.quiz-q{font-size:14px;font-weight:700;margin-bottom:9px}
-.opt{display:block;margin:5px 0;cursor:pointer;font-size:14px}
-.opt input{margin-right:7px}
-.fill-input{padding:8px 11px;width:220px;max-width:100%;font-size:14px}
-.quiz-check{margin-top:9px;color:#fff;border:0;padding:8px 18px;cursor:pointer;font-size:13px;font-weight:700;transition:background .15s,transform .1s}
+.quiz{margin-top:13px;padding:14px 15px;background:var(--accent-soft);border:1px dashed var(--line-2);border-radius:var(--r-sm)}
+.quiz-q{font-size:14px;font-weight:700;margin-bottom:9px;color:var(--ink)}
+.quiz-tag{background:#F0DED4;color:var(--accent)}
+.opt{display:block;margin:5px 0;cursor:pointer;font-size:14px;color:var(--ink-2)}
+.opt input{margin-right:7px;accent-color:var(--accent)}
+.fill-input{padding:8px 11px;width:240px;max-width:100%;font-size:14px;border:1px solid var(--line);border-radius:10px;
+  transition:border-color .15s,box-shadow .15s}
+.fill-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.quiz-check{margin-top:9px;color:#fff;border:0;padding:9px 20px;cursor:pointer;font-size:13px;font-weight:700;
+  border-radius:10px;background:var(--grad-accent);box-shadow:0 4px 12px var(--ring);transition:filter .15s,transform .1s}
+.quiz-check:hover{filter:brightness(1.05)}
 .quiz-check:active{transform:scale(.97)}
-.quiz-feedback{margin-top:9px;font-weight:700;font-size:14px}
+.quiz-feedback{margin-top:9px;font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px}
 .quiz-feedback.ok{color:var(--good)} .quiz-feedback.no{color:var(--bad)}
+.quiz-feedback .fb-ic{display:inline-flex;align-items:center;gap:5px}
 .quiz-explain{margin-top:7px;font-size:13px;color:var(--muted);line-height:1.5}
 
 /* review */
@@ -434,98 +599,52 @@ section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-
 .review th,.review td{border-bottom:1px solid var(--line);padding:11px 9px;text-align:left}
 .review th{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.03em}
 .review tbody tr:last-child td{border-bottom:0}
-.rate{margin:0 2px;width:31px;height:31px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:all .12s}
-.rv-next{font-weight:800}
-.rv-term{font-weight:600}
+.rate{margin:0 2px;width:32px;height:32px;background:var(--card);cursor:pointer;font-size:13px;font-weight:600;
+  color:var(--muted);border:1px solid var(--line);border-radius:9px;transition:all .12s}
+.rate:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.rate.active{background:var(--accent-deep);color:#fff;border-color:var(--accent-deep)}
+.rv-next{font-weight:800;color:var(--accent)}
+.rv-term{font-weight:600;color:var(--ink)}
 footer.pkg{text-align:center;font-size:var(--fs-xs);margin-top:14px;line-height:1.6;color:var(--muted)}
-
-/* feynman check */
-.feynman-check{margin-top:10px;display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;cursor:pointer;user-select:none;transition:all .15s}
-.feynman-check .fchk-box{display:flex;align-items:center}
-.feynman-check.done{}
 
 /* toast */
 .toast{position:fixed;left:50%;bottom:32px;transform:translateX(-50%) translateY(24px);
   color:#fff;padding:13px 20px;border-radius:14px;font-size:14px;font-weight:600;
-  display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;z-index:50;box-shadow:var(--shadow-md)}
+  display:flex;align-items:center;gap:9px;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;
+  z-index:60;background:var(--ink);box-shadow:var(--shadow-lg)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-.toast .t-icon{display:flex;align-items:center}
+.toast .t-icon{display:flex;align-items:center;color:var(--accent)}
 .toast .t-icon svg{display:block}
 
+@keyframes pop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.12);opacity:1}100%{transform:scale(1)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
 @media (max-width:560px){
-  .wrap{padding:24px 14px 72px}
+  .wrap{padding:22px 14px 72px}
   .badge-grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
-  .honor-bar{gap:12px;padding:14px}
+  .honor-bar{gap:10px 14px;padding:12px}
+  section{padding:20px 16px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important}
 }
 """
 
+# Theme variants: only override custom properties + a few flourishes.
 CSS_EDITORIAL = """
 :root{
   --paper:#f4f1ea; --paper-2:#ece6d8; --card:#fbf9f2;
   --ink:#1d1a14; --ink-2:#2c271e; --muted:#7a6f5b;
   --line:#ddd4c0; --line-2:#cdc1a6;
-  --brand:#9a3b22; --brand-soft:#f3e7df; --brand-deep:#6f2a16;
-  --accent:#a8442a; --gold:#bd8a2c;
-  --good:#3f7d4f; --bad:#bf3b30; --warn:#c5791f;
-  --serif:"Iowan Old Style",Georgia,"Times New Roman","Songti SC","Noto Serif SC","Source Han Serif SC",serif;
-  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
-  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --accent:#9a3b22; --accent-soft:#f3e7df; --accent-deep:#6f2a16;
+  --good:#3f7d4f; --bad:#bf3b30; --gold:#bd8a2c;
+  --grad-accent:linear-gradient(135deg,#c25a36,#9a3b22);
+  --grad-good:linear-gradient(135deg,#5aa06a,#3f7d4f);
+  --ring:rgba(154,59,34,.3);
 }
-body{background:var(--paper);color:var(--ink);font-family:var(--sans)}
-header.pkg h1{font-family:var(--serif);font-weight:600;color:var(--ink)}
-header.pkg .meta{color:var(--muted)}
-header.pkg:after{content:"";display:block;width:54px;height:3px;background:var(--accent);margin-top:16px}
-.offline{border:1px solid var(--line-2);color:var(--muted);padding:4px 11px;border-radius:var(--r-pill);background:var(--card)}
-.offline svg{display:block}
-
-section{background:var(--card);border:1px solid var(--line);border-radius:var(--r-card);padding:24px 26px;box-shadow:var(--shadow-sm)}
-section h2{font-family:var(--serif)}
-section h2 .badge{background:var(--brand-soft);color:var(--brand)}
-
-.honor-bar{background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r-card);box-shadow:var(--shadow-sm)}
-.hb-badge{background:var(--brand);color:#fff;border-radius:9px}
-.hb-lv{background:var(--card);border:1px solid var(--line-2);color:var(--ink-2)}
-.hb-xp-track{background:var(--line)}
-.hb-xp-fill{background:linear-gradient(90deg,#e9c46a,#bd8a2c);box-shadow:0 0 10px rgba(189,138,44,.4)}
-.hb-streak{color:var(--brand)}
-#hbStreakIcon{color:var(--brand)}
-.hall-head{color:var(--ink)}
-.hall-head svg{color:var(--gold)}
-.badge-card{border:1px solid var(--line);border-radius:var(--r-card);padding:16px 10px;text-align:center;background:var(--card)}
-.badge-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
-.bc-icon{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto;border-radius:50%;background:var(--brand-soft);color:var(--brand);transition:all .25s}
-.badge-card.locked{filter:grayscale(.9);opacity:.4}
-.badge-card.locked .bc-icon{background:var(--paper-2);color:var(--muted)}
-.badge-card.unlocked{border-color:var(--gold);box-shadow:var(--shadow-md)}
-.badge-card.unlocked .bc-icon{background:linear-gradient(135deg,#e9c46a,#bd8a2c);color:#fff;box-shadow:0 4px 14px rgba(189,138,44,.45)}
-.bc-check{position:absolute;top:8px;right:10px;display:none;color:var(--good)}
-.badge-card.unlocked .bc-check{display:flex}
-
-.card{border:1px solid var(--line);border-radius:var(--r-card);padding:18px 20px;background:var(--card);box-shadow:var(--shadow-sm);transition:box-shadow .2s}
-.card:hover{box-shadow:var(--shadow-md)}
-.card-no{background:var(--brand);color:#fff;border-radius:9px}
-.flip-front,.flip-back{border:1px solid var(--line);border-radius:var(--r-sm)}
-.flip-front{background:var(--brand-soft)}
-.flip-back{border-color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand-soft)}
-.tag{background:var(--brand-soft);color:var(--brand)}
-.story{background:#faf3e6;border-left:3px solid var(--gold)}
-.mnemonic{background:#eef5f0;border-left:3px solid var(--good)}
-.feynman{background:#f1f7f2;border-left:3px solid var(--good)}
-.quiz{background:var(--brand-soft);border:1px dashed var(--line-2);border-radius:var(--r-sm)}
-.quiz-tag{background:#f0e2da;color:var(--brand)}
-.opt input{accent-color:var(--brand)}
-.fill-input{border:1px solid var(--line);border-radius:8px;transition:border-color .15s,box-shadow .15s}
-.fill-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
-.quiz-check{background:var(--brand)}
-.quiz-check:hover{background:var(--ink-2)}
-.rate{border:1px solid var(--line);border-radius:8px}
-.rate:hover{background:var(--brand);color:#fff;border-color:var(--brand)}
-.rv-next{color:var(--brand)}
-.feynman-check{background:var(--card);border:1.5px solid var(--good);color:#1f6b39;border-radius:9px;padding:6px 12px}
-.feynman-check:hover{background:#f1f7f2}
-.feynman-check.done{background:var(--good);border-color:var(--good);color:#fff}
-.toast{background:var(--ink)}
-.toast .t-icon{color:var(--gold)}
+body{background:var(--paper)}
+header.pkg h1{font-family:var(--serif);font-weight:600}
 """
 
 CSS_SWISS = """
@@ -533,199 +652,32 @@ CSS_SWISS = """
   --paper:#fafaf8; --paper-2:#f0f0ee; --card:#ffffff;
   --ink:#0f0f0f; --ink-2:#2a2a29; --muted:#6f6f6c;
   --line:#d8d8d4; --line-2:#bcbcb6;
-  --brand:var(--accent); --accent:#002FA7; --brand-soft:#eef0f6; --brand-deep:#001f6e;
-  --good:#0a7d4f; --bad:#c0322b; --warn:#c5791f;
-  --sans:"Helvetica Neue",Helvetica,"Arial","Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
-  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --accent:#002FA7; --accent-soft:#eef0f6; --accent-deep:#001f6e;
+  --good:#0a7d4f; --bad:#c0322b; --gold:#C99A3F;
+  --grad-accent:linear-gradient(135deg,#244bc4,#002FA7);
+  --grad-good:linear-gradient(135deg,#2a9b6c,#0a7d4f);
+  --ring:rgba(0,47,167,.3);
+  --serif:"Helvetica Neue",Helvetica,Arial,system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
 }
-body{background:var(--paper);color:var(--ink);font-family:var(--sans)}
-header.pkg h1{font-family:var(--sans);font-weight:200;color:var(--ink);letter-spacing:-.02em}
-header.pkg .meta{color:var(--muted);font-family:var(--mono)}
-header.pkg:after{content:"";display:block;width:64px;height:6px;background:var(--accent);margin-top:18px}
-.offline{border:1px solid var(--line-2);color:var(--muted);padding:4px 11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em}
-.offline svg{display:block}
-
-section{border-top:2px solid var(--ink);padding:26px 0 6px;margin-bottom:30px}
-section:first-of-type{border-top:0;padding-top:0}
-section h2{font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-section h2 .badge{background:var(--accent);color:#fff;border-radius:0}
-
-.honor-bar{border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);padding:18px 4px;gap:20px}
-.hb-badge{background:var(--ink);color:#fff}
-.hb-lv{background:#fff;border:1px solid var(--ink);color:var(--ink)}
-.hb-xp-track{background:#fff;border:1px solid var(--line-2)}
-.hb-xp-fill{background:var(--accent)}
-.hb-streak{color:var(--ink)}
-#hbStreakIcon{color:var(--accent)}
-.hall-head{color:var(--ink);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
-.hall-head svg{color:var(--accent)}
-.badge-card{border:1px solid var(--line);border-radius:0;padding:18px 8px 14px;text-align:center;background:#fff}
-.badge-card:hover{transform:none;box-shadow:none;border-color:var(--ink)}
-.bc-icon{display:flex;align-items:center;justify-content:center;width:46px;height:46px;margin:0 auto;color:var(--ink)}
-.badge-card.locked{opacity:.34;filter:none}
-.badge-card.locked .bc-icon{color:var(--muted)}
-.badge-card.unlocked{border:2px solid var(--accent)}
-.badge-card.unlocked .bc-icon{color:var(--accent)}
-.bc-check{position:absolute;top:7px;right:9px;display:none;color:var(--accent)}
-.badge-card.unlocked .bc-check{display:flex}
-.badge-card.just-unlocked{animation:pop .5s cubic-bezier(.2,.8,.2,1)}
-
-.card{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:0 0 28px;background:transparent;margin-bottom:30px}
-.card:hover{box-shadow:none}
-.card-no{background:var(--accent);color:#fff;width:26px;height:26px;border-radius:0}
-.flip-front,.flip-back{border:1px solid var(--line);border-radius:0}
-.flip-front{background:var(--paper-2)}
-.flip-back{border-color:var(--accent);box-shadow:inset 2px 0 0 var(--accent)}
-.tag{background:transparent;border:1px solid var(--line-2);color:var(--ink);border-radius:0;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono)}
-.story,.mnemonic,.feynman{background:transparent;border-left:2px solid var(--accent);border-radius:0;padding:2px 0 2px 13px}
-.mnemonic{border-left-color:var(--good)}
-.feynman{border-left-color:var(--good)}
-.quiz{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:0;background:transparent}
-.quiz-tag{background:var(--accent);color:#fff}
-.opt input{accent-color:var(--accent)}
-.fill-input{border:1px solid var(--line-2);border-radius:0;transition:border-color .15s,box-shadow .15s}
-.fill-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,47,167,.15)}
-.quiz-check{background:var(--accent);border-radius:0}
-.quiz-check:hover{background:var(--ink)}
-.rate{border:1px solid var(--line-2);border-radius:0}
-.rate:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
-.rv-next{color:var(--accent)}
-.feynman-check{background:#fff;border:1.5px solid var(--good);color:#0a7d4f;border-radius:0;padding:6px 12px}
-.feynman-check:hover{background:#f3f8f5}
-.feynman-check.done{background:var(--good);border-color:var(--good);color:#fff}
-.toast{background:var(--ink);border-radius:0}
-.toast .t-icon{color:var(--accent)}
-@media (max-width:560px){
-  section{border-top-width:2px}
-}
+body{background:var(--paper)}
+header.pkg h1{font-family:var(--serif);font-weight:700;letter-spacing:-.02em}
+.honor-bar{border-radius:0;border:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+.hb-badge{border-radius:0;background:var(--ink)}
+.hb-mini{border-radius:0}
+.hb-stat,.card,.flip-front,.flip-back,.feynman-answer,.quiz{border-radius:0}
+.feynman-retell,.quiz-check,.feynman-check{border-radius:0}
 """
-
-CSS_CLAUDE = """
-:root{
-  --paper:#FBFAF7; --paper-2:#F2EFE9; --card:#FFFFFF;
-  --ink:#26231F; --ink-2:#3A352F; --muted:#6E6A62;
-  --line:#E9E3D9; --line-2:#DBD3C5;
-  --brand:var(--accent); --accent:#CC785C; --brand-soft:#F6ECE6; --brand-deep:#A8593F;
-  --good:#3F7D5A; --bad:#C0492F; --warn:#C5791F;
-  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Songti SC","Noto Serif SC",serif;
-  --sans:system-ui,-apple-system,"Segoe UI","Helvetica Neue","PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
-  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
-}
-body{background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:16px}
-header.pkg h1{font-family:var(--serif);font-weight:600;color:var(--ink);letter-spacing:-.01em;line-height:1.1}
-header.pkg .meta{color:var(--muted)}
-header.pkg:after{content:"";display:block;width:48px;height:3px;border-radius:2px;background:var(--accent);margin-top:16px}
-.offline{border:1px solid var(--line-2);color:var(--muted);padding:4px 11px;border-radius:var(--r-pill);background:var(--card)}
-.offline svg{display:block}
-
-section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 28px;box-shadow:var(--shadow-sm)}
-section h2{font-family:var(--serif);font-weight:600}
-section h2 .badge{background:var(--brand-soft);color:var(--accent)}
-
-.honor-bar{background:var(--paper-2);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-sm)}
-.hb-badge{background:var(--accent);color:#fff;border-radius:10px}
-.hb-lv{background:var(--card);border:1px solid var(--line-2);color:var(--ink-2)}
-.hb-xp-track{background:var(--line)}
-.hb-xp-fill{background:linear-gradient(90deg,#E0A187,#CC785C);box-shadow:0 0 10px rgba(204,120,92,.35)}
-.hb-streak{color:var(--accent)}
-#hbStreakIcon{color:var(--accent)}
-.hall-head{color:var(--ink)}
-.hall-head svg{color:var(--accent)}
-.badge-card{border:1px solid var(--line);border-radius:16px;padding:16px 10px;text-align:center;background:var(--card)}
-.badge-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md)}
-.bc-icon{display:flex;align-items:center;justify-content:center;width:58px;height:58px;margin:0 auto;border-radius:50%;background:var(--brand-soft);color:var(--accent);transition:all .25s}
-.badge-card.locked{filter:grayscale(.85);opacity:.42}
-.badge-card.locked .bc-icon{background:var(--paper-2);color:var(--muted)}
-.badge-card.unlocked{border-color:var(--accent);box-shadow:var(--shadow-md)}
-.badge-card.unlocked .bc-icon{background:linear-gradient(135deg,#E0A187,#CC785C);color:#fff;box-shadow:0 4px 14px rgba(204,120,92,.4)}
-.bc-check{position:absolute;top:8px;right:10px;display:none;color:var(--good)}
-.badge-card.unlocked .bc-check{display:flex}
-
-.card{border:1px solid var(--line);border-radius:16px;padding:18px 20px;background:var(--card);box-shadow:var(--shadow-sm);transition:box-shadow .2s}
-.card:hover{box-shadow:var(--shadow-md)}
-.card-no{background:var(--accent);color:#fff;border-radius:10px}
-.flip-front,.flip-back{border:1px solid var(--line);border-radius:12px}
-.flip-front{background:var(--brand-soft)}
-.flip-back{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--brand-soft)}
-.tag{background:var(--brand-soft);color:var(--accent)}
-.story{background:#FBF4EE;border-left:3px solid var(--accent)}
-.mnemonic{background:#EEF5F0;border-left:3px solid var(--good)}
-.feynman{background:#F1F7F2;border-left:3px solid var(--good)}
-.quiz{background:var(--brand-soft);border:1px dashed var(--line-2);border-radius:12px}
-.quiz-tag{background:#F0E4DC;color:var(--accent)}
-.opt input{accent-color:var(--accent)}
-.fill-input{border:1px solid var(--line);border-radius:10px;transition:border-color .15s,box-shadow .15s}
-.fill-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--brand-soft)}
-.quiz-check{background:var(--accent)}
-.quiz-check:hover{background:var(--ink-2)}
-.rate{border:1px solid var(--line);border-radius:10px}
-.rate:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
-.rv-next{color:var(--accent)}
-.feynman-check{background:var(--card);border:1.5px solid var(--good);color:#2F7A53;border-radius:10px;padding:6px 12px}
-.feynman-check:hover{background:#F1F7F2}
-.feynman-check.done{background:var(--good);border-color:var(--good);color:#fff}
-.toast{background:var(--ink)}
-.toast .t-icon{color:var(--accent)}
-"""
-
-CSS = CSS_COMMON + CSS_EDITORIAL  # fallback; build_html picks per --theme
 
 
 JS = r"""
-function checkQuiz(btn){
-  var q=btn.closest('.quiz');
-  var fb=q.querySelector('.quiz-feedback');
-  var ex=q.querySelector('.quiz-explain');
-  var ok=false;
-  var fill=q.querySelector('.fill-input');
-  if(fill){
-    ok = fill.value.trim()===fill.dataset.ans.trim();
-  }else{
-    var sel=q.querySelector('input[type=radio]:checked');
-    var ans=parseInt(q.querySelector('.correct-hide').dataset.ans,10);
-    if(!sel){fb.textContent='请先选择一个答案';fb.className='quiz-feedback no';fb.hidden=false;return;}
-    ok = parseInt(sel.value,10)===ans;
-  }
-  fb.innerHTML = (ok?iconSvg('check',16)+'<span class="fb-ic">答对了！</span>'
-                    :iconSvg('x',16)+'<span class="fb-ic">再想想</span>');
-  fb.className = 'quiz-feedback '+(ok?'ok':'no');
-  fb.hidden=false; ex.hidden=false;
-  if(q.dataset.answered!=='1'){ q.dataset.answered='1';
-    S.quizAnswered++; if(ok) S.quizCorrect++;
-    grantXP(ok?PKG.xp_rules.quiz_correct:PKG.xp_rules.quiz_wrong);
-    bumpStreak(); afterAction();
-  }
-}
-function sm2(ef,n,q,last){
-  ef = ef + (0.1 - (5-q)*(0.08 + (5-q)*0.02));
-  if(ef<1.3) ef=1.3;
-  if(q<3){return {ef:ef,n:0,interval:1};}
-  n=n+1;
-  var interval;
-  if(n===1) interval=1;
-  else if(n===2) interval=6;
-  else interval=Math.round(last*ef);
-  return {ef:ef,n:n,interval:interval};
-}
-function rate(btn){
-  var row=btn.closest('tr');
-  var q=parseInt(btn.dataset.q,10);
-  var ef=parseFloat(row.dataset.ef);
-  var n=parseInt(row.dataset.n,10);
-  var last=parseFloat(row.dataset.last);
-  var r=sm2(ef,n,q,last);
-  row.dataset.ef=r.ef; row.dataset.n=r.n; row.dataset.last=r.interval;
-  row.querySelector('.rv-next').textContent='+'+r.interval+' 天';
-  if(row.dataset.rated!=='1'){ row.dataset.rated='1';
-    if(q>=4) row.dataset.ge4='1';
-    S.reviewCount++; grantXP(PKG.xp_rules.review_rate); bumpStreak(); afterAction();
-  }
-}
-
-/* ===== Gamification engine ===== */
+/* ===== Gamification engine (shared, live-synced state) ===== */
 const PKG = __PKG__;
 const ICONS = __ICONS__;
 function iconSvg(name,size,cls){var inner=ICONS[name]||ICONS['medal'];return '<svg viewBox="0 0 24 24" width="'+(size||18)+'" height="'+(size||18)+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'+(cls?(' class="'+cls+'"'):'')+'>'+inner+'</svg>';}
+function setText(id,t){var e=document.getElementById(id);if(e)e.textContent=t;}
+function setWidth(id,w){var e=document.getElementById(id);if(e)e.style.width=w+'%';}
+function clamp(v){return Math.max(0,Math.min(100,v));}
+
 var LS_KEY = 'mf_' + (PKG.storageKey||'default');
 function lsGet(){ try{return JSON.parse(localStorage.getItem(LS_KEY))||{};}catch(e){return {};} }
 function lsSet(s){ try{localStorage.setItem(LS_KEY,JSON.stringify(s));}catch(e){} }
@@ -757,62 +709,141 @@ function evaluateBadges(){
   });
   return newly;
 }
+
+/* single source of truth for the on-screen honor wall */
 function renderHonor(){
   var lv=levelFor(S.xp), nxt=nextLevel(S.xp);
-  var n=document.getElementById('hbLevelName'); if(n)n.textContent=lv.title;
-  var no=document.getElementById('hbLevelNo'); if(no)no.textContent='Lv.'+lv.level;
-  var pct=100; if(nxt){var span=nxt.min_xp-lv.min_xp; pct=Math.max(0,Math.min(100,Math.round((S.xp-lv.min_xp)/span*100)));}
-  var f=document.getElementById('hbXpFill'); if(f)f.style.width=pct+'%';
-  var xt=document.getElementById('hbXpText'); if(xt)xt.textContent=S.xp+' XP'+(nxt?(' / '+nxt.min_xp):' · 满级');
-  var st=document.getElementById('hbStreak'); if(st)st.textContent=S.streak;
-  var si=document.getElementById('hbStreakIcon'); if(si){si.innerHTML=iconSvg('flame',16); si.style.opacity=S.streak>0?'1':'0.35';}
+  setText('hbLevelName', lv.title);
+  setText('hbLevelNo','Lv.'+lv.level);
+  var pct=100; if(nxt){var span=nxt.min_xp-lv.min_xp; pct=clamp((S.xp-lv.min_xp)/span*100);}
+  setWidth('hbXpFill', pct);
+  setText('hbXpText', S.xp+' XP'+(nxt?(' / '+nxt.min_xp):' · 满级'));
+  setText('hbStreak', S.streak);
+  var si=document.getElementById('hbStreakIcon'); if(si)si.style.opacity=S.streak>0?'1':'0.35';
+  var dc=Object.keys(S.flips).length;
+  setText('hbDoneCards', dc+'/'+(PKG.totals.cards_total||0));
+  setText('hbDoneQuiz', S.quizAnswered+'/'+(PKG.totals.quiz_total||0));
+  setText('hbDoneReview', S.reviewCount+'/'+(PKG.totals.review_total||0));
+  setText('hbDoneFeynman', S.feynmanDone+'/'+(PKG.totals.feynman_total||0));
+  setText('hbBadgeCount', S.badges.length+'/'+(PKG.badges.length||0));
+  var total=(PKG.totals.cards_total||0)+(PKG.totals.quiz_total||0)+(PKG.totals.review_total||0)+(PKG.totals.feynman_total||0);
+  var done=dc+S.quizAnswered+S.reviewCount+S.feynmanDone;
+  setWidth('hbProgressFill', total? clamp(done/total*100):0);
 }
-function renderHall(){
-  PKG.badges.forEach(function(b){
-    var el=document.getElementById('bg-'+b.id); if(!el)return;
-    if(S.badges.indexOf(b.id)>=0){el.classList.add('unlocked');el.classList.remove('locked');}
+function paintBadge(id, unlocked){
+  ['bg-'+id,'hb-badge-'+id].forEach(function(pid){
+    var el=document.getElementById(pid); if(!el)return;
+    if(unlocked){el.classList.add('unlocked');el.classList.remove('locked');}
     else{el.classList.add('locked');el.classList.remove('unlocked');}
   });
 }
-function toast(msg,icon){
+function renderHall(){
+  PKG.badges.forEach(function(b){ paintBadge(b.id, S.badges.indexOf(b.id)>=0); });
+}
+function toast(msg,ic){
   var t=document.getElementById('mfToast');
   if(!t){t=document.createElement('div');t.id='mfToast';t.className='toast';document.body.appendChild(t);}
-  t.innerHTML='<span class="t-icon">'+iconSvg(icon||'medal',16)+'</span>'+msg;
+  t.innerHTML='<span class="t-icon">'+iconSvg(ic||'medal',16)+'</span>'+msg;
   t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove('show');},2600);
 }
 function grantXP(n){ S.xp+=n; }
+function refresh(){ renderHonor(); renderHall(); }
 function afterAction(){
   var beforeLv=levelFor(S.xp).level;
   var newly=evaluateBadges();
-  lsSet(S); renderHonor(); renderHall();
+  lsSet(S); refresh();
   var afterLv=levelFor(S.xp).level;
   if(afterLv>beforeLv) toast('升级！'+levelFor(S.xp).title,'sparkles');
   newly.forEach(function(b){
     var el=document.getElementById('bg-'+b.id);
+    paintBadge(b.id,true);
     if(el){el.classList.add('just-unlocked');setTimeout(function(){el.classList.remove('just-unlocked');},600);}
     toast('解锁勋章：'+b.name, b.icon);
   });
 }
+
+/* ===== Quiz ===== */
+function checkQuiz(btn){
+  var q=btn.closest('.quiz');
+  var fb=q.querySelector('.quiz-feedback');
+  var ex=q.querySelector('.quiz-explain');
+  var ok=false;
+  var fill=q.querySelector('.fill-input');
+  if(fill){
+    ok = fill.value.trim()===fill.dataset.ans.trim();
+  }else{
+    var sel=q.querySelector('input[type=radio]:checked');
+    var ans=parseInt(q.querySelector('.correct-hide').dataset.ans,10);
+    if(!sel){fb.innerHTML=iconSvg('x',16)+'<span class="fb-ic">请先选择一个答案</span>';fb.className='quiz-feedback no';fb.hidden=false;return;}
+    ok = parseInt(sel.value,10)===ans;
+  }
+  fb.innerHTML = (ok?iconSvg('check',16)+'<span class="fb-ic">答对了！</span>'
+                    :iconSvg('x',16)+'<span class="fb-ic">再想想</span>');
+  fb.className = 'quiz-feedback '+(ok?'ok':'no');
+  fb.hidden=false; ex.hidden=false;
+  if(ok && !q.dataset.correctMarked){ q.dataset.correctMarked='1'; S.quizCorrect++; }
+  if(q.dataset.answered!=='1'){ q.dataset.answered='1';
+    S.quizAnswered++; grantXP(ok?PKG.xp_rules.quiz_correct:PKG.xp_rules.quiz_wrong);
+    bumpStreak(); afterAction();
+  }
+}
+
+/* ===== SM-2 review ===== */
+function sm2(ef,n,q,last){
+  ef = ef + (0.1 - (5-q)*(0.08 + (5-q)*0.02));
+  if(ef<1.3) ef=1.3;
+  if(q<3){return {ef:ef,n:0,interval:1};}
+  n=n+1;
+  var interval;
+  if(n===1) interval=1;
+  else if(n===2) interval=6;
+  else interval=Math.round(last*ef);
+  return {ef:ef,n:n,interval:interval};
+}
+function rate(btn){
+  var row=btn.closest('tr');
+  var q=parseInt(btn.dataset.q,10);
+  var ef=parseFloat(row.dataset.ef);
+  var n=parseInt(row.dataset.n,10);
+  var last=parseFloat(row.dataset.last);
+  var r=sm2(ef,n,q,last);
+  row.dataset.ef=r.ef; row.dataset.n=r.n; row.dataset.last=r.interval;
+  row.querySelector('.rv-next').textContent='+'+r.interval+' 天';
+  // highlight selected rating
+  row.querySelectorAll('.rate').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  if(row.dataset.rated!=='1'){ row.dataset.rated='1';
+    if(q>=4) row.dataset.ge4='1';
+    S.reviewCount++; grantXP(PKG.xp_rules.review_rate); bumpStreak(); afterAction();
+  }
+}
+
+/* ===== Flip card ===== */
 function onFlip(flipEl){
+  flipEl.classList.toggle('flipped');
   var card=flipEl.closest('.card'); if(!card)return;
   var idx=card.id; if(S.flips[idx])return; S.flips[idx]=1;
   grantXP(PKG.xp_rules.flip_card); bumpStreak(); afterAction();
 }
-function onFeynman(fc){
+
+/* ===== Feynman module ===== */
+function onFeynmanRetell(btn){
+  var wrap=btn.closest('.feynman');
+  var ans=wrap.querySelector('.feynman-answer');
+  if(ans.hidden){ ans.hidden=false; btn.classList.add('active'); }
+  else { ans.hidden=true; btn.classList.remove('active'); }
+}
+function onFeynmanCheck(fc){
   if(fc.classList.contains('done'))return;
   fc.classList.add('done');
   var box=fc.querySelector('.fchk-box'); if(box)box.innerHTML=iconSvg('check',14);
-  var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='已复述';
+  var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='已对照核对 ✓';
   S.feynmanDone++; grantXP(PKG.xp_rules.feynman_done); bumpStreak(); afterAction();
 }
-document.addEventListener('click',function(e){
-  if(e.target.classList.contains('quiz-check')) checkQuiz(e.target);
-  if(e.target.classList.contains('rate')) rate(e.target);
-  var flip=e.target.closest('.flip'); if(flip) onFlip(flip);
-  var fc=e.target.closest('.feynman-check'); if(fc) onFeynman(fc);
-});
+
+/* ===== init ===== */
 (function init(){
-  evaluateBadges(); lsSet(S); renderHonor(); renderHall();
+  evaluateBadges(); lsSet(S); refresh();
 })();
 """
 
@@ -835,7 +866,7 @@ PAGE = """<!DOCTYPE html>
 {honor_bar}
 
 <section>
-  <h2><span class="badge">养成</span> 荣誉殿堂</h2>
+  <h2><span class="badge">养成</span> 荣誉殿堂 · 徽章图鉴</h2>
   {hall_of_fame}
 </section>
 
@@ -851,7 +882,7 @@ PAGE = """<!DOCTYPE html>
 
 <section>
   <h2><span class="badge">测验</span> 自测区</h2>
-  <p class="muted">先答再点「检查」，看解析。错的回对应卡片复习。</p>
+  <p class="muted">先答再点「检查」，看解析。错的回对应卡片复习。进度实时同步到顶部荣誉墙。</p>
   {quizzes_intro}
 </section>
 
@@ -868,7 +899,7 @@ PAGE = """<!DOCTYPE html>
 </html>"""
 
 
-def build_html(data: dict, theme: str = "editorial") -> str:
+def build_html(data: dict, theme: str = "claude") -> str:
     title = html.escape(str(data.get("title", "学习包")))
     source = html.escape(str(data.get("source", "未注明")))
     audience = html.escape(str(data.get("audience", "通用")))
@@ -882,12 +913,12 @@ def build_html(data: dict, theme: str = "editorial") -> str:
     review_html = render_review(concepts, data.get("review_schedule", []))
     gam = compute_gamification(data)
     honor_bar, hall_of_fame, pkg_json = render_gamification(data, gam)
-    # quizzes section: re-render quiz blocks collected (already inside cards);
-    # provide a lightweight note that quizzes live on each card.
     quizzes_intro = (
         "下面每张卡片底部都带自测题；这里汇总提示：优先用「填空/自己举例」的方式回忆，"
         "比被动读记得牢（生成效应）。"
     )
+    theme_css = {"claude": "", "editorial": CSS_EDITORIAL, "swiss": CSS_SWISS}.get(theme, "")
+    css = CSS_COMMON + theme_css
     return PAGE.format(
         title=title,
         source=source,
@@ -901,9 +932,7 @@ def build_html(data: dict, theme: str = "editorial") -> str:
         hall_of_fame=hall_of_fame,
         offline_icon=icon("package", 12),
         js=JS.replace("__PKG__", pkg_json).replace("__ICONS__", json.dumps(ICONS, ensure_ascii=False)),
-        css=(CSS_COMMON + CSS_SWISS) if theme == "swiss"
-            else (CSS_COMMON + CSS_CLAUDE) if theme == "claude"
-            else (CSS_COMMON + CSS_EDITORIAL),
+        css=css,
     )
 
 
@@ -931,6 +960,11 @@ def build_md(data: dict) -> str:
             lines.append(f"**类比/故事：** {c.get('story')}")
         if c.get("mnemonic"):
             lines.append(f"**口诀：** {c.get('mnemonic')}")
+        if c.get("feynman"):
+            lines.append(f"**费曼复述：** {c.get('feynman')}")
+            fa = c.get("feynman_answer")
+            if fa:
+                lines.append(f"**标准讲解：** {fa}")
         quiz = c.get("quiz")
         if quiz:
             lines.append(f"**自测：** {quiz.get('q')}")
@@ -941,8 +975,6 @@ def build_md(data: dict) -> str:
                     mark = "✓" if idx == quiz.get("answer") else " "
                     lines.append(f"  {mark} {opt}")
             lines.append(f"解析：{quiz.get('explain', '')}")
-        if c.get("feynman"):
-            lines.append(f"**费曼：** {c.get('feynman')}")
         if c.get("web_source"):
             lines.append(f"> 来源：{c.get('web_source')}")
         lines.append("")
@@ -956,7 +988,6 @@ def build_md(data: dict) -> str:
             lines.append(f"| {r.get('term', r.get('concept_id'))} | +{iv[0]} 天 |")
         lines.append("")
 
-    # 荣誉体系（养成）
     gam = compute_gamification(data)
     if gam.get("levels"):
         lines.append("## 荣誉体系（养成）")
@@ -983,9 +1014,9 @@ def main() -> int:
                     help="Output format (default html).")
     ap.add_argument("--theme", dest="theme", choices=["claude", "editorial", "swiss"],
                     default="claude",
-                    help="Visual theme for HTML output: claude (Claude Design: warm ivory + "
-                         "clay accent + serif display, default), editorial (warm magazine), "
-                         "or swiss (Swiss International / right angles).")
+                    help="Visual theme for HTML output: claude (default, Claude Design warm "
+                         "ivory + clay accent + serif display), editorial (warm magazine), or "
+                         "swiss (Swiss International / right angles, klein blue).")
     args = ap.parse_args()
 
     payload = json.loads(Path(args.infile).read_text(encoding="utf-8"))

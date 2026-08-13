@@ -15,6 +15,8 @@ visual:      互补视觉：{ "type": "svg", "svg": "<svg>...</svg>" }
               —— 必须是结构/空间/关系图，不是装饰
 quiz:        [{ "q": 题面, "options": [...], "answer": 索引, "explain": 解析 }]
 feynman:     一句「用自己的话讲一遍」的提示语
+feynman_answer: （可选）点击「复述 / 看标准讲解」后展开的标准讲解；
+              不填则由脚本用 card_back + plain + story 自动合成
 ```
 
 **反面教材**：卡背面放一段 300 字论文摘抄 + 一张无关配图 → 违规（一卡多概念、装饰图、不互补）。
@@ -85,6 +87,7 @@ review_schedule:
       "visual": { "type": "svg", "svg": "<svg ...>...</svg>" },
       "quiz": { "q": "题面", "type": "mc", "options": ["A","B"], "answer": 0, "explain": "解析" },
       "feynman": "用自己的话讲一遍的提示",
+      "feynman_answer": "（可选）标准讲解：点击「复述 / 看标准讲解」后展开，供对照自评",
       "web_source": "（可选）联网来源+日期"
     }
   ],
