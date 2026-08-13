@@ -30,6 +30,14 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+# 桥接到通用 skill 自动更新机制（schrodinger-skills/skill-auto-update/updater.py）。
+# 独立分发该 skill 时此目录可能不存在，降级为「不桥接」（不影响自身更新逻辑）。
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "skill-auto-update"))
+    import updater as _shared_updater
+except Exception:  # noqa: BLE001
+    _shared_updater = None
+
 SKILL_NAME = "layout-analysis"
 REPO_OWNER = "sljdxde"
 REPO_NAME = "schrodinger-skills"
@@ -240,6 +248,59 @@ def inside_git_worktree(path: Path) -> bool:
     return any((parent / ".git").exists() for parent in [path, *path.parents])
 
 
+def find_repo_root(skill_dir: Path) -> Path | None:
+    """向上查找包含 .git 的仓库根目录；找不到返回 None。"""
+    for parent in [skill_dir, *skill_dir.parents]:
+        if (parent / ".git").exists():
+            return parent
+    return None
+
+
+def _run_git(repo_root: Path, args: list[str], timeout: int = 120) -> "subprocess.CompletedProcess":
+    return subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        capture_output=True, text=True, timeout=timeout,
+    )
+
+
+def git_pull_if_behind(repo_root: Path, branch: str = REPO_BRANCH) -> dict[str, object]:
+    """git 工作副本的安全同步：dirty 跳过 → fetch → 比较 → ff-only pull。
+
+    设计目标：让安装在 git 仓库内的 skill（如本机 symlink 到 schrodinger-skills
+    仓库）也能"自动同步 GitHub"，而不是被 ``inside_git_worktree`` 一刀切拒绝。
+    任何失败都降级返回（不抛异常），保证自检更新不会阻塞后续分析。
+    """
+    status = _run_git(repo_root, ["status", "--porcelain"])
+    if status.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "error",
+                "message": f"git status 失败: {status.stderr.strip()[-300:]}"}
+    if status.stdout.strip():
+        return {"mode": "git", "pulled": False, "status": "dirty",
+                "message": "本地有未提交改动，跳过 git pull 以免覆盖；请先 commit/stash 后再用。"}
+    fetch = _run_git(repo_root, ["fetch", "origin", branch])
+    if fetch.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "fetch_failed",
+                "message": f"git fetch 失败（网络/代理？）: {fetch.stderr.strip()[-300:]}；已降级，继续使用当前版本。"}
+    rev = _run_git(repo_root, ["rev-list", "--left-right", "--count", f"HEAD...origin/{branch}"])
+    if rev.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "error",
+                "message": "无法比较本地与远端提交。"}
+    parts = rev.stdout.strip().split("\t")
+    if len(parts) != 2:
+        return {"mode": "git", "pulled": False, "status": "error",
+                "message": f"rev-list 输出异常: {rev.stdout.strip()!r}"}
+    ahead, behind = int(parts[0]), int(parts[1])
+    if behind == 0:
+        return {"mode": "git", "pulled": False, "status": "up_to_date",
+                "message": f"已与 origin/{branch} 同步，无需更新。"}
+    pull = _run_git(repo_root, ["pull", "--ff-only", "origin", branch])
+    if pull.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "pull_failed",
+                "message": f"git pull --ff-only 失败: {pull.stderr.strip()[-300:]}；请手动处理。"}
+    return {"mode": "git", "pulled": True, "status": "updated",
+            "message": f"已从 origin/{branch} 快进更新（本地落后 {behind} 个提交）。"}
+
+
 def download_remote_skill(tmp: Path) -> Path:
     url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/{REPO_BRANCH}.zip"
     archive = tmp / "repo.zip"
@@ -368,14 +429,30 @@ def check_status() -> dict[str, object]:
 def apply_updates(allow_repo_working_copy: bool = False) -> dict[str, object]:
     skill_dir = find_skill_dir()
     assert_skill_dir(skill_dir)
-    if inside_git_worktree(skill_dir) and not allow_repo_working_copy:
-        return {
-            "skill": SKILL_NAME,
-            "local_path": str(skill_dir),
-            "applied": False,
-            "reason": "inside_git_worktree",
-            "message": "Refusing to replace a git working copy. Re-run with --allow-repo-working-copy if intentional.",
-        }
+    if inside_git_worktree(skill_dir):
+        if allow_repo_working_copy:
+            # 显式选择 zip 覆盖（会破坏 git 历史，仅高级用户故意为之；默认不推荐）。
+            status = check_status()
+            backup_path = None
+            if status["skill_update"]["update_available"]:
+                backup_path = str(replace_tree(_download_to_apply_copy(), skill_dir))
+            status["applied"] = bool(status["skill_update"]["update_available"])
+            status["backup"] = backup_path
+            if NPM_PACKAGE and status.get("npm") and status["npm"].get("update_available"):
+                status["npm"]["install"] = install_latest_npm()
+            return status
+        # 默认（推荐）：git 工作副本走安全的 git pull 同步，而不是一刀切拒绝。
+        repo_root = find_repo_root(skill_dir)
+        if repo_root is None:
+            return {"skill": SKILL_NAME, "local_path": str(skill_dir), "applied": False,
+                    "reason": "no_git_root",
+                    "message": "检测到 git 工作副本但找不到仓库根，跳过自动更新。"}
+        result = git_pull_if_behind(repo_root, REPO_BRANCH)
+        result["skill"] = SKILL_NAME
+        result["local_path"] = str(skill_dir)
+        result["applied"] = result.get("pulled", False)
+        return result
+    # 非 git 安装（zip/手动拷贝）：原版本优先 + 清单回退的 zip 覆盖逻辑。
     status = check_status()
     backup_path = None
     if status["skill_update"]["update_available"]:
@@ -385,6 +462,40 @@ def apply_updates(allow_repo_working_copy: bool = False) -> dict[str, object]:
     if NPM_PACKAGE and status.get("npm") and status["npm"].get("update_available"):
         status["npm"]["install"] = install_latest_npm()
     return status
+
+
+# --------------------------------------------------------------------------
+# Bridge to the shared auto-update registry
+# --------------------------------------------------------------------------
+
+def _bridge_to_shared_registry(result: dict) -> None:
+    """把本次本 skill 自检更新的结果登记到通用注册表，供任务结束后统一提示。
+
+    网络类失败（fetch_failed / pull_failed）记为 ABORTED_NETWORK，使
+    ``format_update_report()`` 能在所有任务完成后告知用户失败原因与手动步骤。
+    """
+    if _shared_updater is None:
+        return
+    status = result.get("status")
+    skill_dir = result.get("local_path")
+    S = _shared_updater.UpdateStatus
+    if status in ("fetch_failed", "pull_failed"):
+        _shared_updater.record_outcome(
+            SKILL_NAME, S.ABORTED_NETWORK,
+            error=f"GitHub 拉取失败：{(result.get('message') or '')[:200]}",
+            skill_dir=skill_dir,
+        )
+    elif status == "updated":
+        _shared_updater.record_outcome(SKILL_NAME, S.UPDATED, skill_dir=skill_dir)
+    elif status == "up_to_date":
+        _shared_updater.record_outcome(SKILL_NAME, S.UP_TO_DATE, skill_dir=skill_dir)
+    elif status == "dirty":
+        _shared_updater.record_outcome(SKILL_NAME, S.SKIPPED, skill_dir=skill_dir)
+    else:
+        _shared_updater.record_outcome(
+            SKILL_NAME, S.ABORTED_OTHER,
+            error=result.get("message"), skill_dir=skill_dir,
+        )
 
 
 # --------------------------------------------------------------------------
@@ -472,6 +583,7 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Apply available skill updates after creating a backup.")
     parser.add_argument("--allow-repo-working-copy", action="store_true", help="Allow replacing a skill folder inside a git working copy.")
     parser.add_argument("--self-test", action="store_true", help="Run local updater self-tests.")
+    parser.add_argument("--report", action="store_true", help="Print the shared auto-update report (failures + manual steps) for all skills this session.")
     parser.add_argument("--version", action="store_true", help="Print the local skill version.")
     args = parser.parse_args()
 
@@ -486,8 +598,17 @@ def main() -> int:
             "version": format_semver(local_version) if local_version else None,
         }, ensure_ascii=False))
         return 0
+    if args.report:
+        if _shared_updater is None:
+            print("（未接入通用自动更新模块，无法生成跨 skill 报告）")
+            return 0
+        report = _shared_updater.format_update_report()
+        print(report if report else "（本次所有 skill 自动更新均成功，无失败项）")
+        return 0
     if args.apply:
-        print(json.dumps(apply_updates(args.allow_repo_working_copy), ensure_ascii=False, indent=2))
+        result = apply_updates(args.allow_repo_working_copy)
+        _bridge_to_shared_registry(result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     print(json.dumps(check_status(), ensure_ascii=False, indent=2))
     return 0

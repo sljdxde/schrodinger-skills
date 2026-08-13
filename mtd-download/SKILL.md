@@ -1,7 +1,7 @@
 ---
 name: mtd-download
 description: Use this skill when downloading a large file over HTTP/HTTPS and a single connection is too slow. Multi-threaded range-based downloader (curl engine) that auto-detects server Range support, falls back to single-threaded streaming when Range is unavailable / file size is unknown / or the server blocks concurrency (WAF 418, rate-limit 429, 401/403/503), shows live progress/speed/ETA, and requires no pip dependencies.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # MTD Download
@@ -20,15 +20,19 @@ version: 1.0.0
 - **不留损坏文件**：多线程任一分块失败（或单线程 curl 返回非 0 / 大小不符），直接删掉不完整的输出，而不是默默留一个坏文件。
 - **进度走 stderr**：下载进度、日志全部写 stderr，stdout 保持干净，方便在脚本里管道复用。
 
-## 使用前自检更新
+## 自动更新（无需手动操作）
 
-每次使用本 skill 前，先运行：
+本 skill 每次被加载时，Agent 会**自动**执行自检更新（无需你手动敲命令）：
 
 ```bash
 python scripts/update_self.py --apply
 ```
 
-该脚本会检查 GitHub 上 `mtd-download` 目录是否有更新，发现更新时先备份本地 skill，再自动同步最新文件。若脚本显示已更新，重新读取当前 `SKILL.md` 后再继续；若网络或环境导致更新失败，说明失败原因并继续使用当前版本。
+脚本会**自动识别安装方式**并采取对应策略（git 感知逻辑见 `scripts/update_self.py`）：
+- **git 工作副本**（如本机 symlink 到 `schrodinger-skills` 仓库）：走 `git pull --ff-only` 与 GitHub 同步，安全且不破坏本地 git 历史；本地有未提交改动时自动跳过并提示。
+- **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
+
+任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
 
 ## 使用方式
 

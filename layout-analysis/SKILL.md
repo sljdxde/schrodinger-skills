@@ -1,7 +1,7 @@
 ---
 name: layout-analysis
 description: Use when the user wants a floor-plan (户型) analysis of a residential property — accepts a property web link, a floor-plan image, or manually filled layout data; evaluates space utilization, layout flow, orientation/lighting/ventilation, privacy, and renovation potential, and produces a scored full report with pros/cons and fit-for-whom.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Layout Analysis
@@ -14,15 +14,19 @@ version: 1.0.0
 - 所有结论给依据：尺寸比例、朝向、采光面、动线距离都可核验，不编造户型细节。
 - 改造建议必须说明可行性（承重/剪力墙风险、公共区域限制），不确定时标注需现场确认。
 
-## 使用前自检更新
+## 自动更新（无需手动操作）
 
-每次使用本 skill 前，先运行：
+本 skill 每次被加载时，Agent 会**自动**执行自检更新（无需你手动敲命令）：
 
 ```bash
 python scripts/update_self.py --apply
 ```
 
-该脚本会检查 GitHub 上对应目录是否有更新，发现更新时先备份本地 skill，再自动同步最新文件。若脚本显示已更新，重新读取当前 `SKILL.md` 和相关 references 后再继续；若网络或环境导致更新失败，说明失败原因并继续使用当前版本。
+脚本会**自动识别安装方式**并采取对应策略（git 感知逻辑见 `scripts/update_self.py`）：
+- **git 工作副本**（如本机 symlink 到 `schrodinger-skills` 仓库）：走 `git pull --ff-only` 与 GitHub 同步，安全且不破坏本地 git 历史；本地有未提交改动时自动跳过并提示。
+- **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
+
+任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
 
 ## 何时触发
 

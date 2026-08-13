@@ -1,8 +1,8 @@
 ---
 name: house-buying
 name_zh: 学区房助手
-description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations.
-version: 1.4.0
+description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations. Also triggered by explicit requests to use the house-buying or 学区房助手 skill, or by natural-language phrases such as 请使用 house-buying 分析、分析学区房、买房值不值得、学区房是否值得买、购房分析、帮我看个房子.
+version: 1.4.2
 ---
 
 # 学区房助手（House Buying）
@@ -37,9 +37,11 @@ python scripts/update_self.py --apply
 
 任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。若脚本显示已更新，Agent 会重新读取当前 `SKILL.md` 和相关 references 后再继续分析。
 
+**收尾提示（任务完成后必做）**：在给出最终回复之前，运行 `python scripts/update_self.py --report`。若输出非空警告（形如「本次有以下 skill 自动更新未成功…」），须**原样转告用户**失败的具体原因与手动更新步骤；若输出「本次所有 skill 自动更新均成功」，则无需提及。该报告跨 skill 汇总本次会话所有更新失败，符合通用自动更新机制（见 `../skill-auto-update/`）。
+
 ## 工作流
 
-1. 自动自检更新：加载本 skill 后第一步**必须**执行 `python scripts/update_self.py --apply`（脚本按 git/非 git 自动选策略，失败静默降级）；若返回 updated，重新读取当前 `SKILL.md` 与 references 后再继续。
+1. 自动自检更新：加载本 skill 后第一步**必须**执行 `python scripts/update_self.py --apply`（脚本按 git/非 git 自动选策略，失败静默降级）；若返回 updated，重新读取当前 `SKILL.md` 与 references 后再继续。完成全部分析、给出最终回复前，运行 `python scripts/update_self.py --report`，若输出更新失败警告则原样转告用户（含原因+手动步骤）。
 2. 交互式需求采集：先按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算、首付比例或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
 3. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
 4. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。**先做透第一维度「房价」**（挂牌/成交月度时间轴 + 环比/同比/N月涨跌幅 + 带看/房源量），再按用户诉求逐层展开成交量/供需比/土地出让/学区政策/人口流动/信贷环境（见 `references/dimension-network.md`，脚本 `python scripts/data_sources.py dimensions` 可查各维度字段与来源）。**核心双源：贝壳系（贝壳/链家）+ 我爱我家，关键数据（成交价/挂牌价/小区档案）尽量双平台交叉核对**；杭州叠加杭房数研/小鸡选房高频源；诸葛找房/安居客/房天下/58同城仅作交叉验证。用 `python scripts/data_sources.py sources --city <城市>` 调出该城预置的政府公开源、政务 APP 与本地小程序（`scripts/city_sources.json` 已内置全国省会 + 自治区首府 + 直辖市 + 计划单列市 + 强地级市约 45 城）。按 `references/school-district-workflow.md` 用 `scripts/data_sources.py` 编排取数，网页源遇到反爬时按 `data-source-playbook.md` 的反爬通道处理（配置 endpoint/token/cookie、浏览器化请求或本机 Playwright 渲染公开页面，不破解验证码、不做高频批量抓取）。**所有采集到的数据点（价格/成交/物业/建成/车位/学区等）必须带真实 URL 引用 + 发布时间 + 数据口径 + 一致性标注，禁止无来源数据。**

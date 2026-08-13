@@ -1,7 +1,7 @@
 ---
 name: skill-architect
 description: Use when the user wants to turn a vague need or personal/domain experience into a working, installable AI Agent Skill — runs a comprehensive first-principles interview (10 facets: identity, audience, goal, input, process, analysis framework, output spec, boundaries, knowledge, interaction/quality) as a decision tree with question clusters, produces a Skill Blueprint, compiles it into a schrodinger-skills package (SKILL.md + agents/openai.yaml + scripts/update_self.py + references/), and evaluates the result with a 4-dimension rubric.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Skill Architect
@@ -19,15 +19,19 @@ version: 1.0.0
 - **可核验、不编造**：涉及事实、数据、判断时给依据与置信度；拿不到公开证据就写「未查到」，不补故事。
 - **产出必须可落仓库**：Compiler 产出的包使用与 `house-buying` / `memory-forge` 完全相同的布局，立即可被 Claude Code / Codex / Cursor 安装，且自带自检更新。
 
-## 使用前自检更新
+## 自动更新（无需手动操作）
 
-每次使用本 skill 前，先运行：
+本 skill 每次被加载时，Agent 会**自动**执行自检更新（无需你手动敲命令）：
 
 ```bash
 python scripts/update_self.py --apply
 ```
 
-该脚本会检查 GitHub 上 `skill-architect` 目录是否有更新，发现更新时先备份本地 skill，再自动同步最新文件。若脚本显示已更新，重新读取当前 `SKILL.md` 和相关 references 后再继续；若网络或环境导致更新失败，说明失败原因并继续使用当前版本。
+脚本会**自动识别安装方式**并采取对应策略（git 感知逻辑见 `scripts/update_self.py`）：
+- **git 工作副本**（如本机 symlink 到 `schrodinger-skills` 仓库）：走 `git pull --ff-only` 与 GitHub 同步，安全且不破坏本地 git 历史；本地有未提交改动时自动跳过并提示。
+- **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
+
+任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
 
 ## 何时触发
 
@@ -42,7 +46,7 @@ python scripts/update_self.py --apply
 
 ## 工作流
 
-1. **自检更新**：执行上面的 `scripts/update_self.py --apply`，必要时重新加载 skill。
+1. **自动自检更新**：加载本 skill 后第一步**必须**执行 `python scripts/update_self.py --apply`（脚本按 git/非 git 自动选策略，失败静默降级）；若返回 updated，重新读取当前 `SKILL.md` 与 references 后再继续。
 2. **分流判断**：一句话判断用户是 Path A（有需求说不清）还是 Path B（有经验想沉淀）。两者都不像时，先用一轮追问澄清。
 3. **动态访谈（10 维度决策树）**：
    - 按 `references/interview-engine.md` 的 10 维度（F0 身份 → F1 受众 → F2 目标/类型 → F3 输入 → F4 流程 → F5 分析框架⚠️条件 → F6 输出规格⚠️条件 → F7 边界 → F8 数据 → F9 交互质量）逐面抛簇提问。

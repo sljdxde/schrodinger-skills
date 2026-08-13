@@ -1,7 +1,7 @@
 ---
 name: memory-forge
 description: Use when the user pastes or uploads study material (notes, articles, lecture text, .txt/.md/.docx/.pdf) and wants to understand and remember it — generates one-concept-per-card knowledge cards, plain-language stories and analogies, complementary diagrams or mind-maps, mnemonics, interactive self-test quizzes, and a spaced-repetition (SM-2) review schedule; can open a real browser or search the web to explain unfamiliar terms with authoritative diagrams.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Memory Forge
@@ -18,19 +18,23 @@ version: 1.0.0
 - **让学习者产出**：填空、自己举例子，比被动读记得牢（生成效应）。
 - **联网解释必标来源 + 日期**：凡是去网上查的权威解释/图，都要写清出处和获取时间。
 
-## 使用前自检更新
+## 自动更新（无需手动操作）
 
-每次使用本 skill 前，先运行：
+本 skill 每次被加载时，Agent 会**自动**执行自检更新（无需你手动敲命令）：
 
 ```bash
 python scripts/update_self.py --apply
 ```
 
-该脚本会检查 GitHub 上 `memory-forge` 目录是否有更新，发现更新时先备份本地 skill，再自动同步最新文件。若脚本显示已更新，重新读取当前 `SKILL.md` 和相关 references 后再继续；若网络或环境导致更新失败，说明失败原因并继续使用当前版本。
+脚本会**自动识别安装方式**并采取对应策略（git 感知逻辑见 `scripts/update_self.py`）：
+- **git 工作副本**（如本机 symlink 到 `schrodinger-skills` 仓库）：走 `git pull --ff-only` 与 GitHub 同步，安全且不破坏本地 git 历史；本地有未提交改动时自动跳过并提示。
+- **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
+
+任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
 
 ## 工作流
 
-1. **自检更新**：执行上面的 `scripts/update_self.py --apply`，必要时重新加载 skill。
+1. **自动自检更新**：加载本 skill 后第一步**必须**执行 `python scripts/update_self.py --apply`（脚本按 git/非 git 自动选策略，失败静默降级）；若返回 updated，重新读取当前 `SKILL.md` 与 references 后再继续。
 2. **输入采集**：按 `references/input-parsing.md` 摄取材料。粘贴文本直接用；`.txt` / `.md` 用 `Read`；`.docx` 调 `markitdown-skill` 转 md 再读；`.pdf` 先 `Read`，失败退回 `markitdown-skill`。材料过长先分段（chunk）抽取再合并去重。
 3. **确认需求（最多问一轮，≤5 个问题）**：受众基础（小白/进阶）、是否需要导出学习包、输出语言（默认中文）、是否有重点章节。信息基本够就直接开工，别用「我先看看」绕过。
 4. **概念解析**：把材料拆成概念清单 + 它们的关系；按熟悉度判断哪些概念需要联网深潜（见第 5 步）。

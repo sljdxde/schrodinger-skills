@@ -1,26 +1,28 @@
 ---
 name: skills-doctor
 description: Use this skill when diagnosing, auditing, or fixing AI agent skills. Detects risks, conflicts, duplicates, zombies, and generates fix prompts. Supports Claude Code, Codex, Cursor, OpenCode etc.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Skills Doctor
 
 诊断和治理本地 AI Agent Skills 的工具，支持 Claude Code、Codex、Cursor、OpenCode 等多种生态。
 
-## 使用前自检更新
+## 自动更新（无需手动操作）
 
-每次使用本 skill 前，先运行：
+本 skill 每次被加载时，Agent 会**自动**执行自检更新（无需你手动敲命令）：
 
 ```bash
 python scripts/update_self.py --apply
 ```
 
-该脚本会同时检查两类更新：
-- `skills-doctor` skill 目录本身是否有 GitHub 更新；有更新时先备份本地 skill，再自动同步最新文件。
-- `agent-skill-doctor` npm 包是否有新版本；有新版本时执行 `npm install -g agent-skill-doctor@latest`。
+脚本会**自动识别安装方式**并采取对应策略（git 感知逻辑见 `scripts/update_self.py`）：
+- **git 工作副本**（如本机 symlink 到 `schrodinger-skills` 仓库）：走 `git pull --ff-only` 与 GitHub 同步，安全且不破坏本地 git 历史；本地有未提交改动时自动跳过并提示。
+- **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
 
-若脚本显示 skill 已更新，重新读取当前 `SKILL.md` 后再继续。若网络、Python 或 npm 环境导致更新失败，说明失败原因；npm 更新失败时可退回使用 `npx agent-skill-doctor@latest ...`。
+对于 `skills-doctor`，脚本**额外**检查配套 npm 包 `agent-skill-doctor` 的新版本，有更新时执行 `npm install -g agent-skill-doctor@latest`（npm 环境缺失或失败时退回 `npx agent-skill-doctor@latest ...`）。
+
+任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
 
 ## 何时触发
 

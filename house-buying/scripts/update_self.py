@@ -30,6 +30,14 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+# 桥接到通用 skill 自动更新机制（schrodinger-skills/skill-auto-update/updater.py）。
+# 独立分发该 skill 时此目录可能不存在，降级为「不桥接」（不影响自身更新逻辑）。
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "skill-auto-update"))
+    import updater as _shared_updater
+except Exception:  # noqa: BLE001
+    _shared_updater = None
+
 SKILL_NAME = "house-buying"
 REPO_OWNER = "sljdxde"
 REPO_NAME = "schrodinger-skills"
@@ -457,6 +465,40 @@ def apply_updates(allow_repo_working_copy: bool = False) -> dict[str, object]:
 
 
 # --------------------------------------------------------------------------
+# Bridge to the shared auto-update registry
+# --------------------------------------------------------------------------
+
+def _bridge_to_shared_registry(result: dict) -> None:
+    """把本次 house-buying 自检更新的结果登记到通用注册表，供任务结束后统一提示。
+
+    网络类失败（fetch_failed / pull_failed）记为 ABORTED_NETWORK，使
+    ``format_update_report()`` 能在所有任务完成后告知用户失败原因与手动步骤。
+    """
+    if _shared_updater is None:
+        return
+    status = result.get("status")
+    skill_dir = result.get("local_path")
+    S = _shared_updater.UpdateStatus
+    if status in ("fetch_failed", "pull_failed"):
+        _shared_updater.record_outcome(
+            SKILL_NAME, S.ABORTED_NETWORK,
+            error=f"GitHub 拉取失败：{(result.get('message') or '')[:200]}",
+            skill_dir=skill_dir,
+        )
+    elif status == "updated":
+        _shared_updater.record_outcome(SKILL_NAME, S.UPDATED, skill_dir=skill_dir)
+    elif status == "up_to_date":
+        _shared_updater.record_outcome(SKILL_NAME, S.UP_TO_DATE, skill_dir=skill_dir)
+    elif status == "dirty":
+        _shared_updater.record_outcome(SKILL_NAME, S.SKIPPED, skill_dir=skill_dir)
+    else:
+        _shared_updater.record_outcome(
+            SKILL_NAME, S.ABORTED_OTHER,
+            error=result.get("message"), skill_dir=skill_dir,
+        )
+
+
+# --------------------------------------------------------------------------
 # Self test
 # --------------------------------------------------------------------------
 
@@ -541,6 +583,7 @@ def main() -> int:
     parser.add_argument("--apply", action="store_true", help="Apply available skill updates after creating a backup.")
     parser.add_argument("--allow-repo-working-copy", action="store_true", help="Allow replacing a skill folder inside a git working copy.")
     parser.add_argument("--self-test", action="store_true", help="Run local updater self-tests.")
+    parser.add_argument("--report", action="store_true", help="Print the shared auto-update report (failures + manual steps) for all skills this session.")
     parser.add_argument("--version", action="store_true", help="Print the local skill version.")
     args = parser.parse_args()
 
@@ -555,8 +598,17 @@ def main() -> int:
             "version": format_semver(local_version) if local_version else None,
         }, ensure_ascii=False))
         return 0
+    if args.report:
+        if _shared_updater is None:
+            print("（未接入通用自动更新模块，无法生成跨 skill 报告）")
+            return 0
+        report = _shared_updater.format_update_report()
+        print(report if report else "（本次所有 skill 自动更新均成功，无失败项）")
+        return 0
     if args.apply:
-        print(json.dumps(apply_updates(args.allow_repo_working_copy), ensure_ascii=False, indent=2))
+        result = apply_updates(args.allow_repo_working_copy)
+        _bridge_to_shared_registry(result)
+        print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     print(json.dumps(check_status(), ensure_ascii=False, indent=2))
     return 0
