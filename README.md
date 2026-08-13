@@ -33,7 +33,7 @@
 
 | 名字 | 一句话 | 链接 |
 |---|---|---|
-| [House-Buying](./house-buying) | 全国 46 城住宅购房尽调与决策分析：五级数据源体系、引用溯源防伪、价格动量、学区溢价、升学生源代际传导与价格预测 | [SKILL.md](./house-buying/SKILL.md) |
+| [学区房助手（House-Buying）](./house-buying) | 全国 46 城住宅购房尽调与决策分析：五级数据源体系、引用溯源防伪、价格动量、学区溢价、升学生源代际传导与价格预测 | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills-Doctor](./skills-doctor) | 诊断和治理本地 AI Agent Skills，检测风险、冲突、重复、僵尸等问题 | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory-Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD-Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
@@ -62,7 +62,7 @@
 
 ## Skills
 
-### [House-Buying](./house-buying)
+### [学区房助手（House-Buying）](./house-buying)
 
 中国住宅购房尽调和决策分析工具。适合评估具体楼盘、学区房、片区对比和买入时机，要求联网核验成交、挂牌、学校、政策、升学、生源、小区人口、学区溢价与城市基本面数据。
 

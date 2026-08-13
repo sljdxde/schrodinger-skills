@@ -1,4 +1,4 @@
 interface:
-  display_name: "House Buying"
+  display_name: "学区房助手"
   short_description: "面向中国住宅购房决策的成交学区生源社区尽调分析与价格预测；五级数据源体系（T0核心平台/T1官方佐证/T3交叉验证）与引用防伪"
   default_prompt: "Use $house-buying to evaluate a target Chinese residential property in the user-declared city, with transaction timelines, school, community, and risk evidence."
