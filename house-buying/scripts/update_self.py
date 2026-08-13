@@ -240,6 +240,59 @@ def inside_git_worktree(path: Path) -> bool:
     return any((parent / ".git").exists() for parent in [path, *path.parents])
 
 
+def find_repo_root(skill_dir: Path) -> Path | None:
+    """向上查找包含 .git 的仓库根目录；找不到返回 None。"""
+    for parent in [skill_dir, *skill_dir.parents]:
+        if (parent / ".git").exists():
+            return parent
+    return None
+
+
+def _run_git(repo_root: Path, args: list[str], timeout: int = 120) -> "subprocess.CompletedProcess":
+    return subprocess.run(
+        ["git", "-C", str(repo_root), *args],
+        capture_output=True, text=True, timeout=timeout,
+    )
+
+
+def git_pull_if_behind(repo_root: Path, branch: str = REPO_BRANCH) -> dict[str, object]:
+    """git 工作副本的安全同步：dirty 跳过 → fetch → 比较 → ff-only pull。
+
+    设计目标：让安装在 git 仓库内的 skill（如本机 symlink 到 schrodinger-skills
+    仓库）也能"自动同步 GitHub"，而不是被 ``inside_git_worktree`` 一刀切拒绝。
+    任何失败都降级返回（不抛异常），保证自检更新不会阻塞后续分析。
+    """
+    status = _run_git(repo_root, ["status", "--porcelain"])
+    if status.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "error",
+                "message": f"git status 失败: {status.stderr.strip()[-300:]}"}
+    if status.stdout.strip():
+        return {"mode": "git", "pulled": False, "status": "dirty",
+                "message": "本地有未提交改动，跳过 git pull 以免覆盖；请先 commit/stash 后再用。"}
+    fetch = _run_git(repo_root, ["fetch", "origin", branch])
+    if fetch.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "fetch_failed",
+                "message": f"git fetch 失败（网络/代理？）: {fetch.stderr.strip()[-300:]}；已降级，继续使用当前版本。"}
+    rev = _run_git(repo_root, ["rev-list", "--left-right", "--count", f"HEAD...origin/{branch}"])
+    if rev.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "error",
+                "message": "无法比较本地与远端提交。"}
+    parts = rev.stdout.strip().split("\t")
+    if len(parts) != 2:
+        return {"mode": "git", "pulled": False, "status": "error",
+                "message": f"rev-list 输出异常: {rev.stdout.strip()!r}"}
+    ahead, behind = int(parts[0]), int(parts[1])
+    if behind == 0:
+        return {"mode": "git", "pulled": False, "status": "up_to_date",
+                "message": f"已与 origin/{branch} 同步，无需更新。"}
+    pull = _run_git(repo_root, ["pull", "--ff-only", "origin", branch])
+    if pull.returncode != 0:
+        return {"mode": "git", "pulled": False, "status": "pull_failed",
+                "message": f"git pull --ff-only 失败: {pull.stderr.strip()[-300:]}；请手动处理。"}
+    return {"mode": "git", "pulled": True, "status": "updated",
+            "message": f"已从 origin/{branch} 快进更新（本地落后 {behind} 个提交）。"}
+
+
 def download_remote_skill(tmp: Path) -> Path:
     url = f"https://github.com/{REPO_OWNER}/{REPO_NAME}/archive/refs/heads/{REPO_BRANCH}.zip"
     archive = tmp / "repo.zip"
@@ -368,14 +421,30 @@ def check_status() -> dict[str, object]:
 def apply_updates(allow_repo_working_copy: bool = False) -> dict[str, object]:
     skill_dir = find_skill_dir()
     assert_skill_dir(skill_dir)
-    if inside_git_worktree(skill_dir) and not allow_repo_working_copy:
-        return {
-            "skill": SKILL_NAME,
-            "local_path": str(skill_dir),
-            "applied": False,
-            "reason": "inside_git_worktree",
-            "message": "Refusing to replace a git working copy. Re-run with --allow-repo-working-copy if intentional.",
-        }
+    if inside_git_worktree(skill_dir):
+        if allow_repo_working_copy:
+            # 显式选择 zip 覆盖（会破坏 git 历史，仅高级用户故意为之；默认不推荐）。
+            status = check_status()
+            backup_path = None
+            if status["skill_update"]["update_available"]:
+                backup_path = str(replace_tree(_download_to_apply_copy(), skill_dir))
+            status["applied"] = bool(status["skill_update"]["update_available"])
+            status["backup"] = backup_path
+            if NPM_PACKAGE and status.get("npm") and status["npm"].get("update_available"):
+                status["npm"]["install"] = install_latest_npm()
+            return status
+        # 默认（推荐）：git 工作副本走安全的 git pull 同步，而不是一刀切拒绝。
+        repo_root = find_repo_root(skill_dir)
+        if repo_root is None:
+            return {"skill": SKILL_NAME, "local_path": str(skill_dir), "applied": False,
+                    "reason": "no_git_root",
+                    "message": "检测到 git 工作副本但找不到仓库根，跳过自动更新。"}
+        result = git_pull_if_behind(repo_root, REPO_BRANCH)
+        result["skill"] = SKILL_NAME
+        result["local_path"] = str(skill_dir)
+        result["applied"] = result.get("pulled", False)
+        return result
+    # 非 git 安装（zip/手动拷贝）：原版本优先 + 清单回退的 zip 覆盖逻辑。
     status = check_status()
     backup_path = None
     if status["skill_update"]["update_available"]:
