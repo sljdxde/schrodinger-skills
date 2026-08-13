@@ -2,7 +2,7 @@
 name: house-buying
 name_zh: 学区房助手
 description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations. Also triggered by explicit requests to use the house-buying or 学区房助手 skill, or by natural-language phrases such as 请使用 house-buying 分析、分析学区房、买房值不值得、学区房是否值得买、购房分析、帮我看个房子.
-version: 1.5.0
+version: 1.5.1
 ---
 
 # 学区房助手（House Buying）

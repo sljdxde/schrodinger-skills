@@ -237,8 +237,8 @@ def generate_report(analysis: dict) -> str:
         "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>{title}</title><style>{ds.olive_theme_css()}{extra_css}</style></head>"
-        f"<body><h1>{title}</h1>{body}"
-        "<h2>参考资料</h2><ol class='cites'>" + cites_html + "</ol>"
+        f"<body><div class='wrap'><h1>{title}</h1>{body}"
+        "<h2>参考资料</h2><ol class='cites'>" + cites_html + "</ol></div>"
         "</body></html>"
     )
 
