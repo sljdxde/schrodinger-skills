@@ -1,7 +1,7 @@
 ---
 name: memory-forge
 description: Use when the user pastes or uploads study material (notes, articles, lecture text, .txt/.md/.docx/.pdf) and wants to understand and remember it — generates one-concept-per-card knowledge cards, plain-language stories and analogies, complementary diagrams or mind-maps, mnemonics, interactive self-test quizzes, and a spaced-repetition (SM-2) review schedule; can open a real browser or search the web to explain unfamiliar terms with authoritative diagrams.
-version: 1.1.0
+version: 1.1.1
 ---
 
 # Memory Forge
@@ -31,6 +31,10 @@ python scripts/update_self.py --apply
 - **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
 
 任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
+
+**更新失败汇总**：若本次会话中本 skill（或同批其他 skill）的自动更新因 GitHub 拉取超时等网络异常失败，Agent 会在**所有任务完成后**调用 `python scripts/update_self.py --report`，统一输出失败原因与手动更新步骤（`git pull --ff-only` 或重新安装），不会中途打断你的任务。
+
+> 最近一次更新：2026-08-13（v1.1.1）— 本版本用于验证自动更新机制在**独立安装（如 codex）**上能否从 GitHub 正常同步。若你在新安装中看到此说明，说明自动更新已成功生效。
 
 ## 工作流
 
