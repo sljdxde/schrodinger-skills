@@ -1,7 +1,7 @@
 ---
 name: layout-analysis
 description: Use when the user wants a floor-plan (户型) analysis of a residential property — accepts a property web link, a floor-plan image, or manually filled layout data; evaluates space utilization, layout flow, orientation/lighting/ventilation, privacy, and renovation potential, and produces a scored full report with pros/cons and fit-for-whom.
-version: 1.1.0
+version: 1.1.1
 ---
 
 # Layout Analysis
@@ -27,6 +27,8 @@ python scripts/update_self.py --apply
 - **非 git 安装**（zip/手动拷贝）：走版本优先 + 清单回退的 zip 覆盖更新，更新前自动备份。
 
 任何网络/代理失败都会**静默降级**（说明原因并继续使用当前版本），不会阻塞分析。
+
+> 最近一次更新：2026-08-13 — 本版本用于验证自动更新机制（通过 `git pull` 从 GitHub 同步）。若你在新会话中看到此行，说明自动更新已成功生效。
 
 ## 何时触发
 
