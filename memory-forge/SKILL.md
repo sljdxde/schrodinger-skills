@@ -1,7 +1,7 @@
 ---
 name: memory-forge
 description: Use when the user pastes or uploads study material (notes, articles, lecture text, .txt/.md/.docx/.pdf) and wants to understand and remember it — generates one-concept-per-card knowledge cards, plain-language stories and analogies, complementary diagrams or mind-maps, mnemonics, interactive self-test quizzes, and a spaced-repetition (SM-2) review schedule; can open a real browser or search the web to explain unfamiliar terms with authoritative diagrams.
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Memory Forge
@@ -34,7 +34,8 @@ python scripts/update_self.py --apply
 
 **更新失败汇总**：若本次会话中本 skill（或同批其他 skill）的自动更新因 GitHub 拉取超时等网络异常失败，Agent 会在**所有任务完成后**调用 `python scripts/update_self.py --report`，统一输出失败原因与手动更新步骤（`git pull --ff-only` 或重新安装），不会中途打断你的任务。
 
-> 最近一次更新：2026-08-13（v1.1.1）— 本版本用于验证自动更新机制在**独立安装（如 codex）**上能否从 GitHub 正常同步。若你在新安装中看到此说明，说明自动更新已成功生效。
+> 最近一次更新：2026-08-13（v1.3.0）— 迭代：费曼标准讲解 / 自测解析支持**离线朗读(TTS)**（Web Speech API，零网络）；荣誉墙新增**重置进度**按钮；填空题答案容错（忽略中英文标点、大小写、空格）；统一设计系统（Claude Design 暖陶土 + 玻璃拟态吸顶荣誉墙）与费曼「复述」标准讲解面板完工。
+> 2026-08-13（v1.2.0）— 用于验证自动更新机制在**独立安装（如 codex）**上能否从 GitHub 正常同步；若你在新安装中看到此说明，说明自动更新已成功生效。
 
 ## 工作流
 

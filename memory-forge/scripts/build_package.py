@@ -44,6 +44,7 @@ ICONS = {
     "lightbulb": '<path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/>',
     "layers": '<path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/>',
     "repeat": '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
+    "volume": '<path d="M11 4.7 6.6 9H3v6h3.6L11 19.3z"/><path d="M16 9a4 4 0 0 1 0 6"/><path d="M19.4 6.6a8 8 0 0 1 0 10.8"/>',
 }
 
 
@@ -131,7 +132,9 @@ def render_cards(concepts: list[dict]) -> str:
                 f'onclick="onFeynmanRetell(this)">'
                 f'{icon("pen-line", 15)} <span>复述 / 看标准讲解</span></button>'
                 f'<div class="feynman-answer" hidden>'
-                f'<div class="fa-title">{icon("check", 14)} 标准讲解（对照自评）</div>'
+                f'<div class="fa-title">{icon("check", 14)} <span>标准讲解（对照自评）</span>'
+                f'<button class="fa-speak" type="button" title="朗读讲解" '
+                f'onclick="speakFrom(this,\'.fa-body\')">{icon("volume", 14)}</button></div>'
                 f'<div class="fa-body">{ans_html}</div></div>'
                 f'<span class="feynman-check" role="button" tabindex="0" '
                 f'onclick="onFeynmanCheck(this)" '
@@ -197,7 +200,9 @@ def render_quiz(quiz: dict | None) -> str:
         f'<div class="quiz-body">{body}</div>'
         f'<button class="quiz-check" type="button" onclick="checkQuiz(this)">检查</button>'
         f'<div class="quiz-feedback" hidden></div>'
-        f'<div class="quiz-explain" hidden>解析：{explain}</div>'
+        f'<div class="quiz-explain" hidden>解析：{explain} '
+        f'<button class="mini-speak" type="button" title="朗读解析" '
+        f'onclick="speakFrom(this,\'.quiz-explain\')">{icon("volume", 14)}</button></div>'
         f"</div>"
     )
 
@@ -218,7 +223,7 @@ def render_review(concepts: list[dict], review: list[dict]) -> str:
             for q in range(0, 6)
         )
         rows.append(
-            f"""<tr data-ef="{ef}" data-n="0" data-last="{first}">
+            f"""<tr data-ef="{ef}" data-n="0" data-last="{first}" data-first="{first}">
   <td class="rv-term">{term}</td>
   <td class="rv-next">+{first} 天</td>
   <td class="rv-rate">{btns}</td>
@@ -361,6 +366,7 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
         f'<span class="hb-stat-label">勋章</span></div>
   </div>
   <div class="hb-badges" title="已解锁勋章（实时同步）">{mini_html}</div>
+  <button class="hb-reset" type="button" onclick="resetProgress()" title="清除本包进度">重置进度</button>
   <div class="hb-progress"><div class="hb-progress-fill" id="hbProgressFill"></div></div>
 </div>"""
 
@@ -497,6 +503,10 @@ section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-
 .hb-progress{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--line);overflow:hidden}
 .hb-progress-fill{height:100%;width:0;background:var(--grad-accent);
   transition:width .6s cubic-bezier(.16,1,.3,1);box-shadow:0 0 8px var(--ring)}
+.hb-reset{margin-left:auto;align-self:center;font-size:12px;font-weight:700;color:var(--muted);
+  background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;cursor:pointer;
+  transition:all .15s;flex-shrink:0}
+.hb-reset:hover{color:var(--bad);border-color:var(--bad)}
 
 /* hall of fame */
 .hall-head{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:800;margin-bottom:14px}
@@ -575,6 +585,12 @@ section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-
 .feynman-check:hover{background:#EAF4EE}
 .feynman-check.done{background:var(--good);border-color:var(--good);color:#fff}
 .feynman-check.done .fchk-box{color:#fff}
+.fa-speak,.mini-speak{display:inline-flex;align-items:center;justify-content:center;margin-left:auto;
+  width:30px;height:30px;border-radius:9px;border:1px solid var(--line);background:var(--card);
+  color:var(--accent);cursor:pointer;transition:all .15s;flex-shrink:0}
+.fa-speak:hover,.mini-speak:hover{background:var(--accent-soft)}
+.fa-speak.speaking,.mini-speak.speaking{background:var(--accent);color:#fff;border-color:var(--accent)}
+.quiz-explain{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 
 /* quiz */
 .quiz{margin-top:13px;padding:14px 15px;background:var(--accent-soft);border:1px dashed var(--line-2);border-radius:var(--r-sm)}
@@ -770,7 +786,8 @@ function checkQuiz(btn){
   var ok=false;
   var fill=q.querySelector('.fill-input');
   if(fill){
-    ok = fill.value.trim()===fill.dataset.ans.trim();
+    var norm=function(s){return (s||'').trim().toLowerCase().replace(/[。.，,、\.\s]/g,'');};
+    ok = norm(fill.value)===norm(fill.dataset.ans);
   }else{
     var sel=q.querySelector('input[type=radio]:checked');
     var ans=parseInt(q.querySelector('.correct-hide').dataset.ans,10);
@@ -839,6 +856,44 @@ function onFeynmanCheck(fc){
   var box=fc.querySelector('.fchk-box'); if(box)box.innerHTML=iconSvg('check',14);
   var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='已对照核对 ✓';
   S.feynmanDone++; grantXP(PKG.xp_rules.feynman_done); bumpStreak(); afterAction();
+}
+
+/* ===== Read-aloud (offline Web Speech API) ===== */
+function speak(text, btn){
+  if(!('speechSynthesis' in window)){ toast('当前浏览器不支持朗读','x'); return; }
+  if(window.speechSynthesis.speaking){ window.speechSynthesis.cancel();
+    document.querySelectorAll('.speaking').forEach(function(e){e.classList.remove('speaking');}); return; }
+  var u=new SpeechSynthesisUtterance(text||''); u.lang='zh-CN';
+  try{ var vs=window.speechSynthesis.getVoices()||[];
+    for(var i=0;i<vs.length;i++){ if(/zh|chinese/i.test(vs[i].lang)){u.voice=vs[i];break;} } }catch(e){}
+  u.onend=function(){ document.querySelectorAll('.speaking').forEach(function(e){e.classList.remove('speaking');}); };
+  window.speechSynthesis.speak(u); if(btn)btn.classList.add('speaking');
+}
+function speakFrom(btn, sel){
+  var panel=btn.closest('.feynman-answer')||btn.closest('.quiz');
+  var el=panel?panel.querySelector(sel):null; if(!el)return;
+  speak(el.innerText, btn);
+}
+
+/* ===== Reset progress ===== */
+function resetProgress(){
+  if(!confirm('确定清除本学习包的全部进度（经验 / 徽章 / 翻转 / 复习 / 费曼）？'))return;
+  try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){}
+  try{localStorage.removeItem(LS_KEY);}catch(e){}
+  S=Object.assign({xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,feynmanDone:0,streak:0,lastDay:null,flips:{}},{});
+  document.querySelectorAll('.review tr[data-ef]').forEach(function(r){
+    r.dataset.n='0'; r.dataset.last=r.dataset.first||'1'; delete r.dataset.rated; delete r.dataset.ge4;
+    var nx=r.querySelector('.rv-next'); if(nx)nx.textContent='+'+r.dataset.last+' 天';
+    r.querySelectorAll('.rate').forEach(function(b){b.classList.remove('active');});
+  });
+  document.querySelectorAll('.flip.flipped').forEach(function(f){f.classList.remove('flipped');});
+  document.querySelectorAll('.feynman-check.done').forEach(function(fc){
+    fc.classList.remove('done');
+    var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='我已对照核对';
+    var box=fc.querySelector('.fchk-box'); if(box)box.innerHTML=iconSvg('square',14);
+  });
+  document.querySelectorAll('.quiz').forEach(function(q){ delete q.dataset.correctMarked; delete q.dataset.answered; });
+  afterAction(); toast('进度已重置','sunrise');
 }
 
 /* ===== init ===== */
