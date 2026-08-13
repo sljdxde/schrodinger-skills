@@ -1,0 +1,372 @@
+{
+  "_schema": "学区房政策基线快照：逐城记录义务教育入学政策关键字段。由 data_sources.py policy 命令读取，供 school-cohort-analysis / forecasting 设定默认情景权重。字段：multi_school_assignment=多校划片状态，teacher_rotation=教师轮岗，hukou_decoupled=户籍与学位/权益是否脱钩，seat_lock_years=学位锁定年限(年,null=未执行/未知)，alert_mechanism=学区预警机制，verify_status=核实状态，sources=来源URL列表，note=备注。",
+  "_last_verified": "2026-08-13",
+  "_national_baseline": "2026 起全国城区义务教育全面推行多校划片+电脑派位；教师满9年必须轮岗、城区优质校年轮岗≥15%/骨干≥20%；国发〔2026〕11号推常住地提供基本公共服务（户籍与权益脱钩方向）。少子化：2017新生1723万→2025年792万，2025小学招生比2023峰值少22%。分析默认将「学区确定性」权重下调、「政策风险情景」置信度上调。",
+  "_default": {
+    "multi_school_assignment": "unknown",
+    "teacher_rotation": "unknown",
+    "hukou_decoupled": "unknown",
+    "seat_lock_years": null,
+    "alert_mechanism": "unknown",
+    "verify_status": "待联网核验",
+    "sources": [],
+    "note": "未逐城核实；分析时以当年该市/区教育局招生公告为准，勿直接引用为结论。"
+  },
+  "北京": {
+    "multi_school_assignment": "部分区已执行(西城/东城等热点区多校划片)",
+    "teacher_rotation": "已推行(优质校轮岗)",
+    "hukou_decoupled": "否(房户一致优先)",
+    "seat_lock_years": 6,
+    "alert_mechanism": "部分区发布学位预警",
+    "verify_status": "部分核实(市场数据)",
+    "sources": [
+      "https://news.ifeng.com/c/8uE38tth2GK",
+      "https://www.toutiao.com/article/7667135933850010135"
+    ],
+    "note": "海淀学区房2025同比约-35%；热点区多校划片削弱「买房锁名校」逻辑。"
+  },
+  "上海": {
+    "multi_school_assignment": "部分区执行(公民同招+五年一户)",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否(人户一致优先)",
+    "seat_lock_years": 5,
+    "alert_mechanism": "部分区发布学位预警",
+    "verify_status": "部分核实",
+    "sources": [
+      "https://shrxbm.edu.sh.gov.cn",
+      "https://nw.eastday.com/self/yw/20260407/815c273f487a4b61960b5614b9a11112.html"
+    ],
+    "note": "16区已发布年度招生细则与对口地段表；静安/徐汇等执行五年一户。"
+  },
+  "深圳": {
+    "multi_school_assignment": "推行(部分区530学位全摇号)",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "部分(租购同权+积分入学)",
+    "seat_lock_years": null,
+    "alert_mechanism": "部分区发布",
+    "verify_status": "部分核实",
+    "sources": [
+      "https://news.ifeng.com/c/8uE38tth2GK",
+      "https://zjj.sz.gov.cn:8004/"
+    ],
+    "note": "积分入学不唯房产；530学位全摇号为强信号，学区确定性显著下降。"
+  },
+  "杭州": {
+    "multi_school_assignment": "推行(公民同招+部分区多校划片)",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否(房户一致优先)",
+    "seat_lock_years": 6,
+    "alert_mechanism": "部分区发布",
+    "verify_status": "部分核实",
+    "sources": [
+      "https://www.hangzhou.gov.cn/col/col1228974656/art/2026/art_c0ab0155f9b127f3c61a1c6d5ecf2180.html"
+    ],
+    "note": "超七成学区房门槛回落150万以下；部分区六年一学位。"
+  },
+  "南京": {
+    "multi_school_assignment": "部分区执行",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "部分区发布",
+    "verify_status": "部分核实(样例城市)",
+    "sources": [
+      "https://www.njqxq.gov.cn/qxqrmzf/202505/t20250516_5564170.html"
+    ],
+    "note": "多数区六年一学位；学区房分析样例城市，规则较成熟。"
+  },
+  "宁波": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zjw.ningbo.gov.cn/"],
+    "note": "住建局公开单小区级成交参考价，官方源精度高。"
+  },
+  "苏州": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zfcjj.suzhou.gov.cn/"],
+    "note": "住建局公开即时成交/出售信息公示。"
+  },
+  "无锡": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://js.wuxi.gov.cn/"],
+    "note": "官方发布部分小区二手住房成交参考价格。"
+  },
+  "佛山": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://fszj.foshan.gov.cn/"],
+    "note": "月度交易情况/昨日成交量公开。"
+  },
+  "珠海": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://bdc.zhuhai.gov.cn"],
+    "note": "不动产登记中心网签公示/以图查房公开。"
+  },
+  "重庆": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "渝水区红黄绿分级(新余)",
+    "verify_status": "部分核实(预警)",
+    "sources": [
+      "https://www.yushui.gov.cn/yushui/ldxxrnpgd/2026-01/02/content_86cf234ec92a4f27b5175311e74fd1a7.shtml"
+    ],
+    "note": "学区预警机制先行城市之一。"
+  },
+  "长春": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "朝阳等区发布学位预警",
+    "verify_status": "部分核实(预警)",
+    "sources": [
+      "https://new.qq.com/rain/a/20260102A046J500"
+    ],
+    "note": "已发布学位预警通告。"
+  },
+  "成都": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": 6,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.cdzjryb.com/"],
+    "note": "当日成交与预现售公示公开。"
+  },
+  "广州": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zfcj.gz.gov.cn/zfcj/ygjy/"],
+    "note": "阳光家缘存量房网签公开可查。"
+  },
+  "西安": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zfyxdj.xa.gov.cn/"],
+    "note": "销售公示公开；二手房成交明细未公开。"
+  },
+  "武汉": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zgj.wuhan.gov.cn"],
+    "note": "公开成交公示不全。"
+  },
+  "青岛": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.qdfd.com.cn/"],
+    "note": "存量房监管平台房源核验公开。"
+  },
+  "厦门": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["http://szjj.xm.gov.cn/"],
+    "note": "房源信息编码核验公开。"
+  },
+  "天津": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zfcxjs.tj.gov.cn"],
+    "note": "网签明细需实名。"
+  },
+  "哈尔滨": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.hrbhousedata.com"],
+    "note": "以办理网签备案为主。"
+  },
+  "南昌": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["http://ncfdc.com.cn/"],
+    "note": "真实成交价公开，适合内置数据源。"
+  },
+  "济南": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://jncc.jinan.gov.cn/jnfcjyzx/"],
+    "note": "二手房真实成交价公开源较弱。"
+  },
+  "郑州": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.zhenghaofang.cn"],
+    "note": "政府核验房源公开展示。"
+  },
+  "合肥": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.hfzfzlw.com/clf"],
+    "note": "监管平台+合肥住房为核心渠道。"
+  },
+  "长沙": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://szjw.changsha.gov.cn"],
+    "note": "平台房源经政府核验公示。"
+  },
+  "福州": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://bdcdj.fuzhou.gov.cn/"],
+    "note": "二手房逐套成交价公开度低。"
+  },
+  "沈阳": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://fcj.shenyang.gov.cn/"],
+    "note": "无公开批量网签成交公示。"
+  },
+  "石家庄": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zjj.sjz.gov.cn/"],
+    "note": "无公开批量成交/挂牌数据接口。"
+  },
+  "太原": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://fgj.taiyuan.gov.cn/"],
+    "note": "挂牌房源/网签查询需实名。"
+  },
+  "昆明": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.kmhouse.org.cn/"],
+    "note": "退房/预售公示公开。"
+  },
+  "贵阳": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["http://www.gyfc.net.cn"],
+    "note": "筑房网网签查询需登录。"
+  },
+  "南宁": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://zjj.nanning.gov.cn"],
+    "note": "商品房成交套数有公开公示页。"
+  },
+  "海口": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://hkrealestate.haikou.gov.cn"],
+    "note": "公开二手挂牌地图与新房公示。"
+  },
+  "洛阳": {
+    "multi_school_assignment": "推行中",
+    "teacher_rotation": "已推行",
+    "hukou_decoupled": "否",
+    "seat_lock_years": null,
+    "alert_mechanism": "待核",
+    "verify_status": "待联网核验",
+    "sources": ["https://www.lyzbj.org.cn/"],
+    "note": "住房保障中心「我要查」公开预售/签约/指导价。"
+  }
+}

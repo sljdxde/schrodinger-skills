@@ -781,6 +781,55 @@ class WubaSource(WebSource):
         ]
 
 
+class GovCommunityAdapter(BaseSource):
+    """T1 官方单小区数据适配器（G 模块）。
+
+    针对已公开单小区级成交/公示的城市（宁波/苏州/无锡/佛山/珠海等，见
+    references/data-source-playbook.md 第八节），在 sources.json 为该城配置
+    gov.endpoint 后，直拉小区级成交参考价/公示，作为 T1 强证据。未配置或
+    解析失败时退回精确 T1 检索式，由 AI 代理联网取数后回填。
+    """
+    name = "官方单小区"
+    kind = "web"
+    provides = "both"
+    tier = "T1"
+
+    def can_api(self, city: Optional[str] = None) -> bool:
+        # T1 官方源多为无需登录公开页，仅需 endpoint 即可拉取
+        return bool(self.endpoint_for(city))
+
+    def search_queries(self, community: str, district: str, city: str = "杭州",
+                       months: int = 36) -> list:
+        c = f"{district} " if district else ""
+        return [
+            f"{city} {c}{community} 官方 二手房 成交 公示 网签",
+            f"{city} 住建局 {c}{community} 存量房 成交参考价",
+            f"{city} {c}{community} 不动产登记 网签公示",
+        ]
+
+    def _fetch_api(self, community: str, district: str, city: str,
+                   months: int = 36) -> SourceFetchResult:
+        endpoint = self.endpoint_for(city)
+        if not endpoint:
+            raise RuntimeError("未配置 gov endpoint，退回检索")
+        html = self._request_text(endpoint, city=city)
+        # 官方页面结构易变：不做脆弱的字段解析，返回原始页（截断）供 AI 解析，
+        # 作为 T1 强证据承载；解析失败时改用检索式兜底。
+        return SourceFetchResult(
+            source=self.name,
+            community=community,
+            city=city,
+            queries=self.search_queries(community, district, city, months),
+            raw_note=("已拉取官方页面原始内容（前 20000 字符），请 AI 代理按该城页面"
+                      "结构解析小区级成交/公示并补回 listings/transactions/history；"
+                      "解析失败时改用检索式兜底。\n---RAW---\n"
+                      + html[:20000]),
+            confidence="medium",
+            mode="api",
+            months=months,
+        )
+
+
 def load_sources(city: str = "杭州") -> list:
     """加载配置好的数据源（endpoint/token/cookie/headers 在 sources.json）。"""
     sources = [
@@ -815,6 +864,7 @@ def load_sources(city: str = "杭州") -> list:
 # 全国城市源注册表（预置内置，避免运行时检索）
 # --------------------------------------------------------------------------- #
 CITY_REGISTRY_PATH = SKILL_DIR / "scripts" / "city_sources.json"
+CITY_POLICY_PATH = SKILL_DIR / "scripts" / "city_policy.json"
 
 
 def load_city_registry() -> dict:
@@ -824,6 +874,63 @@ def load_city_registry() -> dict:
         except Exception:
             return {}
     return {}
+
+
+def load_city_policy(city: str = "") -> dict:
+    """读取逐城 2026 政策基线（见 references/policy-baseline-2026.md）。
+
+    返回该城政策基线字典；未提供城市或城市未登记时返回 _default
+    （verify_status=待联网核验）。
+    """
+    data: dict = {}
+    if CITY_POLICY_PATH.is_file():
+        try:
+            data = json.loads(CITY_POLICY_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    default = data.get("_default", {})
+    if city:
+        return data.get(city, default)
+    return default
+
+
+def national_policy_baseline() -> str:
+    if CITY_POLICY_PATH.is_file():
+        try:
+            data = json.loads(CITY_POLICY_PATH.read_text(encoding="utf-8"))
+            return data.get("_national_baseline", "")
+        except Exception:
+            return ""
+    return ""
+
+
+def cmd_policy(args) -> int:
+    city = getattr(args, "city", "") or ""
+    if not city:
+        print("【2026 全国政策基线】")
+        print(national_policy_baseline())
+        return 0
+    p = load_city_policy(city)
+    print(f"【{city} 2026 政策基线】（核实状态：{p.get('verify_status', '未知')}）")
+    fields = [
+        ("多校划片", "multi_school_assignment"),
+        ("教师轮岗", "teacher_rotation"),
+        ("户籍与学位/权益脱钩", "hukou_decoupled"),
+        ("学位锁定年限(年)", "seat_lock_years"),
+        ("学区预警机制", "alert_mechanism"),
+    ]
+    for label, key in fields:
+        val = p.get(key, "未知")
+        print(f"  - {label}: {val}")
+    if p.get("note"):
+        print(f"  备注: {p['note']}")
+    if p.get("sources"):
+        print("  来源:")
+        for s in p["sources"]:
+            print(f"    - {s}")
+    print("\n⚠️ 凡 verify_status=待联网核验，分析时以当年该市/区教育局招生公告为准，"
+          "勿直接引用本快照为结论。")
+    return 0
 
 
 def city_source_queries(city: str) -> dict:
@@ -853,6 +960,18 @@ def city_source_queries(city: str) -> dict:
         if name and name != "无":
             sources.append(name)
             queries.append(f"{name} {city} 二手房 成交价 小区 走势")
+    # 学区划片源（C 模块）：区教育局招生专栏 + 检索兜底
+    sd = entry.get("school_district") or {}
+    if sd:
+        q_sd = sd.get("fallback_search") or f"{city} 教育局 义务教育招生 对口地段表"
+        queries.append(f"【学区划片】{q_sd}")
+        if sd.get("education_bureau_url"):
+            queries.append(f"【学区划片-官方入口】{sd['education_bureau_url']}")
+    # 学区预警源（D 模块）：红黄牌预警 + 检索兜底
+    al = entry.get("enrollment_alert") or {}
+    if al:
+        q_al = al.get("fallback_search") or f"{city} 学区预警 学位预警"
+        queries.append(f"【学区预警】{q_al}")
     if not entry:
         queries.append(
             f"{city} 二手房 成交价 挂牌价 近36个月 走势"
@@ -867,6 +986,8 @@ def city_source_queries(city: str) -> dict:
             f"{g.get('name')}: {g.get('public_access')}"
             for g in entry.get("gov", [])
         ],
+        "school_district": entry.get("school_district"),
+        "enrollment_alert": entry.get("enrollment_alert"),
     }
 
 
@@ -1470,6 +1591,29 @@ th,td{border:1px solid var(--line);padding:7px 10px;vertical-align:top}
 """
 
 
+def cmd_gov(args) -> int:
+    city = getattr(args, "city", "") or "杭州"
+    community = getattr(args, "community", "") or ""
+    district = getattr(args, "district", "") or ""
+    months = getattr(args, "months", 36)
+    if not community:
+        print("【官方单小区数据 gov 适配器（T1）】")
+        print("用法: python data_sources.py gov --community <小区> --city <城市> [--district <区>]")
+        print("说明: 在 scripts/sources.json 为该城配置 gov.endpoint 后，直拉官方小区级"
+              "成交/公示(T1 强证据)；未配置或失败则退回精确 T1 检索式。")
+        print("      已公开单小区数据的城市（宁波/苏州/无锡/佛山/珠海等）见 "
+              "references/data-source-playbook.md 第八节。")
+        return 0
+    src = GovCommunityAdapter(city=city)
+    res = src.fetch(community, district, city, months=months)
+    print(f"【gov:{city} {community}】mode={res.mode} confidence={res.confidence} tier={res.tier}")
+    for q in res.queries:
+        print(f"  - {q}")
+    if res.mode == "api" and "---RAW---" in res.raw_note:
+        print(f"  - 已拉取官方原始页（供 AI 解析），长度 {len(res.raw_note)} 字符")
+    return 0
+
+
 def olive_theme_css() -> str:
     """返回「橄榄手记」风格完整 CSS（浅色、高对比、清晰优先），粘入 <style> 即可。"""
     return OLIVE_CSS
@@ -1912,6 +2056,31 @@ def self_test() -> int:
     assert dims["price"]["mandatory"] is True and dims["volume"]["mandatory"] is False, "第一维度标记错误"
     print("✓ 引用防伪元数据与7维度网络框架正确")
 
+    # 8) 政策基线快照（A 模块）
+    nb = national_policy_baseline()
+    assert "多校划片" in nb, "全国政策基线缺失"
+    hzp = load_city_policy("杭州")
+    assert hzp.get("multi_school_assignment"), "杭州政策基线缺失"
+    assert load_city_policy("不存在城").get("verify_status") == "待联网核验", "未登记城市未回退默认"
+    print("✓ 政策基线快照（city_policy.json）读取正确")
+
+    # 9) 学区划片/预警源注册表（C+D 模块）
+    qz = city_source_queries("上海")
+    assert qz.get("school_district"), "school_district 字段缺失"
+    assert qz.get("enrollment_alert"), "enrollment_alert 字段缺失"
+    assert any("学区划片" in x for x in qz["queries"]), "学区划片检索式缺失"
+    assert any("学区预警" in x for x in qz["queries"]), "学区预警检索式缺失"
+    print("✓ 学区划片/预警源注册表（city_sources.json）已接入 sources 命令")
+
+    # 10) 官方单小区 gov 适配器（G 模块）
+    g = GovCommunityAdapter(city="杭州")
+    assert not g.can_api("杭州"), "无 endpoint 不应判定可 API"
+    res = g.fetch("文鼎苑", "", "杭州", 12)
+    assert res.mode == "websearch", "无 endpoint 应退回检索"
+    assert any("官方" in x for x in res.queries), "gov 检索式缺失"
+    assert res.tier == "T1", "gov 应为 T1"
+    print("✓ 官方单小区 gov 适配器（无配置退回 T1 检索）正确")
+
     print("\nself-test passed" if ok else "self-test failed")
     return 0 if ok else 1
 
@@ -1972,6 +2141,19 @@ def main() -> int:
     pdim.add_argument("--dimension", default="", help="单维查询：price/volume/supply_demand/"
                       "land/school_policy/population/credit")
     pdim.set_defaults(func=cmd_dimensions)
+
+    ppol = sub.add_parser(
+        "policy", help="读取某城 2026 政策基线（多校划片/教师轮岗/户籍脱钩/学位锁定/预警）")
+    ppol.add_argument("--city", default="", help="目标城市；留空则输出全国政策基线")
+    ppol.set_defaults(func=cmd_policy)
+
+    pgov = sub.add_parser(
+        "gov", help="T1 官方单小区数据适配器：配置 endpoint 直拉，否则精确检索兜底")
+    pgov.add_argument("--community", default="")
+    pgov.add_argument("--district", default="")
+    pgov.add_argument("--city", default="杭州")
+    pgov.add_argument("--months", type=int, default=36)
+    pgov.set_defaults(func=cmd_gov)
 
     p.add_argument("--self-test", action="store_true", help="运行自检")
     args = p.parse_args()

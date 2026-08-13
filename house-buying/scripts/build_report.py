@@ -9,6 +9,7 @@ render_bar_chart / render_range_chart。仅 stdlib 依赖。
 """
 import re
 import sys
+import json
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -176,5 +177,116 @@ def main() -> int:
     return 0
 
 
+def generate_report(analysis: dict) -> str:
+    """参数化装配单文件自包含 HTML 报告（Module F）。
+
+    把「引用锚点转换 + 章节装配 + 自包含校验」从手写 HTML 中抽离，减少
+    AI 代理写报告时的占位符遗漏、图表错位、引用锚点丢失。
+
+    analysis 结构：
+    {
+      "title": str,
+      "conclusion": str,            # 开头结论（建议/谨慎/观望/不建议）
+      "meta": str,                  # 用户输入摘要/关键假设（HTML 片段）
+      "sections": [                 # 有序章节
+        {"id": "1", "title": "楼盘基本面", "html": "<p>...</p>"},
+        ...
+      ],
+      "cites": [{"label","url","date?","caliber?","consistency?"}],
+      "charts": [                   # 可选，注入到指定章节前
+        {"svg": "<svg>...</svg>", "caption": "...", "before_section_id": "4"}
+      ],
+      "extra_css": ""               # 可选附加样式
+    }
+    返回完整 HTML 字符串（含 olive_theme_css 视觉规范 + 可点击引用 + 校验）。
+    """
+    title = analysis.get("title", "购房分析报告")
+    conclusion = analysis.get("conclusion", "")
+    meta = analysis.get("meta", "")
+    sections = analysis.get("sections", [])
+    cites = analysis.get("cites", [])
+    charts = analysis.get("charts", [])
+    extra_css = analysis.get("extra_css", "")
+
+    body_parts: list = []
+    if conclusion:
+        body_parts.append(f'<div class="conclusion">{conclusion}</div>')
+    if meta:
+        body_parts.append(f'<div class="meta">{meta}</div>')
+
+    section_html: dict = {}
+    for sec in sections:
+        sid = str(sec.get("id", ""))
+        h = f'<h2 id="sec-{sid}">{sec.get("title", "")}</h2>\n{sec.get("html", "")}'
+        section_html[sid] = h
+        body_parts.append(h)
+
+    # 图表注入到目标章节前
+    for ch in charts:
+        target = str(ch.get("before_section_id", ""))
+        block = chart_block(ch.get("svg", ""), ch.get("caption", ""))
+        if target and target in section_html:
+            idx = body_parts.index(section_html[target])
+            body_parts.insert(idx, block)
+        else:
+            body_parts.append(block)
+    body = "\n".join(body_parts)
+
+    cites_html = ds.render_citations(cites)
+    full = (
+        "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        f"<title>{title}</title><style>{ds.olive_theme_css()}{extra_css}</style></head>"
+        f"<body><h1>{title}</h1>{body}"
+        "<h2>参考资料</h2><ol class='cites'>" + cites_html + "</ol>"
+        "</body></html>"
+    )
+
+    # [N] -> 可点击锚点 <a href="#cite-N" class="cite-ref">
+    def repl_sup(m):
+        nums = re.findall(r"\d+", m.group(1))
+        return "".join(
+            f'<a href="#cite-{n}" class="cite-ref">[{n}]</a>' for n in nums
+        )
+    full = re.sub(r"\[(\d+)(?:,\s*\d+)*\]", repl_sup, full)
+
+    # 自包含校验
+    # [N] 显示文本会保留在锚点内（<a ...>[N]</a>），用负向前瞻排除锚点内的，
+    # 只检查「未转换为锚点」的孤立 [N]。
+    leftover = re.findall(r"\[(\d+)\](?!\s*</a>)", full)
+    assert not leftover, f"仍有未转换的引用标记: {leftover[:5]}"
+    assert not re.findall(r"<sup>", full), "仍有未转换的 <sup> 引用"
+    assert "__" not in full, "存在未替换占位符"
+    ref_nums = set(re.findall(r'href="#cite-(\d+)"', full))
+    id_nums = set(re.findall(r'id="cite-(\d+)"', full))
+    missing = ref_nums - id_nums
+    assert not missing, f"锚点缺失对应 id: {missing}"
+    assert "<img" not in full, "不应有外链/本地图片"
+    assert re.search(r'src="(?!#)', full) is None, "不应有非锚点 src"
+    return full
+
+
+def cmd_generate(args) -> int:
+    if not args.input:
+        print("用法: python build_report.py --generate --input analysis.json "
+              "[--output report.html]")
+        return 1
+    analysis = json.loads(Path(args.input).read_text(encoding="utf-8"))
+    html = generate_report(analysis)
+    out = args.output or (Path(args.input).parent / "report.html")
+    Path(out).write_text(html, encoding="utf-8")
+    print(f"✓ 报告已生成：{out}（{len(html)} 字符，自包含校验通过）")
+    return 0
+
+
 if __name__ == "__main__":
+    import argparse
+    ap = argparse.ArgumentParser(description="购房分析报告后处理 / 参数化装配")
+    ap.add_argument("--generate", action="store_true",
+                    help="按 analysis.json 参数化装配单文件自包含 HTML 报告")
+    ap.add_argument("--input", default="", help="analysis.json 路径")
+    ap.add_argument("--output", default="", help="输出 HTML 路径（默认同目录 report.html）")
+    a = ap.parse_args()
+    if a.generate:
+        raise SystemExit(cmd_generate(a))
     raise SystemExit(main())

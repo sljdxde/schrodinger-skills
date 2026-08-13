@@ -74,13 +74,14 @@
 - 基准/乐观/悲观三情景价格预测
 - 明确给出买入、谨慎可买、观望或不建议买入
 
-**最近升级（v1.4.2）：**
+**最近升级（v1.5.0）：**
 - 数据源从“双平台交叉”升级为 **T0–T4 五级体系**，官方源（住建/网签/不动产/统计/教育）在冲突裁决中权重最高
 - 新增 **引用五要素**：所有数据点强制溯源（来源 / URL / 时间 / 口径 / 一致性），杜绝凭空编造
 - 引入 **单一维度展开**策略与 `references/dimension-network.md`，房价维度做透后再扩展其他维度
 - 新增 **生源代际传导**方法论（`references/school-cohort-analysis.md`）：升学率滞后 9–15 年，以历史生源对比当前生源预测未来
 - 城市源注册表 45 → **46 城**（新增洛阳，gov URL 联网核验）
-- 决策记录见 `docs/adr/0005-source-hierarchy-and-dimension-network.md`；当前版本 1.4.2
+- **v1.5.0 优化（按深度评估方案）**：新增 2026 政策基线快照（`city_policy.json` + `policy` 命令，多校划片/教师轮岗/户籍脱钩默认高权重）；学位占用/落户年限用户自查清单与合同模板（`title-verification-checklist.md`）；46 城学区划片与预警源注册表（C+D 模块）；`gov` 官方单小区 T1 adapter；`build_report.py --generate` 参数化报告装配；反爬合规升级（官方 API 优先、抓包法律红线）
+- 决策记录见 `docs/adr/0005-source-hierarchy-and-dimension-network.md`；当前版本 1.5.0
 
 **使用方式：**
 

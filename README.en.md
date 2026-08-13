@@ -76,13 +76,14 @@ Due diligence and decision support for Chinese residential property purchases. I
 - Produce base/optimistic/pessimistic housing-price forecast scenarios
 - Give a clear buy / cautious buy / watch / do-not-buy recommendation
 
-**Recent upgrade (v1.4.2):**
+**Recent upgrade (v1.5.0):**
 - Source model upgraded from "dual-platform cross-check" to a **T0–T4 five-tier hierarchy**; official sources hold the highest weight in conflict resolution
 - Added **citation five-elements**: every data point is traceable (source / URL / date / caliber / consistency) to eliminate fabrication
 - Introduced the **single-dimension-first** strategy with `references/dimension-network.md`
 - Added **student-cohort projection** methodology (`references/school-cohort-analysis.md`): outcomes lag birth cohorts by 9–15 years; project the future by comparing historical vs current cohorts
 - City registry expanded 45 → **46 cities** (Luoyang added, gov URLs verified)
-- Decision record: `docs/adr/0005-source-hierarchy-and-dimension-network.md`; currently 1.4.2
+- **v1.5.0 optimization (per deep-evaluation plan)**: 2026 policy baseline snapshot (`city_policy.json` + `policy` command, multi-school assignment / teacher rotation / hukou decoupling as default high-weight); title-verification checklist & contract template (`title-verification-checklist.md`); 46-city school-district & enrollment-alert registry (C+D); `gov` official single-community T1 adapter; `build_report.py --generate` parameterized report assembly; anti-crawl compliance upgrade (official API first, legal red line on scraping)
+- Decision record: `docs/adr/0005-source-hierarchy-and-dimension-network.md`; currently 1.5.0
 
 **Usage:**
 
