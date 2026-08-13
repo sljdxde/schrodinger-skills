@@ -171,6 +171,7 @@ class SourceFetchResult:
     confidence: str = "low"
     mode: str = "websearch"  # api / websearch
     months: int = 36
+    tier: str = "T3"  # 数据源分级 T0/T1/T1.5/T2/T3/T4
 
     def to_dict(self) -> dict:
         return {
@@ -185,6 +186,7 @@ class SourceFetchResult:
             "confidence": self.confidence,
             "mode": self.mode,
             "months": self.months,
+            "tier": self.tier,
         }
 
 # --------------------------------------------------------------------------- #
@@ -195,6 +197,11 @@ class BaseSource:
     kind = "mini_program"  # mini_program / web
     # 该源主力提供什么口径
     provides = "listing"  # listing / transaction / both
+    # 数据源分级（house-buying 五级体系，见 references/data-source-playbook.md）：
+    # T0=核心平台(贝壳系/我爱我家) / T1=官方佐证(住建/网签/不动产登记) /
+    # T1.5=城市本地高频源(接近网签，如杭房数研) / T2=政务App与本地小程序 /
+    # T3=交叉验证(诸葛找房/安居客/房天下/58同城) / T4=舆情
+    tier = "T3"
 
     def __init__(self, cfg: Optional[dict] = None, city: str = "杭州"):
         self.cfg = cfg or {}
@@ -227,12 +234,17 @@ class BaseSource:
         city = city or self.city
         if self.can_api(city):
             try:
-                return self._fetch_api(community, district, city, months)
+                res = self._fetch_api(community, district, city, months)
+                res.tier = self.tier
+                return res
             except Exception as exc:  # 兜底回检索
                 res = self._fetch_websearch(community, district, city, months)
+                res.tier = self.tier
                 res.raw_note = f"API 拉取失败({exc})，已退回联网检索模式。{res.raw_note}"
                 return res
-        return self._fetch_websearch(community, district, city, months)
+        res = self._fetch_websearch(community, district, city, months)
+        res.tier = self.tier
+        return res
 
     # ---- API 模式：子类实现具体接口 ----
     def _fetch_api(self, community: str, district: str, city: str,
@@ -536,6 +548,7 @@ class HangfangSource(BaseSource):
     name = "杭房数研"
     kind = "mini_program"
     provides = "both"
+    tier = "T1.5"  # 城市本地高频源，接近网签口径
 
     def search_queries(self, community: str, district: str, city: str = "杭州",
                        months: int = 36) -> list:
@@ -572,6 +585,7 @@ class XiaojiSource(BaseSource):
     name = "小鸡选房"
     kind = "mini_program"
     provides = "listing"
+    tier = "T2"  # 城市本地小程序（挂盘口径）
 
     def search_queries(self, community: str, district: str, city: str = "杭州",
                        months: int = 36) -> list:
@@ -604,10 +618,11 @@ class XiaojiSource(BaseSource):
 
 
 class BeikeSource(WebSource):
-    """贝壳/链家（网页）：全国城市成交+挂牌，作为交叉验证源。"""
+    """贝壳/链家（网页）：全国城市成交+挂牌，T0 核心数据源。"""
     name = "贝壳"
     kind = "web"
     provides = "both"
+    tier = "T0"
 
     def search_queries(self, community: str, district: str, city: str = "杭州",
                        months: int = 36) -> list:
@@ -649,10 +664,11 @@ class BeikeSource(WebSource):
 
 
 class WoaiwojiaSource(WebSource):
-    """我爱我家（网页）：全国城市挂牌+成交，作为新增交叉验证源。"""
+    """我爱我家（网页）：全国城市挂牌+成交，T0 核心数据源。"""
     name = "我爱我家"
     kind = "web"
     provides = "both"
+    tier = "T0"
 
     def search_queries(self, community: str, district: str, city: str = "杭州",
                        months: int = 36) -> list:
@@ -693,13 +709,92 @@ class WoaiwojiaSource(WebSource):
         )
 
 
+# --------------------------------------------------------------------------- #
+# T3 交叉验证源（诸葛找房 / 安居客 / 房天下 / 58同城）
+# --------------------------------------------------------------------------- #
+# 用途：同一指标的多源交叉比对，标注一致性程度。只做交叉验证，不单独支撑结论；
+# 未配置 API 时一律退回联网检索模式（生成精确检索式，由代理取数回填）。
+class ZhugeSource(WebSource):
+    """诸葛找房（网页）：多平台聚合挂牌+成交，全国，T3 交叉验证源。"""
+    name = "诸葛找房"
+    kind = "web"
+    provides = "both"
+    tier = "T3"
+
+    def search_queries(self, community: str, district: str, city: str = "杭州",
+                       months: int = 36) -> list:
+        c = f"{district} " if district else ""
+        return [
+            f"{city} {c}{community} 诸葛找房 挂牌价 成交价",
+            f"{city} {c}{community} 诸葛找房 小区 均价 走势",
+            f"{community} 诸葛找房 近{months}个月 房价 走势",
+        ]
+
+
+class AnjukeSource(WebSource):
+    """安居客（网页）：挂牌口径为主，全国，T3 交叉验证源。"""
+    name = "安居客"
+    kind = "web"
+    provides = "listing"
+    tier = "T3"
+
+    def search_queries(self, community: str, district: str, city: str = "杭州",
+                       months: int = 36) -> list:
+        c = f"{district} " if district else ""
+        return [
+            f"{city} {c}{community} 安居客 挂牌价 均价",
+            f"{city} {c}{community} 安居客 小区 二手房 房价",
+            f"{community} 安居客 近{months}个月 房价走势 月度",
+        ]
+
+
+class FangSource(WebSource):
+    """房天下（网页）：挂牌口径为主，全国，T3 交叉验证源。"""
+    name = "房天下"
+    kind = "web"
+    provides = "listing"
+    tier = "T3"
+
+    def search_queries(self, community: str, district: str, city: str = "杭州",
+                       months: int = 36) -> list:
+        c = f"{district} " if district else ""
+        return [
+            f"{city} {c}{community} 房天下 挂牌价 均价",
+            f"{city} {c}{community} 房天下 二手房 房价 走势",
+            f"{community} 房天下 近{months}个月 小区房价 月度",
+        ]
+
+
+class WubaSource(WebSource):
+    """58同城房产（网页）：挂牌为主，中介重复房源多，T3 低置信交叉源。"""
+    name = "58同城"
+    kind = "web"
+    provides = "listing"
+    tier = "T3"
+
+    def search_queries(self, community: str, district: str, city: str = "杭州",
+                       months: int = 36) -> list:
+        c = f"{district} " if district else ""
+        return [
+            f"{city} {c}{community} 58同城 二手房 挂牌价",
+            f"{city} {c}{community} 58同城 小区 均价",
+        ]
+
+
 def load_sources(city: str = "杭州") -> list:
     """加载配置好的数据源（endpoint/token/cookie/headers 在 sources.json）。"""
     sources = [
-        XiaojiSource(city=city),
-        HangfangSource(city=city),
+        # T0 核心双源
         BeikeSource(city=city),
         WoaiwojiaSource(city=city),
+        # T1.5 / T2 城市本地高频源与小程序（杭州）
+        XiaojiSource(city=city),
+        HangfangSource(city=city),
+        # T3 交叉验证源
+        ZhugeSource(city=city),
+        AnjukeSource(city=city),
+        FangSource(city=city),
+        WubaSource(city=city),
     ]
     if SOURCES_CONFIG.is_file():
         try:
@@ -773,6 +868,112 @@ def city_source_queries(city: str) -> dict:
             for g in entry.get("gov", [])
         ],
     }
+
+
+# --------------------------------------------------------------------------- #
+# 维度网络（单一维度展开策略，见 references/dimension-network.md）
+# --------------------------------------------------------------------------- #
+# 先做透第一维度「房价」（mandatory），再按用户诉求逐层展开其余维度；
+# 每个维度列出：数据字段、推荐来源层级（T0-T4）、展开条件、报告输出位置。
+DIMENSION_FRAMEWORK = {
+    "price": {
+        "name": "房价",
+        "mandatory": True,
+        "fields": [
+            "挂牌价（月度时间轴）", "成交价（月度时间轴）", "环比MoM", "同比YoY",
+            "3/6/12/24/36个月涨跌幅", "带看量", "在售房源量", "议价空间", "成交周期",
+        ],
+        "sources": ["T0 贝壳系(贝壳/链家)+我爱我家", "T1 官方网签/住建公示",
+                    "T1.5 城市本地高频源(杭房数研类)", "T3 诸葛找房/安居客/房天下/58同城交叉验证"],
+        "expand_when": "每次分析必做",
+        "output": "报告「交易与价格」章节：走势图 + 时间轴表格 + 峰/谷/当前值 + 动量指标",
+    },
+    "volume": {
+        "name": "成交量",
+        "mandatory": False,
+        "fields": [
+            "月度成交套数（新房/二手分开）", "月度挂牌量", "成交周期（天）",
+            "带看量/带看转化", "近3/6/12个月成交量变化",
+        ],
+        "sources": ["T1 住建局/网签平台月度成交公示", "T1.5 城市高频源", "T0 平台成交记录",
+                    "T3 诸葛找房/中指研究院"],
+        "expand_when": "用户关心市场热度、判断趋势拐点、砍价时机",
+        "output": "报告「市场供需与热度」章节：成交量柱状图（render_bar_chart）",
+    },
+    "supply_demand": {
+        "name": "供需比",
+        "mandatory": False,
+        "fields": [
+            "在售挂牌量", "近12个月成交量", "去化周期（挂牌量/月均成交量）",
+            "新增挂牌 vs 成交比", "库存消化速度",
+        ],
+        "sources": ["T0 平台挂牌量", "T1 网签平台库存/可售公示", "T1.5 城市高频源"],
+        "expand_when": "判断议价空间与买方/卖方市场强弱",
+        "output": "报告「市场供需与热度」章节：去化周期与挂牌/成交比",
+    },
+    "land": {
+        "name": "土地出让",
+        "mandatory": False,
+        "fields": [
+            "近12个月涉宅用地出让宗数/面积/楼面价", "溢价率/流拍率",
+            "板块内新增供应对存量竞争", "土地成交价对房价预期的传导",
+        ],
+        "sources": ["T1 自然资源局/规划资源局土地出让公告与成交公示",
+                    "T1 市公共资源交易中心"],
+        "expand_when": "判断片区未来供应量与价格预期（新房扎堆风险）",
+        "output": "报告「土地与供应」章节（若有数据）",
+    },
+    "school_policy": {
+        "name": "学区/政策",
+        "mandatory": False,
+        "fields": [
+            "对口小学/初中（当年招生公告口径）", "落户/房户一致/学位占用规则",
+            "学区预警/多校划片/教师轮岗", "限购/限售/限贷/公积金政策",
+            "二手房参考价机制",
+        ],
+        "sources": ["T1 教育局招生公告", "T1 住建/房管政策文件", "T2 政务App政策板块"],
+        "expand_when": "涉及学区、政策敏感期、用户有入学诉求（必做）",
+        "output": "报告「学区」系列章节 + 政策风险清单",
+    },
+    "population": {
+        "name": "人口流动",
+        "mandatory": False,
+        "fields": [
+            "常住人口/净流入（统计公报）", "出生人口与学龄人口趋势",
+            "就业/产业人口结构", "租售比与空置 proxy",
+        ],
+        "sources": ["T1 统计局统计公报", "T1 政府工作报告", "T4 主流媒体（低置信）"],
+        "expand_when": "判断中长期需求底座（少子化/人口流出风险）",
+        "output": "报告「长期人口与供需」评分维度 + 情景分析依据",
+    },
+    "credit": {
+        "name": "信贷环境",
+        "mandatory": False,
+        "fields": [
+            "首套/二套房贷利率", "首付比例政策", "公积金贷款额度/利率",
+            "LPR走势与放款周期", "经营贷/消费贷监管口径",
+        ],
+        "sources": ["T1 央行/金融监管总局公告", "T1 住建/公积金中心政策",
+                    "T2 政务App公积金板块"],
+        "expand_when": "测算月供、评估购买力与政策宽松/收紧方向",
+        "output": "报告「家庭现金流与贷款」章节",
+    },
+}
+
+
+def cmd_dimensions(args) -> int:
+    """输出维度网络框架：7 维度（房价为第一维度）的字段/来源/展开条件/输出位置。"""
+    name = getattr(args, "dimension", "") or ""
+    if name:
+        dim = DIMENSION_FRAMEWORK.get(name)
+        if not dim:
+            print(f"未知维度：{name}（可选：{', '.join(DIMENSION_FRAMEWORK)}）",
+                  file=sys.stderr)
+            return 2
+        print(json.dumps({name: dim}, ensure_ascii=False, indent=2))
+        return 0
+    print(json.dumps(DIMENSION_FRAMEWORK, ensure_ascii=False, indent=2))
+    return 0
 
 
 # --------------------------------------------------------------------------- #
@@ -876,6 +1077,100 @@ def render_timeline_chart(history: list, title: str = "", width: int = 720,
             lx += 92
     svg.append("</svg>")
     return "\n".join(svg)
+
+
+# --------------------------------------------------------------------------- #
+# 环比 / 同比 / N 月涨跌幅（数据链路第一维度「房价」的强制输出）
+# --------------------------------------------------------------------------- #
+def _kind_group(history: list) -> dict:
+    """把月度时间轴按口径分组：listing / transaction，键为 YYYY-MM -> (price, count)。"""
+    grouped: dict = {"listing": {}, "transaction": {}}
+    for p in (history or []):
+        if not isinstance(p, dict):
+            continue
+        d = str(p.get("date", "")).strip()
+        v = p.get("price_per_sqm")
+        if not d or v is None:
+            continue
+        try:
+            v = float(v)
+        except (TypeError, ValueError):
+            continue
+        k = "transaction" if "trans" in str(p.get("kind", "listing")).lower() else "listing"
+        cnt = p.get("count")
+        try:
+            cnt = int(cnt or 0)
+        except (TypeError, ValueError):
+            cnt = 0
+        grouped[k][d] = (v, cnt)
+    return grouped
+
+
+def _shift_month(d: str, n: int) -> str:
+    """YYYY-MM 向前/后推 n 个月（n 可为负）。"""
+    y, m = d.split("-")
+    total = int(y) * 12 + int(m) - 1 + n
+    return f"{total // 12:04d}-{total % 12 + 1:02d}"
+
+
+def compute_mom_yoy(history: list, months: int = 36) -> dict:
+    """从月度时间轴计算房价动量指标（口径分挂牌/成交）。
+
+    输出字段：
+      mom:           月度环比（本月 / 上月 - 1），{date: pct}；仅当相邻月份存在时计算，
+                     缺月不编造（2025-03 之后直接到 2026-01 不产生环比）
+      yoy:           月度同比（本月 / 去年同月 - 1），{date: pct}
+      change_nm:     N 个月涨跌幅 {3: pct, 6: pct, 12: pct, 24: pct, 36: pct}
+                     （当前月 vs 恰好 N 个月前的月份，按日历月差；该月缺失则跳过）
+      peak/valley:   区间内峰值 / 谷值 {date, price}
+      current:       最新月份 {date, price, count}
+      months_covered: 覆盖的月份数
+    无数据或样本不足时不编造：单个时点无法算环比/同比时返回 None。
+    """
+    grouped = _kind_group(history)
+    out: dict = {}
+    for kind in ("listing", "transaction"):
+        dmap = grouped[kind]
+        if not dmap:
+            continue
+        dates = sorted(dmap)
+        mom: dict = {}
+        yoy: dict = {}
+        for i, d in enumerate(dates):
+            if i > 0:
+                prev_date, prev = dates[i - 1], dmap[dates[i - 1]][0]
+                if prev and _shift_month(prev_date, 1) == d:
+                    mom[d] = (dmap[d][0] - prev) / prev
+            # 同比：去年同月（YYYY-MM 减一年）
+            y, m = d.split("-") if "-" in d else (d, "")
+            if m:
+                ly = f"{int(y) - 1:04d}-{m}"
+                if ly in dmap:
+                    base = dmap[ly][0]
+                    if base:
+                        yoy[d] = (dmap[d][0] - base) / base
+        change_nm: dict = {}
+        cur = dmap[dates[-1]][0]
+        for n in (3, 6, 12, 24, 36):
+            target = _shift_month(dates[-1], -n)
+            if target in dmap and dmap[target][0]:
+                change_nm[n] = (cur - dmap[target][0]) / dmap[target][0]
+        vals = [(d, v[0]) for d, v in dmap.items()]
+        peak = {"date": max(vals, key=lambda t: t[1])[0],
+                "price": max(v for _, v in vals)}
+        valley = {"date": min(vals, key=lambda t: t[1])[0],
+                  "price": min(v for _, v in vals)}
+        last_date, (last_price, last_count) = dates[-1], dmap[dates[-1]]
+        out[kind] = {
+            "mom": mom,
+            "yoy": yoy,
+            "change_nm": change_nm,
+            "peak": peak,
+            "valley": valley,
+            "current": {"date": last_date, "price": last_price, "count": last_count},
+            "months_covered": len(dates),
+        }
+    return out
 
 
 class SchoolDistrictWorkflow:
@@ -1163,6 +1458,7 @@ th,td{border:1px solid var(--line);padding:7px 10px;vertical-align:top}
 .caption{color:var(--sub);font-size:12.5px;margin-top:8px}
 .cite-ref{color:var(--olive);text-decoration:none;font-size:.85em;vertical-align:super;font-weight:600}
 .cite-ref:hover{text-decoration:underline}
+.cite-meta{color:var(--sub);font-size:12px;margin-left:6px;font-weight:400}
 .cites a{color:var(--olive);text-decoration:underline;text-underline-offset:3px}
 .cites li{margin:4px 0;font-size:13.5px}
 .warn{background:var(--warn);border:1px solid #e5b8a4;color:var(--warn-ink);
@@ -1184,6 +1480,16 @@ def render_citations(cites: list) -> str:
 
     每条 <li> 带 id="cite-N"，正文可用 <a href="#cite-N" class="cite-ref">[N]</a>
     点击跳转到对应引用。url 缺失显示“未提供链接”，不编造。空列表返回空串。
+
+    引用防伪元数据（可选字段，见 data-source-playbook.md「引用格式规范」）：
+      label        来源名称 + 标题（必填）
+      url          真实链接（必填；缺失显示“未提供链接”）
+      date         发布时间或访问时间，如 "2026-07" / "2026-07-15 访问"
+      caliber      数据口径，如 "成交" / "挂牌" / "网签" / "参考均价"
+      consistency  多源一致性程度，如 "双源一致" / "单源" / "来源冲突（见正文）"
+    输出形如：
+      <li id="cite-1"><a href="..." target="_blank">label</a>
+        <span class="cite-meta">[2026-07发布；口径:成交；一致性:双源一致]</span></li>
     """
     if not cites:
         return ""
@@ -1191,11 +1497,23 @@ def render_citations(cites: list) -> str:
     for i, c in enumerate(cites, 1):
         label = str(c.get("label") or f"来源 {i}")
         url = str(c.get("url") or "").strip()
+        meta_parts = []
+        date = str(c.get("date") or "").strip()
+        if date:
+            meta_parts.append(f"{date}发布" if "访问" not in date else date)
+        caliber = str(c.get("caliber") or "").strip()
+        if caliber:
+            meta_parts.append(f"口径:{caliber}")
+        consistency = str(c.get("consistency") or "").strip()
+        if consistency:
+            meta_parts.append(f"一致性:{consistency}")
+        meta = f' <span class="cite-meta">[{"; ".join(meta_parts)}]</span>' if meta_parts else ""
         if url:
             items.append(
-                f'<li id="cite-{i}"><a href="{url}" target="_blank" rel="noopener">{label}</a></li>')
+                f'<li id="cite-{i}"><a href="{url}" target="_blank" rel="noopener">'
+                f"{label}</a>{meta}</li>")
         else:
-            items.append(f'<li id="cite-{i}">{label}（未提供链接）</li>')
+            items.append(f'<li id="cite-{i}">{label}（未提供链接）{meta}</li>')
     return '<ol class="cites">\n' + "\n".join(items) + "\n</ol>"
 
 
@@ -1534,6 +1852,66 @@ def self_test() -> int:
     assert not t2["known"] and "未评级" in t2["tier"], "未知学校应返回未评级"
     print("✓ 橄榄手记CSS / 可点击引用锚点 / 学区梯队 / SVG 图表辅助正确")
 
+    # 8) T3 交叉验证源注册 + 数据源分级标注
+    srcs = load_sources("上海")
+    names = {s.name for s in srcs}
+    for n in ("贝壳", "我爱我家", "诸葛找房", "安居客", "房天下", "58同城"):
+        assert n in names, f"数据源未注册: {n}"
+    tier_map = {s.name: s.tier for s in srcs}
+    assert tier_map["贝壳"] == "T0" and tier_map["我爱我家"] == "T0", "T0 核心源分级错误"
+    assert tier_map["诸葛找房"] == "T3" and tier_map["58同城"] == "T3", "T3 交叉源分级错误"
+    assert tier_map["杭房数研"] == "T1.5", "杭房数研应标注 T1.5 城市高频源"
+    z = ZhugeSource()
+    assert any("诸葛找房" in x and "上海" in x for x in z.search_queries("文鼎苑", "浦东", "上海", 24)), "诸葛检索式缺失"
+    w = WubaSource()
+    assert any("58同城" in x and "上海" in x for x in w.search_queries("文鼎苑", "浦东", "上海", 24)), "58同城检索式缺失"
+    # fetch 结果带 tier
+    res = ZhugeSource().fetch("文鼎苑", "浦东", "上海", 12)
+    assert res.tier == "T3" and res.mode == "websearch", "T3 源 fetch 分级/模式错误"
+    print("✓ T3 交叉验证源注册与五级分级标注正确")
+
+    # 9) 环比/同比/N月涨跌幅
+    momyoy = compute_mom_yoy([
+        {"date": "2026-01", "price_per_sqm": 10000, "kind": "listing", "count": 10},
+        {"date": "2026-02", "price_per_sqm": 11000, "kind": "listing", "count": 8},
+        {"date": "2026-03", "price_per_sqm": 9900, "kind": "listing", "count": 6},
+        {"date": "2025-03", "price_per_sqm": 9000, "kind": "listing", "count": 5},
+    ])
+    assert "listing" in momyoy, "环比/同比缺少挂牌口径"
+    L = momyoy["listing"]
+    # 2026-02 vs 2026-01: (11000-10000)/10000 = +10%；2026-03 vs 2026-02 = -10%
+    assert abs(L["mom"]["2026-02"] - 0.10) < 1e-9, f"环比计算错误: {L['mom']}"
+    assert abs(L["mom"]["2026-03"] + 0.10) < 1e-9, f"环比计算错误: {L['mom']}"
+    # 2025-03 与 2026-01 不连续，缺月不编造环比
+    assert "2026-01" not in L["mom"], "缺月不应编造环比"
+    # 同比：2026-03 vs 2025-03 = +10%
+    assert abs(L["yoy"]["2026-03"] - 0.10) < 1e-9, f"同比计算错误: {L['yoy']}"
+    # 12个月涨跌幅：2026-03 vs 2025-03 = +10%；3/6 个月前月份缺失 → 不输出
+    assert abs(L["change_nm"][12] - 0.10) < 1e-9, f"12月涨跌幅错误: {L['change_nm']}"
+    assert 3 not in L["change_nm"], "缺月不应编造3月涨跌幅"
+    assert L["peak"]["price"] == 11000 and L["valley"]["date"] == "2025-03", "峰谷错误"
+    assert L["current"]["price"] == 9900 and L["months_covered"] == 4, "当前值错误"
+    # 单点时点不编造环比
+    single = compute_mom_yoy([{"date": "2026-07", "price_per_sqm": 50000, "kind": "listing"}])
+    assert single["listing"]["mom"] == {}, "单月不应产生环比"
+    print("✓ 环比/同比/12月涨跌幅/峰谷/当前值计算正确（含缺月不编造）")
+
+    # 10) 引用防伪元数据（发布时间/口径/一致性）+ 维度框架
+    cites = render_citations([
+        {"label": "贝壳某小区页", "url": "https://hz.ke.com/xiaoqu/a",
+         "date": "2026-07-15 访问", "caliber": "挂牌", "consistency": "双源一致"},
+        {"label": "教育局招生公告", "url": "https://edu.example.gov/b",
+         "date": "2026-06", "caliber": "官方文件"},
+    ])
+    assert 'class="cite-meta"' in cites and "口径:挂牌" in cites, "引用元数据未生成"
+    assert "一致性:双源一致" in cites and "2026-07-15 访问" in cites, "引用元数据内容错误"
+    assert 'href="https://hz.ke.com/xiaoqu/a"' in cites, "引用链接丢失"
+    dims = DIMENSION_FRAMEWORK
+    assert set(dims) == {"price", "volume", "supply_demand", "land",
+                         "school_policy", "population", "credit"}, "维度框架缺失"
+    assert dims["price"]["mandatory"] is True and dims["volume"]["mandatory"] is False, "第一维度标记错误"
+    print("✓ 引用防伪元数据与7维度网络框架正确")
+
     print("\nself-test passed" if ok else "self-test failed")
     return 0 if ok else 1
 
@@ -1569,7 +1947,7 @@ def main() -> int:
 
     pf = sub.add_parser("fetch", help="单源拉取某个小区的挂盘/成交/时间轴数据")
     pf.add_argument("--source", required=True,
-                    help="杭房数研 / 小鸡选房 / 贝壳 / 我爱我家")
+                    help="贝壳 / 我爱我家 / 杭房数研 / 小鸡选房 / 诸葛找房 / 安居客 / 房天下 / 58同城")
     pf.add_argument("--community", required=True)
     pf.add_argument("--district", default="")
     pf.add_argument("--city", default="杭州", help="目标城市，例如 上海 / 北京 / 杭州")
@@ -1588,6 +1966,12 @@ def main() -> int:
     psrc = sub.add_parser("sources", help="按声明城市列出预置信息源与精确取数检索式")
     psrc.add_argument("--city", required=True, help="目标城市，例如 上海 / 北京 / 杭州")
     psrc.set_defaults(func=cmd_sources)
+
+    pdim = sub.add_parser(
+        "dimensions", help="输出维度网络框架（房价为第一维度，其余按诉求逐层展开）")
+    pdim.add_argument("--dimension", default="", help="单维查询：price/volume/supply_demand/"
+                      "land/school_policy/population/credit")
+    pdim.set_defaults(func=cmd_dimensions)
 
     p.add_argument("--self-test", action="store_true", help="运行自检")
     args = p.parse_args()

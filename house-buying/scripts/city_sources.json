@@ -1,220 +1,1381 @@
 {
-  "_说明": "全国省会+自治区首府+直辖市(约31城)的预置房产信息源注册表。脚本按用户声明城市自动选源，避免运行时检索。每城含：gov=政府公开源(住建/网签/二手房公示)、gov_app=省级政务APP(浙里办类)、mini_program=本地高价值小程序、national=全国网页源(贝壳/我爱我家，脚本已内置)。public_access 标注取数难易：无需登录公开页=可直接抓公开页；需抓包/需登录=深层数据需用户抓包或实名。不硬编码易失效的深层API。",
+  "_说明": "全国省会+自治区首府+直辖市+计划单列市+强地级市(约46城)的预置房产信息源注册表。脚本按用户声明城市自动选源，避免运行时检索。每城含：gov=政府公开源(住建/网签/不动产登记/自然资源局)、gov_app=省级政务APP(浙里办/随申办/京通/粤省事类)、mini_program=本地高价值小程序、national=全国网页源(贝壳/我爱我家 T0 核心，脚本已内置；T3 交叉验证源诸葛找房/安居客/房天下/58同城为全国通用内置，按 references/data-source-playbook.md 的五级体系随时可用)。public_access 标注取数难易：无需登录公开页=可直接抓公开页；需抓包/需登录=深层数据需用户抓包或实名。不硬编码易失效的深层API。新增城市 gov URL 均经联网核验（2026-08）；无法核验到官网 URL 的城市只登记平台名不写 URL。",
   "北京": {
-    "gov": [{"name": "北京市住建委—房地产交易/存量房网签公示", "url": "https://zjw.beijing.gov.cn", "public_access": "无需登录公开页", "exposes": "网签/成交统计与价格公示公开；单笔网签明细需合同查询密码"}],
-    "gov_app": [{"name": "北京通", "housing_section": "有", "note": "不动产查询/住房租赁/购房资格核验"}],
-    "mini_program": [{"name": "无", "note": "以官方北京住建公众号及全国性平台为主"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "北京市住建委—房地产交易/存量房网签公示",
+        "url": "https://zjw.beijing.gov.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "网签/成交统计与价格公示公开；单笔网签明细需合同查询密码"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "北京通",
+        "housing_section": "有",
+        "note": "不动产查询/住房租赁/购房资格核验"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以官方北京住建公众号及全国性平台为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "成交统计与价格公示公开，结构化抓取可行；单套明细需合同查询密码"
   },
   "天津": {
-    "gov": [{"name": "天津市住建委—天津智慧住房建设租赁综合服务平台", "url": "https://zfcxjs.tj.gov.cn", "public_access": "官网公示无需登录；个人合同/不动产需统一身份认证", "exposes": "商品房买卖合同信息查询、不动产登记信息（需认证）"}],
-    "gov_app": [{"name": "津心办", "housing_section": "有", "note": "津心登：个人不动产登记资料查询/变更登记/转移登记"}],
-    "mini_program": [{"name": "无", "note": "津心办内津心登可查本人不动产，非公开成交数据"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "天津市住建委—天津智慧住房建设租赁综合服务平台",
+        "url": "https://zfcxjs.tj.gov.cn",
+        "public_access": "官网公示无需登录；个人合同/不动产需统一身份认证",
+        "exposes": "商品房买卖合同信息查询、不动产登记信息（需认证）"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "津心办",
+        "housing_section": "有",
+        "note": "津心登：个人不动产登记资料查询/变更登记/转移登记"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "津心办内津心登可查本人不动产，非公开成交数据"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "网签/成交明细需实名，公开页仅政务公示"
   },
   "上海": {
-    "gov": [{"name": "网上房地产（上海市房地产交易中心）", "url": "https://www.fangdi.com.cn", "public_access": "无需登录公开页", "exposes": "可售/挂牌/签约套数面积、区域成交、一手房二手房备案；首页成交挂牌可售数据均公开"}],
-    "gov_app": [{"name": "随申办", "housing_section": "有", "note": "不动产登记掌上办/我的不动产：本人名下房产查询/以图查房"}],
-    "mini_program": [{"name": "一房一万", "note": "本地楼市大数据，查二手房成交价（链家隐藏成交价后的替代渠道）；另有好好选房"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "网上房地产（上海市房地产交易中心）",
+        "url": "https://www.fangdi.com.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "可售/挂牌/签约套数面积、区域成交、一手房二手房备案；首页成交挂牌可售数据均公开"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "随申办",
+        "housing_section": "有",
+        "note": "不动产登记掌上办/我的不动产：本人名下房产查询/以图查房"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "一房一万",
+        "note": "本地楼市大数据，查二手房成交价（链家隐藏成交价后的替代渠道）；另有好好选房"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "官方网上房地产为最权威公开源，首页成交/挂牌/可售可直接抓"
   },
   "重庆": {
-    "gov": [{"name": "重庆网上房地产（市不动产登记中心/住建委）", "url": "https://www.cq315house.com", "public_access": "预售/可售公示公开；网签合同明细需合同号+姓名+身份证", "exposes": "新办预售许可公示、可售房源、商品房/二手房网签合同查询"}],
-    "gov_app": [{"name": "渝快办", "housing_section": "有", "note": "不动产综合服务：查名下房产/出具不动产证明/水电气联动过户"}],
-    "mini_program": [{"name": "冰山查成交", "note": "查重庆各小区二手房成交价与走势，本地常用第三方"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "重庆网上房地产（市不动产登记中心/住建委）",
+        "url": "https://www.cq315house.com",
+        "public_access": "预售/可售公示公开；网签合同明细需合同号+姓名+身份证",
+        "exposes": "新办预售许可公示、可售房源、商品房/二手房网签合同查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "渝快办",
+        "housing_section": "有",
+        "note": "不动产综合服务：查名下房产/出具不动产证明/水电气联动过户"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "冰山查成交",
+        "note": "查重庆各小区二手房成交价与走势，本地常用第三方"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "预售/可售公开可抓；批量成交价借助冰山查成交"
   },
   "石家庄": {
-    "gov": [{"name": "石家庄市住建局—网上服务综合查询/住房租赁公众服务平台", "url": "https://zjj.sjz.gov.cn/", "public_access": "无需登录公开页", "exposes": "网签备案状态查询需合同号+身份证；无公开批量成交公示/挂牌量接口"}],
-    "gov_app": [{"name": "冀时办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "无本地官方房产小程序；商业平台有房源但非政府源"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "石家庄市住建局—网上服务综合查询/住房租赁公众服务平台",
+        "url": "https://zjj.sjz.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "网签备案状态查询需合同号+身份证；无公开批量成交公示/挂牌量接口"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "冀时办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "无本地官方房产小程序；商业平台有房源但非政府源"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "仅按合同号逐笔核验网签备案，无公开批量成交/挂牌数据接口"
   },
   "太原": {
-    "gov": [{"name": "太原市房产管理局—交易综合管理子系统/微信公众号房产在线", "url": "https://fgj.taiyuan.gov.cn/", "public_access": "无需登录公开页（挂牌/网签查询需实名）", "exposes": "挂牌房源查询、网签合同查询、自主挂牌、在线签约、预售现售公示"}],
-    "gov_app": [{"name": "三晋通", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "太原市房产管理局（微信公众号）", "note": "官方入口为微信公众号房产在线，无独立知名小程序"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "太原市房产管理局—交易综合管理子系统/微信公众号房产在线",
+        "url": "https://fgj.taiyuan.gov.cn/",
+        "public_access": "无需登录公开页（挂牌/网签查询需实名）",
+        "exposes": "挂牌房源查询、网签合同查询、自主挂牌、在线签约、预售现售公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "三晋通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "太原市房产管理局（微信公众号）",
+        "note": "官方入口为微信公众号房产在线，无独立知名小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "挂牌房源/网签查询需实名认证；无公开批量成交价量公示页"
   },
   "沈阳": {
-    "gov": [{"name": "沈阳市房产局—房地产市场信息/存量房交易合同网上备案系统", "url": "https://fcj.shenyang.gov.cn/", "public_access": "无需登录公开页", "exposes": "商品房预售信息、存量房交易合同网上备案系统（办理查询入口）"}],
-    "gov_app": [{"name": "辽事通", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "无本地官方房源类小程序"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "沈阳市房产局—房地产市场信息/存量房交易合同网上备案系统",
+        "url": "https://fcj.shenyang.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房预售信息、存量房交易合同网上备案系统（办理查询入口）"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "辽事通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "无本地官方房源类小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "存量房备案系统为办理型入口，需交易主体；无公开批量网签成交公示"
   },
   "长春": {
-    "gov": [{"name": "长春市住房保障和房屋管理局—长春市房产信息平台", "url": "http://www.ccfdw.net", "public_access": "无需登录公开页", "exposes": "预售许可证查询、在售楼盘查询、个人合同备案查询、存量房监管服务平台"}],
-    "gov_app": [{"name": "吉事办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "灵动长春", "note": "不动产专区-个人住房查询/房产查档，偏权属查档而非挂牌房源"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "长春市住房保障和房屋管理局—长春市房产信息平台",
+        "url": "http://www.ccfdw.net",
+        "public_access": "无需登录公开页",
+        "exposes": "预售许可证查询、在售楼盘查询、个人合同备案查询、存量房监管服务平台"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "吉事办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "灵动长春",
+        "note": "不动产专区-个人住房查询/房产查档，偏权属查档而非挂牌房源"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "交易明细按合同/权证逐笔核验；无公开批量成交价量公示"
   },
   "哈尔滨": {
-    "gov": [{"name": "哈尔滨市房屋交易服务平台（市住建局）", "url": "https://www.hrbhousedata.com", "public_access": "无需登录公开页", "exposes": "存量房买卖合同网签备案、资金监管、找中介、我要买房"}],
-    "gov_app": [{"name": "龙易办（原全省事）", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "网签备案经网页/银行网点办理"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "哈尔滨市房屋交易服务平台（市住建局）",
+        "url": "https://www.hrbhousedata.com",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房买卖合同网签备案、资金监管、找中介、我要买房"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "龙易办（原全省事）",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "网签备案经网页/银行网点办理"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "以办理网签备案为主，需实名；无公开批量成交价量公示页"
   },
   "呼和浩特": {
-    "gov": [{"name": "呼和浩特市住建局—房屋备案查询/住房交易服务平台", "url": "http://zfcxjsj.huhhot.gov.cn/", "public_access": "无需登录公开页", "exposes": "房屋备案查询、房地产交易监管、新建/存量房网签备案结果查询"}],
-    "gov_app": [{"name": "蒙速办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "呼和浩特市住房交易服务平台（微信小程序）", "note": "官方二手房网签电子签约小程序（2026.7四区启用）；另爱青城APP可查网签备案"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "呼和浩特市住建局—房屋备案查询/住房交易服务平台",
+        "url": "http://zfcxjsj.huhhot.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "房屋备案查询、房地产交易监管、新建/存量房网签备案结果查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "蒙速办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "呼和浩特市住房交易服务平台（微信小程序）",
+        "note": "官方二手房网签电子签约小程序（2026.7四区启用）；另爱青城APP可查网签备案"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "网签备案查询需合同号+姓名+身份证；无公开批量成交价量公示"
   },
   "南京": {
-    "gov": [{"name": "南京网上房地产（市住房保障和房产局/房地产市场交易中心）", "url": "https://www.njhouse.com.cn/", "public_access": "无需登录公开页", "exposes": "房源/月度市场行情/网签备案信息公示公开；合同个人交易明细需录入"}],
-    "gov_app": [{"name": "苏服办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "房帮宁/宁慧租（市房产局官方）", "note": "二手房买卖、房源权威核验、合同查询"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "南京网上房地产（市住房保障和房产局/房地产市场交易中心）",
+        "url": "https://www.njhouse.com.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "房源/月度市场行情/网签备案信息公示公开；合同个人交易明细需录入"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "苏服办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "房帮宁/宁慧租（市房产局官方）",
+        "note": "二手房买卖、房源权威核验、合同查询"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "月度市场行情与网签公示可公开抓取"
   },
   "杭州": {
-    "gov": [{"name": "杭州市二手房交易监管服务平台（市住保房管局）", "url": "https://zwfw.fgj.hangzhou.gov.cn/jjhygl/guid/", "public_access": "无需登录公开页", "exposes": "挂牌验真房源/机构人员公示/网签备案公开；真实成交价经房管办事小程序/浙里办e房通"}],
-    "gov_app": [{"name": "浙里办", "housing_section": "有", "note": "e房通：二手房网签/不动产查询"}],
-    "mini_program": [{"name": "小鸡选房/杭房数据", "note": "本地高价值：网签价/挂牌实时行情/小区成交分析；另官方杭州房管办事小程序"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "杭州市二手房交易监管服务平台（市住保房管局）",
+        "url": "https://zwfw.fgj.hangzhou.gov.cn/jjhygl/guid/",
+        "public_access": "无需登录公开页",
+        "exposes": "挂牌验真房源/机构人员公示/网签备案公开；真实成交价经房管办事小程序/浙里办e房通"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "浙里办",
+        "housing_section": "有",
+        "note": "e房通：二手房网签/不动产查询"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "小鸡选房/杭房数据",
+        "note": "本地高价值：网签价/挂牌实时行情/小区成交分析；另官方杭州房管办事小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "真实成交价主要经小程序/浙里办e房通暴露"
   },
   "合肥": {
-    "gov": [{"name": "合肥市存量房交易服务监管平台（市住房保障和房产管理局）", "url": "https://www.hfzfzlw.com/clf", "public_access": "无需登录公开页", "exposes": "房源核验码/委托挂牌/合同网签/购房资格查询/挂牌房源量/信用公示"}],
-    "gov_app": [{"name": "皖事通", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "合肥住房（市房产局官方小程序）", "note": "房源核验/委托挂牌/网签/合同查询/生命周期时间轴"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "合肥市存量房交易服务监管平台（市住房保障和房产管理局）",
+        "url": "https://www.hfzfzlw.com/clf",
+        "public_access": "无需登录公开页",
+        "exposes": "房源核验码/委托挂牌/合同网签/购房资格查询/挂牌房源量/信用公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "皖事通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "合肥住房（市房产局官方小程序）",
+        "note": "房源核验/委托挂牌/网签/合同查询/生命周期时间轴"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "监管平台+合肥住房为核心渠道；成交价公开度一般"
   },
   "福州": {
-    "gov": [{"name": "福州市不动产登记和交易中心", "url": "https://bdcdj.fuzhou.gov.cn/", "public_access": "无需登录公开页", "exposes": "商品房/二手房网签入口、不动产登记公告、住宅销售价格变动公开"}],
-    "gov_app": [{"name": "闽政通", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "榕房购", "note": "集租购一体/房企项目展示/政策工具，偏新房展销；e福州APP不动产专区"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "福州市不动产登记和交易中心",
+        "url": "https://bdcdj.fuzhou.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房/二手房网签入口、不动产登记公告、住宅销售价格变动公开"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "闽政通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "榕房购",
+        "note": "集租购一体/房企项目展示/政策工具，偏新房展销；e福州APP不动产专区"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "二手房逐套成交价公开度低，以网签系统+不动产登记公告为主"
   },
   "南昌": {
-    "gov": [{"name": "南昌房地产信息网（市住建局）", "url": "http://ncfdc.com.cn/", "public_access": "无需登录公开页", "exposes": "真实成交价查询/真实核验房源/合同备案查询/预售证查询/二手房核验"}],
-    "gov_app": [{"name": "赣服通", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "南昌房信网（微信小程序/公众号）", "note": "官方权威源，查小区历史成交价与均价/真实成交价"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "南昌房地产信息网（市住建局）",
+        "url": "http://ncfdc.com.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "真实成交价查询/真实核验房源/合同备案查询/预售证查询/二手房核验"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "赣服通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "南昌房信网（微信小程序/公众号）",
+        "note": "官方权威源，查小区历史成交价与均价/真实成交价"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "最大亮点为真实成交价公开，适合内置为数据源"
   },
   "济南": {
-    "gov": [{"name": "济南市房产交易与租赁服务中心网上服务平台（市住建局）", "url": "https://jncc.jinan.gov.cn/jnfcjyzx/", "public_access": "无需登录公开页", "exposes": "商品房预售合同网签备案/住房信息查询结果公开；逐套明细需实名"}],
-    "gov_app": [{"name": "爱山东", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "云看房（济南住建）", "note": "新房户型/价格/五证及网签情况查询；二手房以爱山东房产交易云网签为主"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "济南市房产交易与租赁服务中心网上服务平台（市住建局）",
+        "url": "https://jncc.jinan.gov.cn/jnfcjyzx/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房预售合同网签备案/住房信息查询结果公开；逐套明细需实名"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "爱山东",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "云看房（济南住建）",
+        "note": "新房户型/价格/五证及网签情况查询；二手房以爱山东房产交易云网签为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "二手房真实成交价公开源较弱"
   },
   "郑州": {
-    "gov": [{"name": "郑州市住建局—郑好房服务平台", "url": "https://www.zhenghaofang.cn", "public_access": "郑好房房源页可公开浏览；网签/交易需登录郑好办", "exposes": "政府核验房源、网签备案、房源核验码"}],
-    "gov_app": [{"name": "豫事办", "housing_section": "有", "note": "不动产查询专区"}],
-    "mini_program": [{"name": "郑好房（入口在郑好办App/PC站）", "note": "官方平台，无独立知名第三方成交数据小程序"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "郑州市住建局—郑好房服务平台",
+        "url": "https://www.zhenghaofang.cn",
+        "public_access": "郑好房房源页可公开浏览；网签/交易需登录郑好办",
+        "exposes": "政府核验房源、网签备案、房源核验码"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "豫事办",
+        "housing_section": "有",
+        "note": "不动产查询专区"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "郑好房（入口在郑好办App/PC站）",
+        "note": "官方平台，无独立知名第三方成交数据小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "政府核验房源公开展示；成交明细未完全公开"
   },
   "武汉": {
-    "gov": [{"name": "武汉市住房和城市更新局—个人房产业务网上服务平台", "url": "https://zgj.wuhan.gov.cn", "public_access": "网签申报需登录；公示页不完全公开", "exposes": "存量房个人网签备案系统/商品房买卖合同网签/购房资格码"}],
-    "gov_app": [{"name": "鄂汇办", "housing_section": "有", "note": "不动产登记专区"}],
-    "mini_program": [{"name": "武汉不动产服务平台（微信小程序）", "note": "官方，可查不动产/办登记"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "武汉市住房和城市更新局—个人房产业务网上服务平台",
+        "url": "https://zgj.wuhan.gov.cn",
+        "public_access": "网签申报需登录；公示页不完全公开",
+        "exposes": "存量房个人网签备案系统/商品房买卖合同网签/购房资格码"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "鄂汇办",
+        "housing_section": "有",
+        "note": "不动产登记专区"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "武汉不动产服务平台（微信小程序）",
+        "note": "官方，可查不动产/办登记"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "公开成交公示不全，建议抓包/窗口"
   },
   "长沙": {
-    "gov": [{"name": "长沙市住建局—房屋交易一体化服务平台/长沙住房APP", "url": "https://szjw.changsha.gov.cn", "public_access": "核验房源公开浏览；交易/网签需登录", "exposes": "新房/存量房/租赁政府核验房源公示、合同网签备案、资金监管"}],
-    "gov_app": [{"name": "湘易办", "housing_section": "有", "note": "不动产/保障房专区"}],
-    "mini_program": [{"name": "长沙住房（APP）", "note": "官方一体化平台；第三方长沙购房查可查历史网签/成交价"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "长沙市住建局—房屋交易一体化服务平台/长沙住房APP",
+        "url": "https://szjw.changsha.gov.cn",
+        "public_access": "核验房源公开浏览；交易/网签需登录",
+        "exposes": "新房/存量房/租赁政府核验房源公示、合同网签备案、资金监管"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "湘易办",
+        "housing_section": "有",
+        "note": "不动产/保障房专区"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "长沙住房（APP）",
+        "note": "官方一体化平台；第三方长沙购房查可查历史网签/成交价"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "平台房源经政府核验公示；官方网签明细需登录"
   },
   "广州": {
-    "gov": [{"name": "广州市住建局—阳光家缘", "url": "https://zfcj.gz.gov.cn/zfcj/ygjy/", "public_access": "无需登录公开页", "exposes": "商品房预售/网签备案公示、存量房房源及网签状态、合同备案查询"}],
-    "gov_app": [{"name": "粤省事/穗好办", "housing_section": "有", "note": "不动产服务"}],
-    "mini_program": [{"name": "广州市商品房网签（微信小程序）", "note": "官方，查网签/缴款进度；阳光家缘网页公开查存量房网签"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "广州市住建局—阳光家缘",
+        "url": "https://zfcj.gz.gov.cn/zfcj/ygjy/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房预售/网签备案公示、存量房房源及网签状态、合同备案查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "粤省事/穗好办",
+        "housing_section": "有",
+        "note": "不动产服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "广州市商品房网签（微信小程序）",
+        "note": "官方，查网签/缴款进度；阳光家缘网页公开查存量房网签"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "阳光家缘存量房房源与网签状态公开可查，最易取数"
   },
   "南宁": {
-    "gov": [{"name": "南宁市住建局—商品房销售公示平台/住房服务监管平台", "url": "https://zjj.nanning.gov.cn", "public_access": "商品房公示与成交套数公开页可公开访问；存量房挂牌需登录邕有家", "exposes": "商品房销售公示、网签备案查询、成交套数公开页、存量房自主挂牌"}],
-    "gov_app": [{"name": "智桂通", "housing_section": "有", "note": "二手房转移登记一件事/不动产"}],
-    "mini_program": [{"name": "邕有家（APP/公众号/小程序）", "note": "官方房地产信息平台：二手房自主挂牌/房源核验/资金监管"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "南宁市住建局—商品房销售公示平台/住房服务监管平台",
+        "url": "https://zjj.nanning.gov.cn",
+        "public_access": "商品房公示与成交套数公开页可公开访问；存量房挂牌需登录邕有家",
+        "exposes": "商品房销售公示、网签备案查询、成交套数公开页、存量房自主挂牌"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "智桂通",
+        "housing_section": "有",
+        "note": "二手房转移登记一件事/不动产"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "邕有家（APP/公众号/小程序）",
+        "note": "官方房地产信息平台：二手房自主挂牌/房源核验/资金监管"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "商品房成交套数有公开公示页；存量房网签挂牌经邕有家需登录"
   },
   "海口": {
-    "gov": [{"name": "海口市住宅与房地产市场信息网", "url": "https://hkrealestate.haikou.gov.cn", "public_access": "新房公示/二手挂牌地图可公开浏览；备案查询需登录", "exposes": "新房公示、销售许可公示、二手房屋实时挂牌(地图找房)、合同备案查询"}],
-    "gov_app": [{"name": "海易办", "housing_section": "有", "note": "海口不动产云登记平台/智慧住建/购房资格/房源核验"}],
-    "mini_program": [{"name": "海易办（含海口不动产云登记/智慧住建）", "note": "官方微信小程序可查不动产/办网签备案"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "海口市住宅与房地产市场信息网",
+        "url": "https://hkrealestate.haikou.gov.cn",
+        "public_access": "新房公示/二手挂牌地图可公开浏览；备案查询需登录",
+        "exposes": "新房公示、销售许可公示、二手房屋实时挂牌(地图找房)、合同备案查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "海易办",
+        "housing_section": "有",
+        "note": "海口不动产云登记平台/智慧住建/购房资格/房源核验"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "海易办（含海口不动产云登记/智慧住建）",
+        "note": "官方微信小程序可查不动产/办网签备案"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "公开二手挂牌地图与新房公示；网签备案明细需登录海易办"
   },
   "成都": {
-    "gov": [{"name": "成都住建蓉e办（市住建局）", "url": "https://www.cdzjryb.com/", "public_access": "无需登录公开页", "exposes": "当日成交(新/二手房实时套数面积)/预现售项目公示/房源信息验证/网签合同备案查询"}],
-    "gov_app": [{"name": "天府通办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "成都住建房产超市（官方）/成都房小团", "note": "房产超市：预售/一房一价/销售情况；房小团：二手房真实成交价/挂牌价/租售比"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "成都住建蓉e办（市住建局）",
+        "url": "https://www.cdzjryb.com/",
+        "public_access": "无需登录公开页",
+        "exposes": "当日成交(新/二手房实时套数面积)/预现售项目公示/房源信息验证/网签合同备案查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "天府通办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "成都住建房产超市（官方）/成都房小团",
+        "note": "房产超市：预售/一房一价/销售情况；房小团：二手房真实成交价/挂牌价/租售比"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "当日成交与预现售公示无需登录公开页"
   },
   "贵阳": {
-    "gov": [{"name": "筑房网（贵阳市房产交易管理服务平台，市住建局）", "url": "http://www.gyfc.net.cn", "public_access": "需抓包/登录", "exposes": "商品房网签/备案查询/新楼盘销售查询(一房一价)/二手房网上签约/房源核验"}],
-    "gov_app": [{"name": "贵州政务/云上贵州多彩宝", "housing_section": "有", "note": "多彩找房：不动产产权/房源核验/住房公积金"}],
-    "mini_program": [{"name": "无", "note": "多彩宝APP多彩找房版块含不动产；无独立著名本地房产小程序"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "筑房网（贵阳市房产交易管理服务平台，市住建局）",
+        "url": "http://www.gyfc.net.cn",
+        "public_access": "需抓包/登录",
+        "exposes": "商品房网签/备案查询/新楼盘销售查询(一房一价)/二手房网上签约/房源核验"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "贵州政务/云上贵州多彩宝",
+        "housing_section": "有",
+        "note": "多彩找房：不动产产权/房源核验/住房公积金"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "多彩宝APP多彩找房版块含不动产；无独立著名本地房产小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "筑房网网签/备案查询需机构或本人登录；新盘销售公示页可公开查看"
   },
   "昆明": {
-    "gov": [{"name": "昆明市房产信息网（市住建局）", "url": "https://www.kmhouse.org.cn/", "public_access": "无需登录公开页", "exposes": "退房公示/预售许可公示/合同备案查询/楼盘表房源状态"}],
-    "gov_app": [{"name": "一部手机办事通", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "云南省互联网+不动产登记平台/公众号可查本人不动产"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "昆明市房产信息网（市住建局）",
+        "url": "https://www.kmhouse.org.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "退房公示/预售许可公示/合同备案查询/楼盘表房源状态"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "一部手机办事通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "云南省互联网+不动产登记平台/公众号可查本人不动产"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "退房/预售公示公开；合同备案需本人登录"
   },
   "拉萨": {
-    "gov": [{"name": "拉萨市住建局", "url": "https://zfjs.lasa.gov.cn/", "public_access": "需抓包/登录", "exposes": "商品房/存量房合同备案查询、外网申报、通告公示"}],
-    "gov_app": [{"name": "西藏政务", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "无著名本地房产小程序"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "拉萨市住建局",
+        "url": "https://zfjs.lasa.gov.cn/",
+        "public_access": "需抓包/登录",
+        "exposes": "商品房/存量房合同备案查询、外网申报、通告公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "西藏政务",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "无著名本地房产小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "备案查询需本人实名登录；公开仅通告公示，结构化取数不确定"
   },
   "西安": {
-    "gov": [{"name": "西安市商品住房销售公示平台（市住建局）", "url": "https://zfyxdj.xa.gov.cn/", "public_access": "无需登录公开页", "exposes": "商品住房项目销售公示(预现售证号/可售房源套数/销售公告)/商品房预现售项目公示"}],
-    "gov_app": [{"name": "秦务员", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "西安住建（官方公众号/小程序）", "note": "新房预售/现售公示/合同备案查询；商业西安购房通提供摇号/小区数据"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "西安市商品住房销售公示平台（市住建局）",
+        "url": "https://zfyxdj.xa.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品住房项目销售公示(预现售证号/可售房源套数/销售公告)/商品房预现售项目公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "秦务员",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "西安住建（官方公众号/小程序）",
+        "note": "新房预售/现售公示/合同备案查询；商业西安购房通提供摇号/小区数据"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "销售公示公开无需登录；二手房成交明细未公开"
   },
   "兰州": {
-    "gov": [{"name": "兰州市住建局", "url": "https://zjj.lanzhou.gov.cn/", "public_access": "需抓包/登录", "exposes": "预售项目公示、商品房/存量房合同查询、房屋交易网签数量查询、购房资格查询"}],
-    "gov_app": [{"name": "甘快办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "甘快办含不动产信息查询"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "兰州市住建局",
+        "url": "https://zjj.lanzhou.gov.cn/",
+        "public_access": "需抓包/登录",
+        "exposes": "预售项目公示、商品房/存量房合同查询、房屋交易网签数量查询、购房资格查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "甘快办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "甘快办含不动产信息查询"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "预售项目公示公开，合同/网签数量需本人登录，结构化取数需抓包"
   },
+  "洛阳": {
+    "gov": [
+      {
+        "name": "洛阳市住房保障和房产服务中心（市房产交易主管）",
+        "url": "https://www.lyzbj.org.cn/",
+        "public_access": "无需登录公开页（我要查版块）；存量房合同逐套查询需合同号",
+        "exposes": "预售楼盘查询、期房/现房签约查询、存量房合同查询、预售指导价查询、业务公示"
+      },
+      {
+        "name": "洛阳市住房和城乡建设局",
+        "url": "https://lyszjj.ly.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "政策法规、信息公开、通知公告"
+      },
+      {
+        "name": "洛阳市不动产网上办事大厅（市不动产登记中心）",
+        "url": "http://lysbdc.cn/",
+        "public_access": "公示公告公开；证明查验/电子证照需登录河南政务服务网统一认证",
+        "exposes": "登记公示公告、不动产权证查验、住房证明、不动产任意查、电子证照查询"
+      },
+      {
+        "name": "数据洛阳（洛阳市政府门户·统计发布）",
+        "url": "https://www.ly.gov.cn/sjly/",
+        "public_access": "无需登录公开页",
+        "exposes": "洛阳市国民经济和社会发展统计公报、年度/季度经济运行数据"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "豫事办",
+        "housing_section": "有",
+        "note": "河南政务服务网统一身份认证；不动产查询/住房服务专区"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "洛阳市不动产登记中心（微信公众号）",
+        "note": "官方：不动产登记网上预约、电子证照查询下载、便民服务"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "住房保障和房产服务中心“我要查”公开预售/签约/存量房合同及指导价；逐套网签合同查询需合同号；真实成交均价公开度一般，建议贝壳/我爱我家交叉验证"
+  },
   "西宁": {
-    "gov": [{"name": "西宁市住房保障和房产管理局", "url": "https://fcj.xining.gov.cn/", "public_access": "需抓包/登录", "exposes": "预售/现售楼盘查询、网签查询(经西宁房管公众号)、通告公示"}],
-    "gov_app": [{"name": "青松办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "青海住房平台（微信小程序，省级官方）", "note": "含租房/二手房/新房/小区/查询公示板块，全省房源发布与合同网签备案"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "西宁市住房保障和房产管理局",
+        "url": "https://fcj.xining.gov.cn/",
+        "public_access": "需抓包/登录",
+        "exposes": "预售/现售楼盘查询、网签查询(经西宁房管公众号)、通告公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "青松办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "青海住房平台（微信小程序，省级官方）",
+        "note": "含租房/二手房/新房/小区/查询公示板块，全省房源发布与合同网签备案"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "预售/现售楼盘及网签查询需登录或经西宁房管公众号；部分功能需实名"
   },
   "银川": {
-    "gov": [{"name": "宁夏互联网+智慧房产服务平台（银川站点）/银川市住建局", "url": "https://zjj.yinchuan.gov.cn/", "public_access": "无需登录公开页", "exposes": "预售许可公示、一房一价、房源销售状态公开可查；网签备案查询需本人登录"}],
-    "gov_app": [{"name": "我的宁夏", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "无", "note": "数据经我的宁夏APP及宁夏智慧房产平台"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "宁夏互联网+智慧房产服务平台（银川站点）/银川市住建局",
+        "url": "https://zjj.yinchuan.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "预售许可公示、一房一价、房源销售状态公开可查；网签备案查询需本人登录"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "我的宁夏",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "数据经我的宁夏APP及宁夏智慧房产平台"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "二手房成交明细未公开暴露"
   },
   "乌鲁木齐": {
-    "gov": [{"name": "安居广厦平台（乌鲁木齐市住房保障和房产管理局）", "url": "https://www.wlmq.gov.cn/", "public_access": "需抓包/登录", "exposes": "二手房挂牌网签/住房套次核验/商品房预售许可/网签合同备案查询/房源核验"}],
-    "gov_app": [{"name": "新服办", "housing_section": "有", "note": ""}],
-    "mini_program": [{"name": "安居广厦（官方小程序/公众号）", "note": "网签合同备案查询/二手房挂牌网签/住房套次核验/商品房预售许可"}],
-    "national": ["贝壳", "我爱我家"],
+    "gov": [
+      {
+        "name": "安居广厦平台（乌鲁木齐市住房保障和房产管理局）",
+        "url": "https://www.wlmq.gov.cn/",
+        "public_access": "需抓包/登录",
+        "exposes": "二手房挂牌网签/住房套次核验/商品房预售许可/网签合同备案查询/房源核验"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "新服办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "安居广厦（官方小程序/公众号）",
+        "note": "网签合同备案查询/二手房挂牌网签/住房套次核验/商品房预售许可"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
     "note": "安居广厦提供公开查询，部分业务需实名；结构化批量取数需抓包或登录"
+  },
+  "深圳": {
+    "gov": [
+      {
+        "name": "深圳市房地产信息平台",
+        "url": "https://zjj.sz.gov.cn:8004/",
+        "public_access": "无需登录公开页",
+        "exposes": "网签/成交统计、可售房源、不动产登记信息平台入口"
+      },
+      {
+        "name": "深圳市住房和建设局",
+        "url": "https://zjj.sz.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "政策法规、数据发布、便民查询(房源信息查询)"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "粤省事",
+        "housing_section": "有",
+        "note": "不动产服务专区；官方买房入口 i深房"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "i深房(官方)",
+        "note": "官方买房平台：房源查询/购房资格/保障房"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "房地产信息平台成交/网签统计公开可抓；单套合同明细需实名"
+  },
+  "宁波": {
+    "gov": [
+      {
+        "name": "宁波市房产交易信息服务网",
+        "url": "http://www.cnnbfdc.com/",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房买卖合同网签/备案查询、二手房房源验真、经纪机构备案公示"
+      },
+      {
+        "name": "宁波市住房和城乡建设局",
+        "url": "https://zjw.ningbo.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房数据(成交/挂牌量/挂牌均价)、网签成交、今日可售信息、上月成交数据(每小时/每日刷新)"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "浙里办",
+        "housing_section": "有",
+        "note": "房屋租售小程序：合同网签备案/我的合同"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "房屋租售小程序在浙里办内，无独立知名小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "住建局官网公开存量房成交/挂牌量/挂牌均价（公开页最易取数）"
+  },
+  "青岛": {
+    "gov": [
+      {
+        "name": "青岛市存量房交易监管服务平台",
+        "url": "https://fwjy.qdfd.com.cn:955/secgsd/#/home",
+        "public_access": "无需登录公开页",
+        "exposes": "直售房源发布与展示、房源核验码查询、备案经纪机构查询（2025年9月启用）"
+      },
+      {
+        "name": "青岛市网上房地产",
+        "url": "https://www.qdfd.com.cn/",
+        "public_access": "需登录（山东省统一政务服务门户）",
+        "exposes": "存量房网签电子合同查询/下载、登记信息网上查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "爱山东",
+        "housing_section": "有",
+        "note": "不动产登记/住房服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以青岛市网上房地产及爱山东为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "存量房监管平台房源核验公开；网签合同查询需登录山东省政务门户"
+  },
+  "厦门": {
+    "gov": [
+      {
+        "name": "厦门市住房和建设局",
+        "url": "http://szjj.xm.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "政策/公示/办事服务；存量房网签与房源信息编码核验入口"
+      },
+      {
+        "name": "厦门网上房地产(信用展示端口)",
+        "url": "http://zfj.xm.gov.cn/fdc",
+        "public_access": "无需登录公开页",
+        "exposes": "经纪机构及从业人员信用公示、存量房房源信息编码核验"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "闽政通",
+        "housing_section": "有",
+        "note": "不动产服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "厦门房产之窗",
+        "note": "行业协会平台，房源信息编码核验/中介信用"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "房源信息编码核验公开；逐套成交价公开度低"
+  },
+  "大连": {
+    "gov": [
+      {
+        "name": "大连市住房和城乡建设局",
+        "url": "http://js.dl.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房网签备案平台入口、政策法规、通知公告"
+      },
+      {
+        "name": "大连市存量房网签备案系统",
+        "url": "http://124.93.228.168/dlclfwq",
+        "public_access": "无需登录公开页",
+        "exposes": "合同查询（合同编号+买方证件号+产权证号即可查）"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "辽事通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "网签备案经经纪机构/资金监管银行窗口为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "网签备案合同查询公开（按合同号）；批量成交价无公开公示"
+  },
+  "苏州": {
+    "gov": [
+      {
+        "name": "苏州市住房和城乡建设局",
+        "url": "https://zfcjj.suzhou.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房销售信息(预售许可/可售房源/即时成交)、存量房销售信息(出售信息公示)、经纪机构查询"
+      },
+      {
+        "name": "苏州市区存量房买卖网上管理系统",
+        "url": "http://clf.szfcweb.com",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房出售/承购挂牌信息公示、居间代理委托协议与买卖合同示范文本"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "苏服办",
+        "housing_section": "有",
+        "note": "不动产/住房服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以官网公示与苏服办为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "住建局官网公开即时成交/出售信息公示，易取数"
+  },
+  "无锡": {
+    "gov": [
+      {
+        "name": "无锡市住房和城乡建设局",
+        "url": "https://js.wuxi.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "房地产市场信息(商品房一周备案成交)、二手住房成交参考价格发布机制"
+      },
+      {
+        "name": "无锡房地产市场网",
+        "url": "http://www.wxhouse.com",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房房源核验、合同备案信息公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "苏服办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以官网与苏服办为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "官方发布部分小区二手住房成交参考价格（每年更新）；一周备案成交公开"
+  },
+  "东莞": {
+    "gov": [
+      {
+        "name": "东莞市住房和城乡建设局",
+        "url": "https://zjj.dg.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "住房管理信息公示(全市新建/存量房交易情况、前五镇街交易情况、注销合同公告)、合同查询"
+      },
+      {
+        "name": "东莞市房屋网签备案公示网",
+        "url": "https://dggezf.dg.cn/",
+        "public_access": "需登录（广东省统一身份认证）",
+        "exposes": "存量房网签备案系统、商品房合同查询"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "粤省事",
+        "housing_section": "有",
+        "note": "不动产服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "莞e住建",
+        "note": "官方微信小程序：存量房合同网签/楼盘浏览/房产交易"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "存量房交易情况公开公示；单套明细需登录数字住建门户"
+  },
+  "佛山": {
+    "gov": [
+      {
+        "name": "佛山市住房和城乡建设局",
+        "url": "https://fszj.foshan.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房昨日成交量、月度佛山市房地产交易情况（面积和套数）"
+      },
+      {
+        "name": "佛山市住房保障和房产信息网",
+        "url": "https://fsfc.fszj.foshan.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房签约系统、商品房签约、房源核验"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "粤省事",
+        "housing_section": "有",
+        "note": "不动产服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "网签电子签约经粤信签小程序"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "月度交易情况/昨日成交量公开；存量房网签经官网系统"
+  },
+  "温州": {
+    "gov": [
+      {
+        "name": "温州市房地产市场信息",
+        "url": "https://www.wzfg.com/",
+        "public_access": "无需登录公开页",
+        "exposes": "在售楼盘公告、商品房预售许可、存量房网上交易系统入口"
+      },
+      {
+        "name": "温州市住房和城乡建设局",
+        "url": "http://zjj.wenzhou.gov.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "政策法规、经纪机构网签账号公示、通知公告"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "浙里办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以市场信息网与浙里办为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "市场信息网公开在售与统计；成交明细公开度一般"
+  },
+  "泉州": {
+    "gov": [
+      {
+        "name": "泉州市住房和城乡建设局",
+        "url": "https://zfjsj.quanzhou.gov.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "合同备案查询（备案证号/合同编号）、存量房交易平台（房源核验）"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "闽政通",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "泉房通",
+        "note": "官方平台：房源核验/中介备案/存量房网签（qft168.com）"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "合同备案需备案证号/合同编号；批量成交公示弱"
+  },
+  "南通": {
+    "gov": [
+      {
+        "name": "南通市住房和城乡建设局",
+        "url": "https://zj.nantong.gov.cn/",
+        "public_access": "无需登录公开页",
+        "exposes": "政策法规、公告公示、住房保障信息；存量房合同电子签约备案"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "苏服办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "存量房电子网签系统手机端签约，备案推送税务/不动产"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "存量房电子签约备案全流程网办；公开成交价公示弱"
+  },
+  "嘉兴": {
+    "gov": [
+      {
+        "name": "嘉兴市住房和城乡建设局",
+        "url": "https://jsj.jiaxing.gov.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "嘉兴市本级房地产市场简报（月度）、公告公示、政策法规"
+      },
+      {
+        "name": "嘉兴市二手房交易服务平台",
+        "url": "http://220.191.220.105:88/guid/",
+        "public_access": "无需登录公开页",
+        "exposes": "二手房交易服务/网签入口、备案经纪机构公示"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "浙里办",
+        "housing_section": "有",
+        "note": ""
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以官网与浙里办为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "本级市场简报按月公开；网签服务点线下为主"
+  },
+  "珠海": {
+    "gov": [
+      {
+        "name": "珠海市住房和城乡建设局",
+        "url": "https://zjj.zhuhai.gov.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "商品房价格备案公示、房地产交易监管平台、房地产市场数据查询"
+      },
+      {
+        "name": "珠海市不动产登记中心",
+        "url": "https://bdc.zhuhai.gov.cn",
+        "public_access": "无需登录公开页",
+        "exposes": "存量房合同网签(二手房)、商品房网签公示、不动产综合信息查询/以图查房"
+      }
+    ],
+    "gov_app": [
+      {
+        "name": "粤省事",
+        "housing_section": "有",
+        "note": "不动产服务"
+      }
+    ],
+    "mini_program": [
+      {
+        "name": "无",
+        "note": "以不动产登记中心官网为主"
+      }
+    ],
+    "national": [
+      "贝壳",
+      "我爱我家"
+    ],
+    "note": "不动产登记中心网签公示/以图查房公开可查"
   }
 }

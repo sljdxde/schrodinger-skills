@@ -35,7 +35,7 @@ The self-update helper requires `python`; npm-backed skills such as Skills-Docto
 
 | Name | One-liner | Link |
 |---|---|---|
-| [House-Buying](./house-buying) | Due diligence and decision support for Chinese home purchases in any declared city, including transactions, price timelines, school premiums, student sources, community demographics, and forecasts | [SKILL.md](./house-buying/SKILL.md) |
+| [House-Buying](./house-buying) | Due-diligence & decision analysis for homes across 46 Chinese cities: 5-tier source hierarchy, citation-backed anti-fabrication, price momentum, school premium, student-cohort projection, and price forecasts | [SKILL.md](./house-buying/SKILL.md) |
 | [Skills-Doctor](./skills-doctor) | Diagnose and govern local AI Agent Skills — detect risks, conflicts, duplicates, zombies | [SKILL.md](./skills-doctor/SKILL.md) |
 | [Memory-Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD-Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
@@ -69,15 +69,26 @@ Install the complete personal-knowledge-base bundle from schrodinger-skills, inc
 Due diligence and decision support for Chinese residential property purchases. It is designed for target communities, school-district homes, area comparisons, and buy/watch decisions, with explicit evidence tracking for transaction prices, listings, school-premium comparisons, admissions policy, student sources, community demographics, and city fundamentals.
 
 **Key Features:**
-- Nationwide coverage with user-declared cities; per-city endpoints or search queries
-- Cross-check transaction prices, listing prices, inventory, and negotiation room across Beike, Woaiwojia, Hangfang, Xiaoji, and more
-- Monthly price timelines for the same community, including peak/trough/current values and volatility
+- **46 pre-configured cities**: provincial capitals, municipalities, and major prefecture cities (Shenzhen, Suzhou, Ningbo, Qingdao, Luoyang, etc.); each city's government sources (housing, net-sign, registry, statistics, education) are URL-verified, so new cities plug in at zero cost
+- **5-tier source hierarchy (T0–T4)**: T0 Beike/Lianjia + Woaiwojia as mandatory dual-source cross-check; T1 official sources (housing/registry/statistics/education) carry the highest conflict-resolution weight; T2 government apps (Zheli Ban / Suishen Ban / Jintong / Yushiban) and city mini-programs; T3 Zhuge/Anjuke/Fang/58 as cross-validation only; T4 public opinion as leads
+- **Citation-backed anti-fabrication**: every data point must carry source + real URL + publish/access date + caliber + consistency; multi-source conflicts resolved by "newest > most authoritative caliber > closest to primary (official net-sign/gov)", with ≤5% treated as consistent, >5% disclosed side-by-side, hard conflicts flagged "unverified"
+- **Single-dimension-first rollout**: nail the "price" dimension first (listing/transaction monthly timeline + MoM/YoY/N-month change + viewings/inventory), then expand to volume, supply/demand, land transfer, school policy, migration, and credit
+- Monthly price timelines for the same community, including peak/trough/current values, volatility, and sample size (no fabrication when samples are thin)
 - Anti-scraping adapters for web sources: browser-like requests, cookies/headers, optional Playwright rendering of public pages
 - Compare school-district homes with nearby non-school-district or weaker-school alternatives to quantify the education premium
+- **Student-cohort projection**: middle-school outcomes lag birth cohorts by ~9–15 years; reconstruct the historical cohort, compare it with the current cohort, and project the future (3–5 yrs of outcomes + birth-cohort comparison + base/optimistic/pessimistic scenarios) — answering "what will my child's future look like if I buy now"
 - Analyze school outcomes, admission rules, seat warnings, and student-source quality
 - Build a community demographic profile instead of relying only on price
 - Produce base/optimistic/pessimistic housing-price forecast scenarios
 - Give a clear buy / cautious buy / watch / do-not-buy recommendation
+
+**Recent upgrade (v1.4.0):**
+- Source model upgraded from "dual-platform cross-check" to a **T0–T4 five-tier hierarchy**; official sources hold the highest weight in conflict resolution
+- Added **citation five-elements**: every data point is traceable (source / URL / date / caliber / consistency) to eliminate fabrication
+- Introduced the **single-dimension-first** strategy with `references/dimension-network.md`
+- Added **student-cohort projection** methodology (`references/school-cohort-analysis.md`): outcomes lag birth cohorts by 9–15 years; project the future by comparing historical vs current cohorts
+- City registry expanded 45 → **46 cities** (Luoyang added, gov URLs verified)
+- Decision record: `docs/adr/0005-source-hierarchy-and-dimension-network.md`; semantic versioning, currently 1.4.0
 
 **Usage:**
 
