@@ -23,12 +23,6 @@ Installation is simple — just one sentence to your Agent. No path or configura
 
 *Note for English readers: This project originated in the Chinese AI community. Contributions and translations are welcome.*
 
-Skills in this repository that provide self-update support can compare their local folder with the latest GitHub copy, back up and sync themselves when needed, and update backing tool packages when the skill depends on one. Bundles also provide an explicit installation entry point.
-
-Self-update uses **semantic versioning**: each skill declares a `version` in its `SKILL.md` frontmatter (bundles use a root-level `VERSION` file). The updater compares the remote version first and downloads nothing when versions match; if either side lacks a version it falls back to the legacy file-manifest comparison, so old scripts and old installs stay fully compatible. Rules are in [docs/versioning.md](./docs/versioning.md).
-
-The self-update helper requires `python`; npm-backed skills such as Skills-Doctor also require `npm` for package updates.
-
 ---
 
 ## Table of Contents
@@ -82,13 +76,13 @@ Due diligence and decision support for Chinese residential property purchases. I
 - Produce base/optimistic/pessimistic housing-price forecast scenarios
 - Give a clear buy / cautious buy / watch / do-not-buy recommendation
 
-**Recent upgrade (v1.4.0):**
+**Recent upgrade (v1.4.2):**
 - Source model upgraded from "dual-platform cross-check" to a **T0–T4 five-tier hierarchy**; official sources hold the highest weight in conflict resolution
 - Added **citation five-elements**: every data point is traceable (source / URL / date / caliber / consistency) to eliminate fabrication
 - Introduced the **single-dimension-first** strategy with `references/dimension-network.md`
 - Added **student-cohort projection** methodology (`references/school-cohort-analysis.md`): outcomes lag birth cohorts by 9–15 years; project the future by comparing historical vs current cohorts
 - City registry expanded 45 → **46 cities** (Luoyang added, gov URLs verified)
-- Decision record: `docs/adr/0005-source-hierarchy-and-dimension-network.md`; semantic versioning, currently 1.4.0
+- Decision record: `docs/adr/0005-source-hierarchy-and-dimension-network.md`; currently 1.4.2
 
 **Usage:**
 
@@ -102,10 +96,6 @@ Use house-buying to analyze Shanghai Zhangjiang Tangcheng Haoyuan for self-use p
 ```
 
 The Agent will verify public data first, then produce an evidence-backed report with a monthly price timeline, risks, comparisons, and an actionable recommendation.
-
-**Auto-update:**
-- Run `python scripts/update_self.py --apply` before use
-- Checks and syncs the latest `house-buying` skill folder from GitHub
 
 ### [Skills-Doctor](./skills-doctor)
 
@@ -129,11 +119,6 @@ The Agent will run diagnostics, generate reports, and output a fix plan. You can
 Check for duplicate skills
 Detect zombie skills
 ```
-
-**Auto-update:**
-- Run `python scripts/update_self.py --apply` before use
-- Checks and syncs the latest `skills-doctor` skill folder from GitHub
-- Checks and updates the `agent-skill-doctor` npm package to the latest version
 
 ### [Memory-Forge](./memory-forge)
 
@@ -163,10 +148,6 @@ Or just paste / upload material:
 
 The Agent extracts concepts, then progressively generates cards, stories, a mind-map, quizzes, and a review plan, finishing with inline explanation and a downloadable package.
 
-**Auto-update:**
-- Run `python scripts/update_self.py --apply` before use
-- Checks and syncs the latest `memory-forge` skill folder from GitHub
-
 ### [Personal-Knowledge-Base](./personal-knowledge-base)
 
 A local knowledge-base bundle designed specifically for **Codex + Obsidian + the `ob` CLI**. Codex interprets requests, keeps reads narrow, extracts reusable conclusions, and maintains indexes; `ob` is the vault read/write boundary; Obsidian remains the human-facing browsing and review surface.
@@ -193,11 +174,6 @@ Install both ob-llm-wiki and ob.
 ```
 
 See [personal-knowledge-base/README.md](./personal-knowledge-base/README.md) for the full capability description, layout, and examples.
-
-**Auto-update:**
-- If installed by copying the whole bundle directory, run `python scripts/update_self.py --apply` before use
-- Automatically checks and syncs the `personal-knowledge-base` bundle directory on GitHub (covering both `ob-llm-wiki` and `ob` sub-skills)
-- If sub-skills were installed separately via `install_bundle.py`, re-run `python scripts/install_bundle.py --replace` to update
 
 ### [MTD-Download](./mtd-download)
 
@@ -229,10 +205,6 @@ python scripts/mtd.py <URL> -t 32 -o myfile.iso
 
 The Agent probes first, then downloads with the right strategy and reports the result.
 
-**Auto-update:**
-- Run `python scripts/update_self.py --apply` before use
-- Checks and syncs the latest `mtd-download` skill folder from GitHub
-
 ### [Skill-Architect](./skill-architect)
 
 A Meta Skill that turns vague needs or personal/domain experience into **installable AI Skills**. The core insight: users usually know *what problem* they want to solve, but not *what capabilities* a Skill should have — so the AI acts as product manager + domain expert and runs a **first-principles interview**, then produces a blueprint, compiles a package, and evaluates the result.
@@ -244,7 +216,7 @@ A Meta Skill that turns vague needs or personal/domain experience into **install
 - Dual-path interviews: Path A (Need→Skill) + Path B (Experience→Skill), with experience uniformly mapped onto the same facet table
 - Domain knowledge library: built-in capability checklists for study / travel / investment / creation plus a generic template, to surface unknown needs
 - Interview-to-output: conclusions land in `blueprint.json` fields (`input_spec`, `output_spec`, `analysis`, `interaction_model`), which `compile_skill.py` renders directly into the generated package's Input / Analysis / Output / Interaction sections
-- `compile_skill.py` full scaffolding: produces a package with the exact same layout as house-buying (SKILL.md + agents/openai.yaml + update_self.py + references/ + evaluations/), instantly installable and self-updating
+- `compile_skill.py` full scaffolding: produces a package with the exact same layout as house-buying (SKILL.md + agents/openai.yaml + update_self.py + references/ + evaluations/), instantly installable
 - 4-dimension evaluation: professionalism / completeness / task success rate / error rate, written to `evaluations/self-eval.md`
 
 **Usage:**
@@ -262,10 +234,6 @@ The Agent interviews you, produces a blueprint, compiles a package, and evaluate
 ```bash
 python scripts/compile_skill.py --blueprint examples/sample-blueprint.json --out ./skills
 ```
-
-**Auto-update:**
-- Run `python scripts/update_self.py --apply` before use
-- Checks and syncs the latest `skill-architect` skill folder from GitHub
 
 ---
 

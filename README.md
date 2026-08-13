@@ -21,12 +21,6 @@
 
 安装方式很简单——对 Agent 说一句话就行，不用操心路径和配置。
 
-本仓库中提供自检更新机制的 skill 会在运行时检查 GitHub 上对应目录是否更新，必要时备份并同步本地 skill；带外部工具依赖的 skill 还会检查对应工具包版本。组合包会额外提供明确的安装入口。
-
-自更新走**语义化版本号**：每个 skill 在 `SKILL.md` frontmatter 声明 `version`（组合包用根目录 `VERSION` 文件），更新脚本优先比对远端版本号，版本一致不下载任何内容；任一侧没有版本号时自动回退到旧的文件清单比对，老脚本与老安装完全兼容。规则见 [docs/versioning.md](./docs/versioning.md)。
-
-自检更新需要本机可运行 `python`；`Skills-Doctor` 的 npm 包自动更新还需要本机可运行 `npm`。
-
 ---
 
 ## 目录
@@ -80,13 +74,13 @@
 - 基准/乐观/悲观三情景价格预测
 - 明确给出买入、谨慎可买、观望或不建议买入
 
-**最近升级（v1.4.0）：**
+**最近升级（v1.4.2）：**
 - 数据源从“双平台交叉”升级为 **T0–T4 五级体系**，官方源（住建/网签/不动产/统计/教育）在冲突裁决中权重最高
 - 新增 **引用五要素**：所有数据点强制溯源（来源 / URL / 时间 / 口径 / 一致性），杜绝凭空编造
 - 引入 **单一维度展开**策略与 `references/dimension-network.md`，房价维度做透后再扩展其他维度
 - 新增 **生源代际传导**方法论（`references/school-cohort-analysis.md`）：升学率滞后 9–15 年，以历史生源对比当前生源预测未来
 - 城市源注册表 45 → **46 城**（新增洛阳，gov URL 联网核验）
-- 决策记录见 `docs/adr/0005-source-hierarchy-and-dimension-network.md`；自动更新走语义化版本号，当前 1.4.0
+- 决策记录见 `docs/adr/0005-source-hierarchy-and-dimension-network.md`；当前版本 1.4.2
 
 **使用方式：**
 
@@ -100,10 +94,6 @@
 ```
 
 Agent 会先核验公开数据，再输出带月度价格时间轴的证据台账、风险评估、横向对比和购买建议。
-
-**自动更新：**
-- 使用前运行 `python scripts/update_self.py --apply`
-- 自动检查并同步 GitHub 上的 `house-buying` skill 目录
 
 ### [Skills-Doctor](./skills-doctor)
 
@@ -127,11 +117,6 @@ Agent 会自动运行诊断、生成报告、输出修复计划。也可以指�
 帮我检查有没有重复的 skills
 检测一下有没有僵尸 skill
 ```
-
-**自动更新：**
-- 使用前运行 `python scripts/update_self.py --apply`
-- 自动检查并同步 GitHub 上的 `skills-doctor` skill 目录
-- 自动检查并更新 `agent-skill-doctor` npm 包到最新版
 
 ### [Memory-Forge](./memory-forge)
 
@@ -162,10 +147,6 @@ Agent 会自动运行诊断、生成报告、输出修复计划。也可以指�
 
 Agent 会先抽取概念，再逐步生成卡片、故事、脑图、自测和复习计划，最后给出对话内讲解和可下载的学习包。
 
-**自动更新：**
-- 使用前运行 `python scripts/update_self.py --apply`
-- 自动检查并同步 GitHub 上的 `memory-forge` skill 目录
-
 ### [Personal-Knowledge-Base](./personal-knowledge-base)
 
 面向 **Codex + Obsidian + 本地 `ob` CLI** 的个人知识库组合包。Codex 负责理解问题、选择最小读取范围、提炼可复用结论和维护索引；`ob` 负责把所有读写限制在当前 Obsidian vault；Obsidian 负责人工浏览、链接导航和最终确认。
@@ -192,11 +173,6 @@ https://github.com/sljdxde/schrodinger-skills/tree/main/personal-knowledge-base
 ```
 
 更完整的能力说明、目录结构和使用示例见 [personal-knowledge-base/README.md](./personal-knowledge-base/README.md)。
-
-**自动更新：**
-- 若采用「整体复制组合包目录」方式安装，使用前运行 `python scripts/update_self.py --apply`
-- 自动检查并同步 GitHub 上的 `personal-knowledge-base` 组合包目录（含 `ob-llm-wiki` 与 `ob` 两个子 skill）
-- 若采用 `install_bundle.py` 分别安装子 skill，重新运行 `python scripts/install_bundle.py --replace` 即可更新
 
 ### [MTD-Download](./mtd-download)
 
@@ -228,10 +204,6 @@ python scripts/mtd.py <URL> -t 32 -o myfile.iso
 
 Agent 会先运行探测，再按策略完成下载并报告结果。
 
-**自动更新：**
-- 使用前运行 `python scripts/update_self.py --apply`
-- 自动检查并同步 GitHub 上的 `mtd-download` skill 目录
-
 ### [Skill-Architect](./skill-architect)
 
 把「模糊需求」或「个人/领域经验」变成**可直接安装的 AI Skill** 的 Meta Skill。核心思路：用户往往知道要解决什么问题，却不知道 Skill 该含什么能力——所以 AI 先当产品经理 + 领域专家做一次**第一性原理访谈**，再产出蓝图、编译成包、跑质量评估。
@@ -243,7 +215,7 @@ Agent 会先运行探测，再按策略完成下载并报告结果。
 - 双路径访谈：Path A（Need→Skill，需求驱动）+ Path B（Experience→Skill，经验沉淀），经验统一映射到同一张维度表
 - 领域补全库：内置 学习 / 旅行 / 投资 / 创作 能力清单 + 通用模板，帮用户发现「不知道要什么」
 - 访谈即产出：结论落成 `blueprint.json` 的 `input_spec`/`output_spec`/`analysis`/`interaction_model` 等字段，由 `compile_skill.py` 直接渲染进生成包的「输入 / 分析框架 / 输出规格 / 交互方式」章节
-- `compile_skill.py` 全量脚手架：产出与 house-buying 等完全同构的包（SKILL.md + agents/openai.yaml + update_self.py + references/ + evaluations/），立即可装且自带自检更新
+- `compile_skill.py` 全量脚手架：产出与 house-buying 等完全同构的包（SKILL.md + agents/openai.yaml + update_self.py + references/ + evaluations/），立即可装
 - 4 维评分评估：专业度 / 完整度 / 任务成功率 / 错误率，产出 `evaluations/self-eval.md`
 
 **使用方式：**
@@ -261,10 +233,6 @@ Agent 会先访谈、产出蓝图，再编译成包并评估。也可直接跑�
 ```bash
 python scripts/compile_skill.py --blueprint examples/sample-blueprint.json --out ./skills
 ```
-
-**自动更新：**
-- 使用前运行 `python scripts/update_self.py --apply`
-- 自动检查并同步 GitHub 上的 `skill-architect` skill 目录
 
 ---
 
