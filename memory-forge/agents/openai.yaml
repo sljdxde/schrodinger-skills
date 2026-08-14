@@ -1,4 +1,4 @@
 interface:
   display_name: "Memory Forge"
-  short_description: "把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划"
-  default_prompt: "Use $memory-forge to turn the pasted or uploaded study material into memorable knowledge cards, stories, a mind-map, self-test quizzes, and an SM-2 review schedule."
+  short_description: "把任意学习材料锻造成好懂好记的知识卡/故事/自测，并给出艾宾浩斯复习计划"
+  default_prompt: "Use $memory-forge to turn the pasted or uploaded study material into memorable knowledge cards, stories, self-test quizzes, and an SM-2 review schedule."

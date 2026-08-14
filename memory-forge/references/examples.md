@@ -45,33 +45,19 @@ feynman: 用自己的话讲：为什么改 JS 就能改页面？
 web_source: "来源：MDN Web Docs《DOM》；获取：2026-08-01"
 ```
 
-## 第 5 步：组装脑图
-
-```
-mindmap:
-  root: 前端核心
-  nodes:
-    - { id: r, parent: null, label: 前端核心 }
-    - { id: s1, parent: r, label: 结构 }
-    - { id: c1, parent: s1, label: DOM }
-    - { id: c2, parent: s1, label: div }
-    - { id: s2, parent: r, label: 行为 }
-    - { id: c3, parent: s2, label: 事件委托 }
-```
-
-## 第 6 步：复习计划
+## 第 5 步：复习计划
 
 每个概念默认 `ef=2.5` → `intervals: [1, 6, 16, 40]`。
 
-## 第 7 步：预览 + 交付
+## 第 6 步：预览 + 交付
 
-- Inline：先用 Visualizer `show_widget` 渲染 DOM 翻转卡（可点正/反）+ 脑图 SVG + 1 道自测。
-- 导出：写 `payload.json`（3 概念 + 脑图 + 复习），运行
+- Inline：先用 Visualizer `show_widget` 渲染 DOM 翻转卡（可点正/反）+ 1 道自测。
+- 导出：写 `payload.json`（3 概念 + 复习），运行
   ```bash
   python scripts/build_package.py --in payload.json --out memory-forge-package.html
   ```
   落盘后把路径给用户。
 
-包内章节：故事区 → 3 张翻转卡（含 DOM/事件流内联 SVG）→ 脑图 → 3 道自测（即时判分）→ 复习计划（0–5 自评、SM-2 即时算下次间隔）。完全离线。
+包内章节：故事区 → 3 张翻转卡（含 DOM/事件流内联 SVG）→ 3 道自测（即时判分）→ 复习计划（0–5 自评、SM-2 即时算下次间隔）。完全离线。
 
 > 这个示例对应的真实测试，见本 skill 在「中心荣誉与资质」材料上的走查（开发完成后由 Agent 实跑验证）。

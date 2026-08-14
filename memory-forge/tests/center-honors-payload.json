@@ -150,18 +150,6 @@
       "feynman": "用自己的话讲：论文、世行奖、期刊，分别属于什么性质的输出？"
     }
   ],
-  "mindmap": {
-    "root": "中心荣誉与资质",
-    "nodes": [
-      {"id": "r", "parent": null, "label": "中心"},
-      {"id": "g1", "parent": "r", "label": "荣誉表彰"},
-      {"id": "g2", "parent": "r", "label": "批示与成果"},
-      {"id": "g3", "parent": "r", "label": "平台与应用"},
-      {"id": "g4", "parent": "r", "label": "标准与知产"},
-      {"id": "g5", "parent": "r", "label": "资质"},
-      {"id": "g6", "parent": "r", "label": "学术与刊物"}
-    ]
-  },
   "review_schedule": [
     {"concept_id": "c1", "term": "荣誉表彰", "ef": 2.5, "intervals": [1, 6, 16, 40]},
     {"concept_id": "c2", "term": "领导批示与成果", "ef": 2.5, "intervals": [1, 6, 16, 40]},

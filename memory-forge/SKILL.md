@@ -1,6 +1,6 @@
 ---
 name: memory-forge
-description: Use when the user pastes or uploads study material (notes, articles, lecture text, .txt/.md/.docx/.pdf) and wants to understand and remember it — generates one-concept-per-card knowledge cards, plain-language stories and analogies, complementary diagrams or mind-maps, mnemonics, interactive self-test quizzes, and a spaced-repetition (SM-2) review schedule; can open a real browser or search the web to explain unfamiliar terms with authoritative diagrams.
+description: Use when the user pastes or uploads study material (notes, articles, lecture text, .txt/.md/.docx/.pdf) and wants to understand and remember it — generates one-concept-per-card knowledge cards, plain-language stories and analogies, complementary diagrams, mnemonics, interactive self-test quizzes, and a spaced-repetition (SM-2) review schedule; can open a real browser or search the web to explain unfamiliar terms with authoritative diagrams.
 version: 1.3.0
 ---
 
@@ -47,14 +47,14 @@ python scripts/update_self.py --apply
 6. **逐概念锻造记忆辅助**（严格遵循 `references/memory-science.md` 的 15 条规则）：对每个概念产出
    - 知识卡：正面 = 一个引导问题；背面 = 大白话解释 + 2–4 个要点 + 助记符/口诀。
    - 故事或类比（抽象概念必给）。
-   - 互补视觉（结构图 / 示意图 / 脑图节点），不要装饰图。
+   - 互补视觉（结构图 / 示意图 / 关系图），不要装饰图。
    - 自测题（1 道，MCQ 或填空，附解析）。
    - 复习条目（`id` + `EF=2.5, n=0, I=1`）。
    - 费曼自述提示（「用自己的话讲一遍」）。
-7. **组装脑图**：用根节点 + 分类 + 概念把全篇关系画成树，配合卡片。
+7. **关系梳理（可选）**：用根节点 + 分类 + 概念把全篇关系理清，作为卡片间的索引线索（学习包以翻转卡呈现，不单独出结构图）。
 8. **组装复习计划**：按默认 `EF=2.5` 预生成排程（公式见 `memory-science.md`）。
 9. **生成荣誉体系**（遵循 `references/gamification.md`）：默认给一套等级 + 经验 + 勋章墙 + 连续学习 streak；可**按材料主题加定制勋章**（如荣誉材料加「荣誉满墙」、前端材料加「DOM 驯服者」），让收集有语境代入感。把 `gamification` 段写进 `payload.json`，脚本会自动剔除拿不到的勋章（如包内无联网深潜则不显示「知识猎人」）。
-10. **预览确认**：先内联渲染 1–2 张翻转卡 + 脑图 + 1 道自测 + 荣誉条，确认方向再继续。用 Visualizer `show_widget`（与导出同源）。
+10. **预览确认**：先内联渲染 1–2 张翻转卡 + 1 道自测 + 荣誉条，确认方向再继续。用 Visualizer `show_widget`（与导出同源）。
 11. **双轨交付**：
     - **Inline**：用 `show_widget` 继续把其余卡片/故事/自测在对话里讲清楚。
     - **导出**：把结构化内容写成 `payload.json`，运行
@@ -82,7 +82,7 @@ python scripts/update_self.py --apply
 
 - `references/memory-science.md`：记忆科学证据 + 15 条可落地设计规则（含 SM-2 公式、艾宾浩斯留存率）。
 - `references/input-parsing.md`：各输入格式摄取规则、分段阈值、概念抽取与熟悉度判断。
-- `references/output-templates.md`：卡片 / 故事 / 脑图 / 测验 / 复习计划模板，以及 `build_package.py` 的 JSON schema。
+- `references/output-templates.md`：卡片 / 故事 / 测验 / 复习计划模板，以及 `build_package.py` 的 JSON schema。
 - `references/web-deepdive.md`：何时联网、可信源优先级、取文取图、图转内联 SVG、标来源日期。
 - `references/gamification.md`：荣誉体系设计——等级 / 经验 / 勋章墙 / 连续学习 streak 的实证与默认集、trigger 枚举、定制方式。
 - `references/examples.md`：端到端示例（前端资料走完整流程）。

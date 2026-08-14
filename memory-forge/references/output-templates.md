@@ -1,6 +1,6 @@
 # 输出模板与 JSON Schema（output-templates）
 
-本文件规定每张卡片 / 故事 / 脑图 / 测验 / 复习计划的**内容结构**，以及喂给 `scripts/build_package.py` 的 **JSON 载荷格式**。Agent 产出内容时照这个结构填，再交给脚本渲染成离线 HTML（或 Markdown）。
+本文件规定每张卡片 / 故事 / 测验 / 复习计划的**内容结构**，以及喂给 `scripts/build_package.py` 的 **JSON 载荷格式**。Agent 产出内容时照这个结构填，再交给脚本渲染成离线 HTML（或 Markdown）。
 
 ## 1. 知识卡（concept card）
 
@@ -32,18 +32,7 @@ narrative_body:   一段 150–300 字的具体叙事，含人物/场景/冲突/
 
 例：把「一个数据中心的能力」比喻成「一支球队的荣誉室 + 训练体系 + 装备库」。
 
-## 3. 脑图（mindmap）
-
-```
-mindmap:
-  root:   主题名
-  nodes:  [{ "id": "n1", "parent": null, "label": "分类A" },
-           { "id": "n2", "parent": "n1", "label": "概念1" }, ...]
-```
-
-规则：根 1 个；一级是 2–6 个分类；二级是概念。脚本按 parent 递归做左→右树布局。
-
-## 4. 自测（quiz）
+## 3. 自测（quiz）
 
 每概念 1 题即可（先答后揭晓）。题型优先「生成答案」类：
 
@@ -52,7 +41,7 @@ mindmap:
 
 整包统计正确率，错的点回对应卡片复习。
 
-## 5. 复习计划（review_schedule）
+## 4. 复习计划（review_schedule）
 
 每个概念一行：
 
@@ -63,7 +52,7 @@ review_schedule:
 
 `intervals` 可由 Agent 按 SM-2（默认 EF=2.5, q=5）直接算好，也可只给 `ef` 让脚本算。包内每个条目带 0–5 自评控件，打分后用 SM-2 在浏览器里即时重算「下次：+N 天」（不跨会话持久化）。
 
-## 6. build_package.py 的完整 JSON Schema
+## 5. build_package.py 的完整 JSON Schema
 
 ```json
 {
@@ -91,13 +80,6 @@ review_schedule:
       "web_source": "（可选）联网来源+日期"
     }
   ],
-  "mindmap": {
-    "root": "主题",
-    "nodes": [
-      { "id": "n1", "parent": null, "label": "分类A" },
-      { "id": "n2", "parent": "n1", "label": "概念1" }
-    ]
-  },
   "review_schedule": [
     { "concept_id": "c1", "term": "概念名", "ef": 2.5, "intervals": [1, 6, 16, 40] }
   ]
@@ -110,7 +92,7 @@ review_schedule:
 - `quiz.type` 支持 `"mc"`（options+answer 索引）与 `"fill"`（answer 为字符串）。
 - `web_source` 仅当该概念走联网深潜时填，格式如 `来源：MDN Web Docs；获取：2026-08-01`。
 
-## 7. 调用脚本
+## 6. 调用脚本
 
 ```bash
 # 生成离线 HTML 学习包
@@ -122,7 +104,7 @@ python scripts/build_package.py --in payload.json --format md --out memory-forge
 
 脚本纯 Python 标准库，无第三方依赖；离线保证：所有 CSS/JS/SVG 内联，无任何外链 CDN。
 
-## 8. 荣誉体系（gamification，可选）
+## 7. 荣誉体系（gamification，可选）
 
 给学习包注入「养成感」：等级 + 经验（XP）+ 勋章墙 + 连续学习 streak，进度存浏览器本地（单个 HTML 包内持久化）。设计细则与默认集见 `references/gamification.md`。结构：
 
