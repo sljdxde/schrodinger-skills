@@ -23,13 +23,22 @@
       单线程整文件下载，避免对 WAF 反复重试放大封禁（详见 references/troubleshooting.md 坑七）
     - 断点续传(--resume)：多线程模式下跳过已完成的块(进度记录在 <输出>.mtd-progress)；
       单线程模式下用 curl -C - 续传循环(--max-time 600 + 自动重连)，专门兜底
-      不稳定 CDN 的断流问题
+      不稳定 CDN 的断流问题。**--resume 自愈**：重跑时会主动扫描已存在文件中的
+      大段零字节空洞并视为未完成块，进程被 SIGKILL 中断后也能补下残缺块
+    - 下载后完整性校验（P0）：合并后扫描大段连续零字节(零空洞) + 格式校验
+      (PDF 检查 %PDF 头与 %%EOF 尾；通用用 file 探测 HTML 错误页)。任何「大小对
+      但内容可疑」都判失败并自动补下对应分块，**绝不交付满尺寸但内部损坏的文件**
+    - 代理绕过 / 镜像源：--noproxy 清除代理变量直连；--mirror ghproxy 把 URL 包成
+      https://ghproxy.net/<URL> 直连，内置绕过会截断大响应体的透明代理。代理环境
+      默认分块自动降到 2MB（低于 4.2MB 截断阈值）
+    - GitHub blob 链接归一化：输入 github.com/.../blob/... 自动改写为
+      raw.githubusercontent.com 真文件直链，避免下到 HTML 页面
     - 下载后可选 SHA256 校验（--sha256 比对官方值；默认打印实际 SHA256 供核对）
     - macOS 上下载完成后自动清除 Gatekeeper 隔离标记（com.apple.quarantine），
       避免双击 DMG 报「磁盘映像已损坏」；可用 --no-clear-quarantine 关闭
     - 实时进度条（进度/已下/速度/ETA），输出走 stderr，不污染 stdout
     - 纯标准库 + 系统自带 curl，无需 pip 安装任何依赖
-    - 下载未完成时自动清理不完整的输出文件，避免留下损坏文件
+    - 下载未完成或完整性校验未过时自动清理不完整的输出文件，避免留下损坏文件
 """
 from __future__ import annotations
 
@@ -50,11 +59,18 @@ from urllib.parse import unquote, urlparse
 
 THREADS = 16
 CHUNK_MB = 5                         # 多线程固定分块大小(MB)，小分块抗 CDN 限速挂死
+SAFE_CHUNK_MB = 2                    # 代理环境安全分块(MB)：低于透明代理 4.2MB 截断阈值
 MAX_RETRY = 5                        # 单块重试上限
 PART_THRESHOLD = 4 * 1024 * 1024     # 小于此大小不分段(直接用单线程)
 RANGE_PROBE_LEN = 16384              # Range 内容非零探测长度
 RANGE_ZERO_RATIO = 0.05              # 非零字节占比低于此值(即 >95% 为零)判定 CDN 缺陷
 PROGRESS_SUFFIX = ".mtd-progress"    # 断点续传进度文件后缀
+ZERO_RUN_MIN = 1024                 # 连续全 0 达到此长度(字节)视为可疑空洞
+SCAN_BLOCK = 1 << 16                # 零空洞扫描块大小(64KB)
+
+# 全局 curl 环境：默认继承当前进程环境（会走系统代理）；
+# --noproxy / --mirror 时改写为清掉代理变量的环境，实现直连绕过透明代理。
+_CURL_ENV = None
 
 # WAF / 限流 / 鉴权拦截类响应码：命中即说明服务器在主动拒绝并发或 Range，
 # 应直接改用单线程整文件下载，避免反复重试放大封禁（如华为云 CloudWAF 返回 418 直接拉黑 IP）。
@@ -89,6 +105,212 @@ def _parse_status(hdr_path) -> int:
         if m:
             code = int(m.group(1))
     return code
+
+
+# ---------------------------------------------------------------------------
+# 代理绕过 / 镜像源 / URL 归一化
+# ---------------------------------------------------------------------------
+
+def _curl_env() -> dict:
+    """返回当前应传给 curl 子进程的环境变量（含代理绕过改写）。"""
+    return _CURL_ENV if _CURL_ENV is not None else os.environ
+
+
+def _detect_proxy() -> bool:
+    """检测当前环境是否注入了代理（透明代理会截断 >4.2MB 的响应体）。"""
+    for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+              "ALL_PROXY", "all_proxy"):
+        if os.environ.get(k):
+            return True
+    return False
+
+
+def _make_bypass_env() -> dict:
+    """返回清除所有代理变量后的环境，用于直连绕过透明代理。"""
+    env = os.environ.copy()
+    for k in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy",
+              "ALL_PROXY", "all_proxy", "FTP_PROXY", "ftp_proxy",
+              "NO_PROXY", "no_proxy"):
+        env.pop(k, None)
+    env["NO_PROXY"] = "*"
+    env["no_proxy"] = "*"
+    return env
+
+
+def _normalize_github_url(url: str) -> str:
+    """github.com 的 blob 页面链接 → raw.githubusercontent.com 真文件直链。
+
+    直接 curl blob 链接会拿到 HTML 页面而非文件本体，必须归一化。
+    """
+    m = re.match(
+        r"^https?://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$",
+        url, re.IGNORECASE)
+    if not m:
+        return url
+    owner, repo, ref, path = m.groups()
+    path = path.split("?")[0]          # 去掉 ?token= 等查询参数
+    return f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}"
+
+
+def _apply_mirror(url: str, mirror: str) -> str:
+    """镜像源改写。ghproxy: 包成 https://ghproxy.net/<原URL> 直连，绕过透明代理。"""
+    if not mirror:
+        return url
+    if mirror == "ghproxy":
+        return "https://ghproxy.net/" + url
+    return url
+
+
+# ---------------------------------------------------------------------------
+# 完整性校验：零空洞扫描 + 格式校验（P0 / P1）
+# ---------------------------------------------------------------------------
+
+def _fine_zero_runs(fd, start: int, end: int, min_run: int) -> list:
+    """在 [start,end) 区间内逐字节找连续全 0 区段(>=min_run)。
+
+    仅对空洞候选的局部小窗口调用，故即使大文件也很快。返回闭区间列表。
+    """
+    runs = []
+    fd.seek(start)
+    pos = start
+    run_start = -1
+    run_len = 0
+    remaining = end - start
+    while remaining > 0:
+        buf = fd.read(min(65536, remaining))
+        if not buf:
+            break
+        n = len(buf)
+        for i, b in enumerate(buf):
+            if b == 0:
+                if run_start == -1:
+                    run_start = pos + i
+                run_len += 1
+            else:
+                if run_start != -1 and run_len >= min_run:
+                    runs.append((run_start, run_start + run_len - 1))
+                run_start = -1
+                run_len = 0
+        pos += n
+        remaining -= n
+    if run_start != -1 and run_len >= min_run:
+        runs.append((run_start, run_start + run_len - 1))
+    return runs
+
+
+def _find_zero_runs(path: str, min_run: int = ZERO_RUN_MIN,
+                    block: int = SCAN_BLOCK) -> list:
+    """扫描文件内连续全 0 区段，返回闭区间列表 [(start,end),...]。
+
+    两阶段：
+      1) 粗扫：用 64KB 块级「全零判定」(C 级 count) 快速定位空洞候选——
+         仅把整块全零的区间记为候选。对超大文件也很快，且健康文件(无全零块)直接跳过。
+      2) 精扫：对每个候选向两侧各扩一个块，逐字节确定真实零空洞的精确边界，
+         避免「只补被标记块、边缘仍为零却被误判通过」的漏检。
+    """
+    runs = []
+    try:
+        fsize = os.path.getsize(path)
+    except OSError:
+        return runs
+    if fsize == 0:
+        return runs
+
+    # 1) 粗扫：找整块全零的连续区间（按 64KB 对齐的闭区间）
+    coarse_runs = []
+    run_start = -1
+    run_len = 0
+    pos = 0
+    with open(path, "rb") as f:
+        while pos < fsize:
+            buf = f.read(block)
+            if not buf:
+                break
+            n = len(buf)
+            if buf.count(b"\x00") == n:
+                if run_start == -1:
+                    run_start = pos
+                run_len += n
+            else:
+                if run_start != -1:
+                    coarse_runs.append((run_start, run_start + run_len - 1))
+                    run_start = -1
+                    run_len = 0
+            pos += n
+        if run_start != -1:
+            coarse_runs.append((run_start, run_start + run_len - 1))
+    if not coarse_runs:
+        return runs
+
+    # 2) 精扫：对每处候选扩窗，逐字节得到真实空洞边界
+    with open(path, "rb") as f:
+        for (cs, ce) in coarse_runs:
+            ws = max(0, cs - block)
+            we = min(fsize, ce + block)
+            for (fs_, fe_) in _fine_zero_runs(f, ws, we, min_run):
+                # 只保留与粗扫区域重叠的精确段（即真实空洞本身）
+                if fs_ <= ce and fe_ >= cs:
+                    runs.append((fs_, fe_))
+    return runs
+
+
+def _validate_format(path: Path) -> bool:
+    """下载后格式校验，防止把 HTML 错误页 / 截断文件当成功交付。
+
+    - PDF: 头须为 %PDF，尾须含 %%EOF
+    - 通用: 若 `file` 命令判定为 HTML 但扩展名非 html，判定异常
+    返回 True 表示通过。校验本身出错时放行（不应因校验误判而删文件）。
+    """
+    try:
+        ext = path.suffix.lower()
+        if ext == ".pdf":
+            with open(path, "rb") as f:
+                head = f.read(5)
+                if head[:4] != b"%PDF":
+                    return False
+                f.seek(0, 2)
+                size = f.tell()
+                f.seek(max(0, size - 2048))
+                tail = f.read()
+            if b"%%EOF" not in tail:
+                return False
+            return True
+        if shutil.which("file"):
+            try:
+                out = subprocess.run(["file", "--brief", str(path)],
+                                     capture_output=True, text=True,
+                                     timeout=10, env=_curl_env()).stdout.lower()
+            except Exception:
+                out = ""
+            if "html document" in out and ext not in (".html", ".htm", ".xhtml"):
+                return False
+        return True
+    except Exception:
+        return True
+
+
+def _integrity_check(out_path: Path, chunks: list, total_size: int):
+    """下载后完整性校验：格式校验 + 零空洞扫描。
+
+    返回 (redo_chunks, ok)：
+      ok=False  → 格式明显损坏（如 HTML 页），应判失败并删文件
+      ok=True   → redo_chunks 为需要补下的分块列表（含零空洞覆盖块），可能为空
+    """
+    if not _validate_format(out_path):
+        return (None, False)
+    holes = _find_zero_runs(str(out_path))
+    if not holes:
+        return ([], True)
+    redo = []
+    seen = set()
+    for (hs, he) in holes:
+        for (cid, s, e) in chunks:
+            if cid in seen:
+                continue
+            if s <= he and e >= hs:          # 与空洞重叠
+                redo.append((cid, s, e))
+                seen.add(cid)
+    return (redo, True)
 
 
 class Bar:
@@ -145,7 +367,7 @@ def get_remote_info(url):
          "-w", "SIZE:%{size_download}\nCL:%header{content-length}\n"
                "RANGE:%header{accept-ranges}\nCODE:%{response_code}",
          url],
-        capture_output=True, text=True, timeout=20)
+        capture_output=True, text=True, timeout=20, env=_curl_env())
     size = 0
     supports_range = False
     hostile = False
@@ -184,7 +406,7 @@ def get_remote_info(url):
         probe = subprocess.run(
             ["curl", "-sL", "-o", "/dev/null", "--max-time", "15",
              "-r", "0-0", "-w", "%{http_code}", url],
-            capture_output=True, text=True, timeout=20)
+            capture_output=True, text=True, timeout=20, env=_curl_env())
         pcode = probe.stdout.strip()
         if pcode != "206":
             if pcode.isdigit() and int(pcode) in HTTP_HOSTILE:
@@ -225,7 +447,7 @@ def _range_content_ok(url, total_size) -> bool:
         head = subprocess.run(
             ["curl", "-sL", "--max-time", "15", "-D", "-", "-o", "/dev/null",
              "-r", f"{start}-{end}", url],
-            capture_output=True, text=True, timeout=20)
+            capture_output=True, text=True, timeout=20, env=_curl_env())
     except Exception:
         return False
     if head.returncode != 0:
@@ -243,7 +465,7 @@ def _range_content_ok(url, total_size) -> bool:
     try:
         proc = subprocess.run(
             ["curl", "-sLf", "--max-time", "15", "-r", f"{start}-{end}", url],
-            capture_output=True, timeout=20)
+            capture_output=True, timeout=20, env=_curl_env())
     except Exception:
         return False
     if proc.returncode != 0 or not proc.stdout:
@@ -277,7 +499,8 @@ def _download_block(url, start, end, fd, max_retry):
             proc = subprocess.Popen(
                 ["curl", "-sL", "-D", hdr_name, "-o", "-", "--max-time", "60",
                  "-r", f"{start}-{end}", url],
-                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                env=_curl_env())
             pos = start
             got = 0
             while got < need:
@@ -365,6 +588,25 @@ def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, r
         except OSError:
             pass
 
+    # —— P1 自愈：--resume 时主动扫描已存在文件中的大零空洞，视为未完成块 ——
+    # 进程被 SIGKILL 中断时进度文件可能未记录该块，仅靠 done 集合无法识别空洞，
+    # 因此必须扫描实际文件内容，把被零空洞覆盖的分块重新标记为未完成。
+    if resume and out_path.exists():
+        holes = _find_zero_runs(str(out_path))
+        if holes:
+            hole_cids = set()
+            for (hs, he) in holes:
+                for (cid, s, e) in chunks:
+                    if s <= he and e >= hs:
+                        hole_cids.add(cid)
+            if hole_cids:
+                before = len(done)
+                done -= hole_cids
+                if len(done) != before:
+                    sys.stderr.write(
+                        f"  ⚠ --resume 自愈：发现 {before - len(done)} 个分块为零空洞，"
+                        f"将重新下载\n")
+
     done_bytes = sum(e - s + 1 for (_, s, e) in chunks if _ in done)
     bar = Bar(total_size, out_path.name, initial=done_bytes)
     printer = threading.Thread(target=bar.print_thread, daemon=True)
@@ -408,19 +650,42 @@ def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, r
         printer.join(timeout=1)
 
     if not failed_chunks:
-        try:
-            os.close(fd)
-        except OSError:
-            pass
-        try:
-            progress_file.unlink()
-        except OSError:
-            pass
-        if out_path.stat().st_size != total_size:
-            sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
+        # P0 完整性校验：格式 + 零空洞扫描，绝不交付满尺寸但内部损坏的文件
+        redo, fmt_ok = _integrity_check(out_path, chunks, total_size)
+        if not fmt_ok:
+            sys.stderr.write(
+                "  ❌ 文件格式校验失败（疑似 HTML 错误页 / 截断文件），已删除\n")
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                out_path.unlink()
+            except OSError:
+                pass
+            try:
+                progress_file.unlink()
+            except OSError:
+                pass
             return False
-        sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
-        return True
+        if redo:
+            sys.stderr.write(
+                f"  ⚠ 完整性扫描发现 {len(redo)} 个分块存在零空洞，转入补下流程\n")
+            failed_chunks.extend(redo)
+        else:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            try:
+                progress_file.unlink()
+            except OSError:
+                pass
+            if out_path.stat().st_size != total_size:
+                sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
+                return False
+            sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
+            return True
 
     # 需要回退到单线程的情况
     if saw_hostile is not None:
@@ -445,19 +710,24 @@ def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, r
             else:
                 refill_all_ok = False
         if refill_all_ok:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-            try:
-                progress_file.unlink()
-            except OSError:
-                pass
-            if out_path.stat().st_size != total_size:
-                sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
-                return False
-            sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
-            return True
+            # 复核：补下后应无零空洞（防空洞残留导致交付坏文件）
+            if _find_zero_runs(str(out_path)):
+                refill_all_ok = False
+                sys.stderr.write("  ⚠ 单线程补下后仍存在零空洞，回退整文件单线程下载\n")
+            else:
+                try:
+                    os.close(fd)
+                except OSError:
+                    pass
+                try:
+                    progress_file.unlink()
+                except OSError:
+                    pass
+                if out_path.stat().st_size != total_size:
+                    sys.stderr.write("  ⚠ 文件大小与预期不符，可能下载不完整\n")
+                    return False
+                sys.stderr.write(f"\n  ✅ 完成 → {out_path}\n")
+                return True
         sys.stderr.write("  ⚠ 单线程补下仍失败，回退整文件单线程下载\n")
 
     # —— 回退：整文件单线程流式下载（覆盖半成品）——
@@ -489,7 +759,8 @@ def _download_multi(url, out_path, total_size, threads, chunk_size, max_retry, r
 def _curl_stream(url, out_path, total_size, bar):
     """单线程流式下载（从头），带 -f 防止错误页写入。"""
     proc = subprocess.Popen(["curl", "-sLf", "--max-time", "600", url],
-                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+                            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                            env=_curl_env())
     ok = True
     try:
         with open(out_path, "wb") as f:
@@ -540,7 +811,7 @@ def _download_single(url, out_path, total_size, resume, bar):
             ret = subprocess.run(
                 ["curl", "-sL", "--max-time", "600", "--connect-timeout", "30",
                  "-C", "-", "-o", str(out_path), url],
-                capture_output=True).returncode
+                capture_output=True, env=_curl_env()).returncode
             new = out_path.stat().st_size if out_path.exists() else 0
             bar.done = new
             if total_size:
@@ -591,13 +862,30 @@ def clear_quarantine(path: Path) -> None:
         pass
 
 
-def download(url, out_name=None, threads=THREADS, chunk_mb=CHUNK_MB,
+def download(url, out_name=None, threads=THREADS, chunk_mb=None,
              max_retry=MAX_RETRY, expected_sha256=None, compute_checksum=True,
              clear_quarantine_flag=True, resume=False, overwrite=False,
-             force_single=False):
+             force_single=False, noproxy=False, mirror=None):
+    global _CURL_ENV
     if not _have_curl():
         sys.stderr.write("❌ 未找到 curl，无法下载（需要系统自带 curl）\n")
         return False
+
+    # 0. URL 归一化 + 代理/镜像环境准备
+    url = _normalize_github_url(url)        # github blob → raw 直链
+    url = _apply_mirror(url, mirror)        # 镜像源改写（ghproxy 直连）
+    if noproxy or mirror:
+        _CURL_ENV = _make_bypass_env()      # 清除代理变量，绕过透明代理
+    else:
+        _CURL_ENV = os.environ.copy()
+
+    # 分块大小：显式 > 默认；否则代理环境自动降到安全 2MB（低于 4.2MB 截断阈值）
+    if chunk_mb is None:
+        chunk_mb = SAFE_CHUNK_MB if _detect_proxy() else CHUNK_MB
+    if _detect_proxy() and not (noproxy or mirror) and chunk_mb >= 4:
+        sys.stderr.write(
+            f"  ⚠ 检测到代理环境：默认分块已降到 {chunk_mb}MB 以下 4.2MB 截断阈值；"
+            f"如需更快且不被截断，建议加 --noproxy 或 --mirror ghproxy 走直连\n")
 
     # 1. 探测
     sys.stderr.write("  正在探测服务器... ")
@@ -659,6 +947,27 @@ def download(url, out_name=None, threads=THREADS, chunk_mb=CHUNK_MB,
     if not ok:
         return False
 
+    # 4.5 最终完整性闸门：格式校验 + 零空洞扫描（P0）
+    # 绝不交付满尺寸但内部损坏 / 实为 HTML 错误页的文件。
+    # 零空洞阈值用 1MB：SIGKILL 留下的空洞都是 MB 级；用较大阈值避免误删
+    # 本身含零区段的合法文件（多线程路径仍用 1KB 精确补下，不受影响）。
+    fmt_ok = _validate_format(out_path)
+    holes = _find_zero_runs(str(out_path), min_run=1024 * 1024)
+    if not fmt_ok or holes:
+        reason = []
+        if not fmt_ok:
+            reason.append("格式异常（疑似 HTML 错误页/截断文件）")
+        if holes:
+            reason.append(f"发现 {len(holes)} 处零字节空洞")
+        sys.stderr.write(
+            "  ❌ 下载后完整性校验未通过（" + "；".join(reason)
+            + "），文件不可信，已删除\n")
+        try:
+            out_path.unlink()
+        except OSError:
+            pass
+        return False
+
     # 5. SHA256 校验
     if compute_checksum:
         sys.stderr.write("  计算 SHA256... ")
@@ -687,15 +996,16 @@ def main():
                         help=f"并发数 (默认 {THREADS})")
     parser.add_argument("-o", "--output", default=None,
                         help="输出文件名 (默认从 URL 推断)")
-    parser.add_argument("--chunk", type=int, default=CHUNK_MB,
-                        help=f"多线程固定分块大小 MB (默认 {CHUNK_MB})，"
-                             f"小分块抗 CDN 限速挂死")
+    parser.add_argument("--chunk", type=int, default=None,
+                        help=f"多线程固定分块大小 MB (默认自动：代理环境 {SAFE_CHUNK_MB}MB，"
+                             f"否则 {CHUNK_MB}MB)；小分块抗 CDN 限速挂死")
     parser.add_argument("--max-retry", type=int, default=MAX_RETRY,
                         help=f"单块重试上限 (默认 {MAX_RETRY})")
     parser.add_argument("--single", action="store_true",
                         help="强制单线程下载")
     parser.add_argument("--resume", action="store_true",
-                        help="断点续传（多线程跳过已完成块 / 单线程 curl -C - 续传循环）")
+                        help="断点续传（多线程跳过已完成块 / 单线程 curl -C - 续传循环；"
+                             "会自动扫描并补下零空洞残缺块）")
     parser.add_argument("--overwrite", action="store_true",
                         help="覆盖已存在的输出文件")
     parser.add_argument("--sha256", default=None,
@@ -704,6 +1014,11 @@ def main():
                         help="不计算/打印 SHA256")
     parser.add_argument("--no-clear-quarantine", action="store_true",
                         help="macOS 上下载后不清除 Gatekeeper 隔离标记")
+    parser.add_argument("--noproxy", action="store_true",
+                        help="下载时清除所有代理变量直连，绕过透明代理（海外 CDN 大文件截断时使用）")
+    parser.add_argument("--mirror", default=None, choices=["ghproxy"],
+                        help="镜像源：ghproxy 把 URL 包成 https://ghproxy.net/<URL> 直连，"
+                             "内置绕过透明代理")
     args = parser.parse_args()
 
     ok = download(args.url, args.output, args.threads, args.chunk,
@@ -711,7 +1026,8 @@ def main():
                   compute_checksum=not args.no_checksum,
                   clear_quarantine_flag=not args.no_clear_quarantine,
                   resume=args.resume, overwrite=args.overwrite,
-                  force_single=args.single)
+                  force_single=args.single, noproxy=args.noproxy,
+                  mirror=args.mirror)
     sys.exit(0 if ok else 1)
 
 
