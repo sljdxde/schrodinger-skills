@@ -242,46 +242,106 @@ def render_review(concepts: list[dict], review: list[dict]) -> str:
 # ---------------------------------------------------------------------------
 def default_gamification() -> dict:
     return {
+        # ---- 15-level exponential curve (Roguelike-inspired) ----
+        # Phase 1 (Lv.1-5): Apprentice — quick wins, <30 min to Lv.3
+        # Phase 2 (Lv.6-10): Journeyman — moderate commitment
+        # Phase 3 (Lv.11-15): Master — prestige, dedication required
         "levels": [
-            {"level": 1, "title": "初心学徒", "min_xp": 0},
-            {"level": 2, "title": "识字书生", "min_xp": 50},
-            {"level": 3, "title": "博闻少年", "min_xp": 130},
-            {"level": 4, "title": "通晓学子", "min_xp": 260},
-            {"level": 5, "title": "满腹经纶", "min_xp": 450},
-            {"level": 6, "title": "博学鸿儒", "min_xp": 700},
-            {"level": 7, "title": "融会宗师", "min_xp": 1000},
+            {"level": 1, "title": "初心学徒",   "min_xp": 0,    "phase": "apprentice", "color": "#9E9E9E"},
+            {"level": 2, "title": "识字书生",   "min_xp": 40,   "phase": "apprentice", "color": "#A1887F"},
+            {"level": 3, "title": "博闻少年",   "min_xp": 100,  "phase": "apprentice", "color": "#80CBC4"},
+            {"level": 4, "title": "通晓学子",   "min_xp": 200,  "phase": "apprentice", "color": "#FFB74D"},
+            {"level": 5, "title": "满腹经纶",   "min_xp": 350,  "phase": "journeyman", "color": "#BA68C8",
+             "milestone": "突破！解锁「属性面板」——从此可见六维成长雷达"},
+            {"level": 6, "title": "格物致知",   "min_xp": 550,  "phase": "journeyman", "color": "#64B5F6"},
+            {"level": 7, "title": "学海行者",   "min_xp": 800,  "phase": "journeyman", "color": "#4DD0E1"},
+            {"level": 8, "title": "融会贯通",   "min_xp": 1100, "phase": "journeyman", "color": "#81C784"},
+            {"level": 9, "title": "博闻强识",   "min_xp": 1500, "phase": "journeyman", "color": "#FF8A65"},
+            {"level": 10,"title": "博学鸿儒",    "min_xp": 2000, "phase": "master",     "color": "#F06292",
+             "milestone": "大成！解锁「连击系统」——连续答对触发 XP 加成"},
+            {"level": 11,"title": "一代宗师",    "min_xp": 2700, "phase": "master",     "color": "#7E57C2"},
+            {"level": 12,"title": "开山立派",    "min_xp": 3600, "phase": "master",     "color": "#26A69A"},
+            {"level": 13,"title": "万卷通神",    "min_xp": 4800, "phase": "master",     "color": "#EF5350"},
+            {"level": 14,"title": "学究天人",    "min_xp": 6500, "phase": "master",     "color": "#FFCA28"},
+            {"level": 15,"title": "至圣先师",    "min_xp": 9999, "phase": "legend",     "color": "#E040FB",
+             "milestone": "传说！满级达成——你已是知识殿堂的传奇人物"},
         ],
+        # ---- XP rules with action-type tags for attribute mapping ----
         "xp_rules": {
-            "flip_card": 3,
-            "quiz_correct": 12,
-            "quiz_wrong": 3,
-            "review_rate": 10,
-            "feynman_done": 8,
+            "flip_card":      {"xp": 3,  "attr": "MEM", "label": "记忆"},
+            "quiz_correct":   {"xp": 12, "attr": "INS", "label": "洞察"},
+            "quiz_wrong":     {"xp": 3,  "attr": "INS", "label": "洞察"},
+            "review_rate":     {"xp": 10, "attr": "RES", "label": "韧性"},
+            "feynman_done":   {"xp": 8,  "attr": "EXP", "label": "表达"},
+            "combo_bonus":    {"xp": 0,  "attr": "FOC", "label": "专注"},  # dynamic multiplier
         },
+        # ---- 6 RPG attributes (radar chart stats) ----
+        # Each action increments its attribute; normalized 0-100 for display.
+        # Cap at 100; level milestones raise cap.
+        "attributes": [
+            {"id": "MEM", "name": "记忆力", "icon": "layers",
+             "desc": "翻转卡片积累", "color": "#64B5F6"},
+            {"id": "INS", "name": "洞察力", "icon": "target",
+             "desc": "自测答题积累", "color": "#FF8A65"},
+            {"id": "RES", "name": "韧性",   "icon": "shield",
+             "desc": "复习坚持积累", "color": "#81C784"},
+            {"id": "EXP", "name": "表达力", "icon": "pen-line",
+             "desc": "费曼复述积累", "color": "#BA68C8"},
+            {"id": "CUR", "name": "探索力", "icon": "compass",
+             "desc": "联网深潜积累", "color": "#4DD0E1"},
+            {"id": "FOC", "name": "专注度", "icon": "flame",
+             "desc": "连续学习积累", "color": "#FFB74D"},
+        ],
+        # ---- Combo system config ----
+        "combo": {
+            "enabled_at_level": 10,
+            "multipliers": [1.0, 1.3, 1.6, 2.0],  # 0/1/2/3+ streak
+            "max_combo": 99,
+            "break_on_wrong": True,
+        },
+        # ---- Enhanced badge set (with tier support) ----
         "badges": [
             {"id": "first_pack", "name": "启程", "icon": "sprout",
-             "desc": "打开学习包即得", "trigger": "on_generate"},
+             "desc": "打开学习包即得", "trigger": "on_generate", "tier": 1},
             {"id": "first_quiz", "name": "破冰", "icon": "snowflake",
-             "desc": "首次答对自测", "trigger": "quiz_correct_first"},
+             "desc": "首次答对自测", "trigger": "quiz_correct_first", "tier": 1},
             {"id": "all_quiz", "name": "火眼金睛", "icon": "target",
-             "desc": "本包自测全对", "trigger": "quiz_all_correct"},
+             "desc": "本包自测全对", "trigger": "quiz_all_correct", "tier": 3},
             {"id": "first_review", "name": "温故知新", "icon": "sunrise",
-             "desc": "首次复习自评", "trigger": "review_rate_first"},
+             "desc": "首次复习自评", "trigger": "review_rate_first", "tier": 1},
             {"id": "iron_will", "name": "百炼成钢", "icon": "shield",
-             "desc": "复习自评累计 10 次", "trigger": "review_count>=10"},
+             "desc": "复习自评累计 10 次", "trigger": "review_count>=10", "tier": 2},
             {"id": "master_all", "name": "融会贯通", "icon": "trophy",
-             "desc": "所有概念自评 ≥4", "trigger": "all_review_ge4"},
+             "desc": "所有概念自评 ≥4", "trigger": "all_review_ge4", "tier": 3},
             {"id": "feynman_master", "name": "费曼小能手", "icon": "pen-line",
-             "desc": "完成全部费曼自述", "trigger": "feynman_all"},
+             "desc": "完成全部费曼自述", "trigger": "feynman_all", "tier": 2},
             {"id": "streak3", "name": "三日之约", "icon": "flame",
-             "desc": "连续 3 天学习", "trigger": "streak>=3"},
+             "desc": "连续 3 天学习", "trigger": "streak>=3", "tier": 1},
             {"id": "streak7", "name": "一周不辍", "icon": "sparkles",
-             "desc": "连续 7 天学习", "trigger": "streak>=7"},
-            {"id": "level5", "name": "满腹经纶", "icon": "scroll",
-             "desc": "等级达到「满腹经纶」", "trigger": "level>=5"},
+             "desc": "连续 7 天学习", "trigger": "streak>=7", "tier": 2},
+            {"id": "streak14","name": "半月不怠", "icon": "medal",
+             "desc": "连续 14 天学习", "trigger": "streak>=14", "tier": 3},
+            {"id": "streak30","name": "月轮精进", "icon": "award",
+             "desc": "连续 30 天学习", "trigger": "streak>=30", "tier": 4},
+            {"id": "level5", "name": "小有所成", "icon": "scroll",
+             "desc": "等级达到 Lv.5", "trigger": "level>=5", "tier": 2},
+            {"id": "level10","name": "登堂入室", "icon": "book",
+             "desc": "等级达到 Lv.10", "trigger": "level>=10", "tier": 3},
+            {"id": "level15","name": "至圣传奇", "icon": "sparkles",
+             "desc": "等级达到 Lv.15（满级）", "trigger": "level>=15", "tier": 4},
             {"id": "knowledge_hunter", "name": "知识猎人", "icon": "compass",
-             "desc": "包内含联网深潜讲解", "trigger": "web_deepdive>=1"},
+             "desc": "包内含联网深潜讲解", "trigger": "web_deepdive>=1", "tier": 1},
+            {"id": "combo5", "name": "连击新星", "icon": "flame",
+             "desc": "单次会话连续答对 5 题", "trigger": "combo_max>=5", "tier": 2},
+            {"id": "combo10","name": "连击大师", "icon": "sparkles",
+             "desc": "单次会话连续答对 10 题", "trigger": "combo_max>=10", "tier": 3},
+            {"id": "perfect_pack","name": "完美主义", "icon": "award",
+             "desc": "一轮内全部操作零失误（全对+全≥4分复评）", "trigger": "perfect_run", "tier": 4},
+            {"id": "speed_learner","name": "速学者", "icon": "sunrise",
+             "desc": "10 分钟内完成全部卡片+自测", "trigger": "speed_run", "tier": 2},
         ],
+        # ---- Tier display names ----
+        "tier_names": {1: "铜", 2: "银", 3: "金", 4: "钻石"},
     }
 
 
@@ -292,12 +352,30 @@ def compute_gamification(data: dict) -> dict:
     if user.get("levels"):
         gam["levels"] = user["levels"]
     if user.get("xp_rules"):
-        gam["xp_rules"] = user["xp_rules"]
+        # Merge: keep user's keys, fallback to default for missing
+        merged_rules = dict(gam["xp_rules"])
+        for k, v in user["xp_rules"].items():
+            if isinstance(v, (int, float)):
+                # Legacy format: plain number → wrap in object
+                existing = merged_rules.get(k, {})
+                if isinstance(existing, dict):
+                    existing["xp"] = v
+                else:
+                    merged_rules[k] = {"xp": v, "attr": "GEN", "label": "通用"}
+            else:
+                merged_rules[k] = v
+        gam["xp_rules"] = merged_rules
     if user.get("badges"):
         by_id = {b["id"]: b for b in gam["badges"]}
         for b in user["badges"]:
             by_id[b["id"]] = b
         gam["badges"] = list(by_id.values())
+    if user.get("attributes"):
+        gam["attributes"] = user["attributes"]
+    if user.get("combo"):
+        gam["combo"] = {**gam["combo"], **user["combo"]}
+    if user.get("tier_names"):
+        gam["tier_names"] = user["tier_names"]
 
     concepts = data.get("concepts", [])
     quiz_total = sum(1 for c in concepts if c.get("quiz"))
@@ -314,6 +392,13 @@ def compute_gamification(data: dict) -> dict:
         if t == "feynman_all" and feynman_total == 0:
             continue
         if t == "quiz_all_correct" and quiz_total == 0:
+            continue
+        # Combo/speed/perfect triggers only shown when relevant features exist
+        if t.startswith("combo_") and quiz_total < 3:
+            continue
+        if t == "speed_run" and (cards_total + quiz_total) < 5:
+            continue
+        if t == "perfect_run" and (quiz_total == 0 or review_total == 0):
             continue
         filtered.append(b)
     gam["badges"] = filtered
@@ -332,21 +417,55 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
     totals = gam.get("_totals", {})
     first_level = gam["levels"][0]["title"] if gam["levels"] else "初心学徒"
 
-    # Mini badge strip (lives inside the sticky honor bar, updates live)
+    # ---- Combo display (inline in honor bar) ----
+    combo_html = (
+        '<div class="hb-combo" id="hbCombo" title="连续答对触发 XP 加成（Lv.10 解锁）">'
+        f'{icon("flame", 14)}<span id="hbComboCount">0</span>'
+        '<span class="hb-combo-label">连击</span></div>'
+    )
+
+    # Mini badge strip with tier support
     mini = []
     for b in gam["badges"]:
+        tier = b.get("tier", 1)
+        tier_cls = f"tier-{tier}" if tier > 1 else ""
         mini.append(
-            f'<span class="hb-mini locked" id="hb-badge-{b["id"]}" '
-            f'title="{html.escape(b["name"])}：{html.escape(b["desc"])}">'
+            f'<span class="hb-mini locked {tier_cls}" id="hb-badge-{b["id"]} '
+            f'title="{html.escape(b["name"])}（{gam.get("tier_names",{}).get(tier,"")}）：{html.escape(b["desc"])}">'
             f'{icon(str(b.get("icon", "medal")), 16)}</span>'
         )
     mini_html = "".join(mini)
+
+    # ---- Attribute radar panel (shown when level >= 5) ----
+    attrs = gam.get("attributes", [])
+    attr_dots_html = ""
+    if attrs:
+        dots = []
+        for a in attrs:
+            aid = a["id"]
+            aname = html.escape(a["name"])
+            aicon = icon(str(a.get("icon", "medal")), 12)
+            acolor = a.get("color", "#999")
+            dots.append(
+                f'<div class="attr-dot" data-attr="{aid}" title="{aname}：{html.escape(a.get("desc",""))}">'
+                f'<span class="attr-dot-icon" style="color:{acolor}">{aicon}</span>'
+                f'<span class="attr-dot-bar"><span class="attr-dot-fill" id="attrFill-{aid}" '
+                f'style="background:{acolor}"></span></span>'
+                f'<span class="attr-dot-val" id="attrVal-{aid}">0</span>'
+                f'</div>'
+            )
+        attr_dots_html = (
+            '<div class="attr-panel" id="attrPanel" hidden>'
+            '<div class="attr-title">六维成长</div>'
+            '<div class="attr-dots">' + "".join(dots) + '</div>'
+            '</div>'
+        )
 
     honor_bar = f"""
 <div class="honor-bar" id="honorBar">
   <div class="hb-left">
     <div class="hb-level">
-      <span class="hb-badge">{icon('award', 18)}</span>
+      <span class="hb-badge" id="hbBadgeIcon">{icon('award', 18)}</span>
       <div class="hb-lv-text"><span id="hbLevelName">{html.escape(first_level)}</span>
         <span class="hb-lv" id="hbLevelNo">Lv.1</span></div>
     </div>
@@ -354,6 +473,7 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
       <div class="hb-xp-track"><div class="hb-xp-fill" id="hbXpFill"></div></div>
       <span class="hb-xp-text" id="hbXpText">0 XP</span>
     </div>
+    {attr_dots_html}
   </div>
   <div class="hb-stats">
     <div class="hb-stat"><span id="hbDoneCards">0/0</span><span class="hb-stat-label">卡片</span></div>
@@ -364,6 +484,7 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
         f'<span id="hbStreak">0</span><span class="hb-stat-label">天连续</span></div>
     <div class="hb-stat"><span id="hbBadgeCount">0/{len(gam["badges"])}</span>'
         f'<span class="hb-stat-label">勋章</span></div>
+    {combo_html}
   </div>
   <div class="hb-badges" title="已解锁勋章（实时同步）">{mini_html}</div>
   <button class="hb-reset" type="button" onclick="resetProgress()" title="清除本包进度">重置进度</button>
@@ -376,11 +497,15 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
         name = html.escape(str(b.get("name", "")))
         desc = html.escape(str(b.get("desc", "")))
         bid = html.escape(str(b.get("id", "")))
+        tier = b.get("tier", 1)
+        tier_name = gam.get("tier_names", {}).get(tier, "")
+        tier_badge = f'<span class="bc-tier tier-{tier}">{html.escape(tier_name)}</span>' if tier_name else ''
         cards.append(
             f'<div class="badge-card locked" id="bg-{bid}" data-badge="{bid}" '
             f'title="{desc}"><span class="bc-check">{icon("check", 14)}</span>'
             f'<div class="bc-icon">{bicon}</div>'
-            f'<div class="bc-name">{name}</div><div class="bc-desc">{desc}</div></div>'
+            f'<div class="bc-name">{name}</div>{tier_badge}'
+            f'<div class="bc-desc">{desc}</div></div>'
         )
     hall = (
         '<div class="hall"><div class="hall-head">' + icon("trophy", 20)
@@ -390,12 +515,27 @@ def render_gamification(data: dict, gam: dict) -> tuple[str, str, str]:
         '完成上方任意操作，顶部荣誉墙会实时刷新。</div>'
         "</div>"
     )
+
+    # Build pkg JSON — extract xp values from rule objects for JS
+    xp_rules_flat = {}
+    for k, v in gam.get("xp_rules", {}).items():
+        if isinstance(v, (int, float)):
+            xp_rules_flat[k] = v
+        elif isinstance(v, dict):
+            xp_rules_flat[k] = v.get("xp", 0)
+        else:
+            xp_rules_flat[k] = 0
+
     pkg = {
         "levels": gam["levels"],
-        "xp_rules": gam["xp_rules"],
+        "xp_rules": xp_rules_flat,
+        "xp_rule_details": gam.get("xp_rules", {}),
+        "attributes": gam.get("attributes", []),
+        "combo": gam.get("combo", {}),
         "badges": [
             {"id": b["id"], "name": b["name"], "icon": b["icon"],
-             "desc": b["desc"], "trigger": b["trigger"]}
+             "desc": b["desc"], "trigger": b["trigger"],
+             "tier": b.get("tier", 1)}
             for b in gam["badges"]
         ],
         "totals": totals,
@@ -447,6 +587,9 @@ body{margin:0;line-height:var(--lh);font-size:var(--fs-base);
 .wrap{max-width:960px;margin:0 auto;padding:40px 22px 110px}
 .muted{color:var(--muted);font-size:var(--fs-sm);line-height:1.5}
 :focus-visible{outline:3px solid var(--ring);outline-offset:2px;border-radius:6px}
+
+/* universal hidden – must come before component rules */
+[hidden]{display:none!important}
 
 /* masthead */
 header.pkg{margin-bottom:8px}
@@ -507,6 +650,44 @@ section h2 .badge{font-size:var(--fs-xs);padding:3px 11px;border-radius:var(--r-
   background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 12px;cursor:pointer;
   transition:all .15s;flex-shrink:0}
 .hb-reset:hover{color:var(--bad);border-color:var(--bad)}
+
+/* combo counter */
+.hb-combo{display:none;align-items:center;gap:4px;padding:5px 10px;border-radius:10px;
+  background:var(--accent-soft);color:var(--accent);font-weight:800;font-size:13px;
+  border:1px solid transparent;transition:all .2s;min-width:56px;justify-content:center}
+.hb-combo.active{background:var(--accent);color:#fff;border-color:var(--accent);
+  box-shadow:0 2px 10px var(--ring);animation:comboPulse .6s ease}
+.hb-combo-label{font-size:9px;font-weight:600;opacity:.8}
+@keyframes comboPulse{0%{transform:scale(1)}50%{transform:scale(1.15)}100%{transform:scale(1)}}
+
+/* attribute panel (unlocks at Lv.5) */
+.attr-panel{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--paper-2);
+  border:1px solid var(--line);animation:fadeUp .35s ease}
+.attr-panel[hidden]{display:none}
+.attr-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--muted);margin-bottom:8px}
+.attr-dots{display:flex;flex-direction:column;gap:6px}
+.attr-dot{display:flex;align-items:center;gap:7px}
+.attr-dot-icon{display:flex;align-items:center;width:16px;flex-shrink:0}
+.attr-dot-bar{flex:1;height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.attr-dot-fill{display:block;height:100%;width:0%;border-radius:3px;
+  transition:width .5s cubic-bezier(.16,1,.3,1)}
+.attr-dot-val{font-size:11px;font-weight:700;color:var(--ink-2);min-width:22px;text-align:right;
+  font-variant-numeric:tabular-nums}
+
+/* badge tier indicators */
+.bc-tier{display:inline-block;font-size:9px;font-weight:700;padding:1px 7px;border-radius:6px;
+  margin-top:4px;letter-spacing:.04em;vertical-align:middle}
+.tier-2{background:#E8E8E8;color:#555}  /* silver */
+.tier-3{background:#FFF3D6;color:#B8860B}  /* gold */
+.tier-4{background:#E8F0FE;color:#4A90D9}  /* diamond */
+.hb-mini.tier-2{box-shadow:inset 0 0 0 2px #C0C0C0}
+.hb-mini.tier-3{box-shadow:inset 0 0 0 2px #FFD700}
+.hb-mini.tier-4{box-shadow:inset 0 0 0 2px #87CEEB}
+
+/* level-up milestone toast special style */
+.milestone-toast{background:linear-gradient(135deg,var(--accent),var(--accent-deep))!important;
+  padding:16px 24px!important;border-radius:16px!important}
 
 /* hall of fame */
 .hall-head{display:flex;align-items:center;gap:9px;font-size:17px;font-weight:800;margin-bottom:14px}
@@ -636,10 +817,75 @@ footer.pkg{text-align:center;font-size:var(--fs-xs);margin-top:14px;line-height:
 @keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
 @media (max-width:560px){
-  .wrap{padding:22px 14px 72px}
-  .badge-grid{grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
-  .honor-bar{gap:10px 14px;padding:12px}
-  section{padding:20px 16px}
+  .wrap{padding:16px 12px 80px}
+  /* honor bar: stack vertically on mobile */
+  .honor-bar{flex-direction:column;gap:10px;padding:12px 14px;align-items:stretch}
+  .hb-left{min-width:auto}
+  .hb-level{gap:8px}
+  .hb-badge{width:32px;height:32px;border-radius:10px}
+  #hbLevelName{font-size:14px}
+  .hb-lv{font-size:10px}
+  /* stats grid: 3 columns, compact */
+  .hb-stats{gap:6px;justify-content:center}
+  .hb-stat{min-width:auto;padding:5px 8px;border-radius:10px;flex:1 1 0;max-width:90px}
+  .hb-stat>span:not(.hb-stat-label){font-size:13px}
+  .hb-stat-label{font-size:9px;margin-top:2px}
+  /* badges row: smaller icons */
+  .hb-badges{gap:4px;justify-content:center}
+  .hb-mini{width:28px;height:28px}
+  .hb-reset{margin-left:0;align-self:flex-end;font-size:11px;padding:5px 10px}
+  /* sections */
+  section{padding:16px 14px;border-radius:14px}
+  section h2{font-size:1.1rem;gap:8px}
+  /* badge grid: 3 cols on phone */
+  .badge-grid{grid-template-columns:repeat(3,1fr);gap:8px}
+  .badge-card{padding:12px 8px;border-radius:12px}
+  .bc-icon{width:44px;height:44px}
+  .bc-name{font-size:12px;margin-top:6px}
+  .bc-desc{display:none}          /* hide desc on mobile to save space */
+  .bc-check{top:4px;right:6px}
+  /* cards */
+  .card{padding:14px 14px;border-radius:14px;margin-bottom:16px}
+  .card-head h3{font-size:15px}
+  .card-no{width:24px;height:24px;font-size:13px}
+  /* flip */
+  .flip-front,.flip-back{padding:14px 14px}
+  .q-text{font-size:15px}
+  .a-text{font-size:14px}
+  /* quiz */
+  .quiz{padding:12px 12px}
+  .quiz-q{font-size:13px}
+  .opt{font-size:13px}
+  .quiz-check{width:100%;text-align:center;padding:10px 0}
+  /* review table: horizontal scroll + compact */
+  .review{font-size:12px;display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap}
+  .review th,.review td{padding:8px 7px}
+  .review th{font-size:10px}
+  .rate{width:28px;height:28px;font-size:12px}
+  /* feynman */
+  .feynman{padding:10px 12px}
+  .feynman-retell{padding:8px 14px;font-size:12px;width:100%;justify-content:center}
+  .feynman-check{padding:6px 12px;font-size:12px}
+  /* attribute panel: compact on mobile */
+  .attr-panel{padding:8px 10px;margin-top:6px}
+  .attr-dot-bar{height:5px}
+  .attr-dot-val{font-size:10px;min-width:18px}
+  /* combo: smaller */
+  .hb-combo{min-width:auto;padding:4px 8px;font-size:12px}
+  /* tier badges: hide text on mobile */
+  .bc-tier{display:none}
+  /* header */
+  header.pkg h1{font-size:1.6rem}
+  header.pkg .meta{font-size:12px}
+}
+
+/* ultra-narrow: stat boxes 2-across, hide badge strip in honor bar */
+@media (max-width:380px){
+  .hb-stats{flex-wrap:wrap}
+  .hb-stat{flex:1 1 calc(50% - 6px);max-width:none;min-height:44px}
+  .hb-badges{display:none}      /* save vertical space on tiny screens */
+  .badge-grid{grid-template-columns:repeat(3,1fr);gap:6px}
+  .bc-icon{width:38px;height:38px}
 }
 @media (prefers-reduced-motion:reduce){
   *{animation-duration:.001ms!important;animation-iteration-count:1!important;
@@ -686,7 +932,8 @@ header.pkg h1{font-family:var(--serif);font-weight:700;letter-spacing:-.02em}
 
 
 JS = r"""
-/* ===== Gamification engine (shared, live-synced state) ===== */
+/* ===== Gamification engine v2 (shared, live-synced state) ===== */
+/* Enhanced: attributes, combo system, milestones, tier badges */
 const PKG = __PKG__;
 const ICONS = __ICONS__;
 function iconSvg(name,size,cls){var inner=ICONS[name]||ICONS['medal'];return '<svg viewBox="0 0 24 24" width="'+(size||18)+'" height="'+(size||18)+'" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'+(cls?(' class="'+cls+'"'):'')+'>'+inner+'</svg>';}
@@ -697,7 +944,18 @@ function clamp(v){return Math.max(0,Math.min(100,v));}
 var LS_KEY = 'mf_' + (PKG.storageKey||'default');
 function lsGet(){ try{return JSON.parse(localStorage.getItem(LS_KEY))||{};}catch(e){return {};} }
 function lsSet(s){ try{localStorage.setItem(LS_KEY,JSON.stringify(s));}catch(e){} }
-var S = Object.assign({xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,feynmanDone:0,streak:0,lastDay:null,flips:{}}, lsGet());
+
+/* ---- State (extended for v2) ---- */
+var S = Object.assign({
+  xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,
+  feynmanDone:0,streak:0,lastDay:null,flips:{},
+  /* v2: attributes */
+  attrs:{MEM:0,INS:0,RES:0,EXP:0,CUR:0,FOC:0},
+  /* v2: combo */
+  combo:0,comboMax:0,
+  /* v2: session timer for speed_run */
+  sessionStart:Date.now(),mistakes:0
+}, lsGet());
 
 function todayStr(){var d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
 function ydayStr(){var d=new Date(Date.now()-86400000);return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
@@ -709,6 +967,47 @@ function allReviewedGe4(){ if(!PKG.totals.review_total)return false;
   var rows=document.querySelectorAll('.review tr[data-ef]'); if(!rows.length)return false;
   for(var i=0;i<rows.length;i++){ if(rows[i].dataset.ge4!=='1')return false; } return true; }
 
+/* ---- Attribute helpers ---- */
+function getXP(key){ var r=PKG.xp_rules[key]; return typeof r==='number'?r:(r&&r.xp)||0; }
+function getAttrForKey(key){ var d=PKG.xp_rule_details&&PKG.xp_rule_details[key]; return(d&&d.attr)||'GEN'; }
+function bumpAttr(attrKey,amount){ if(!S.attrs[attrKey])S.attrs[attrKey]=0; S.attrs[attrKey]=(S.attrs[attrKey]||0)+amount; }
+function capAttr(val){ return Math.min(100,Math.max(0,val)); }
+function renderAttrs(){
+  var panel=document.getElementById('attrPanel'); if(!panel)return;
+  var lv=levelFor(S.xp).level;
+  if(lv<5){panel.hidden=true;return;}
+  panel.hidden=false;
+  var attrs=PKG.attributes||[];
+  for(var i=0;i<attrs.length;i++){
+    var aid=attrs[i].id;
+    var val=capAttr(S.attrs[aid]||0);
+    var fillEl=document.getElementById('attrFill-'+aid);
+    var valEl=document.getElementById('attrVal-'+aid);
+    if(fillEl)fillEl.style.width=val+'%';
+    if(valEl)valEl.textContent=Math.round(val);
+  }
+}
+
+/* ---- Combo system ---- */
+function getComboMult(){
+  var cfg=PKG.combo||{};
+  var lv=levelFor(S.xp).level;
+  if(cfg.enabled_at_level&&lv<cfg.enabled_at_level) return 1;
+  var mults=cfg.multipliers||[1,1.3,1.6,2];
+  var idx=Math.min(S.combo, mults.length-1);
+  return mults[idx]||1;
+}
+function renderCombo(){
+  var el=document.getElementById('hbCombo'); if(!el)return;
+  var cfg=PKG.combo||{};
+  var lv=levelFor(S.xp).level;
+  if(cfg.enabled_at_level&&lv<cfg.enabled_at_level){el.style.display='none';return;}
+  el.style.display='flex';
+  var cntEl=document.getElementById('hbComboCount'); if(cntEl)cntEl.textContent=S.combo;
+  if(S.combo>=3)el.classList.add('active'); else el.classList.remove('active');
+}
+
+/* ---- Badge evaluation (extended triggers) ---- */
 function evaluateBadges(){
   var newly=[];
   PKG.badges.forEach(function(b){
@@ -720,7 +1019,9 @@ function evaluateBadges(){
     else if(t==='review_rate_first') ok=S.reviewCount>=1;
     else if(t==='all_review_ge4') ok=allReviewedGe4();
     else if(t==='feynman_all') ok=(PKG.totals.feynman_total>0 && S.feynmanDone>=PKG.totals.feynman_total);
-    else if(t.indexOf('>=')>=0){var m=t.match(/^(\w+)>=(\d+)$/); if(m){var key=m[1],val=+m[2];var map={review_count:S.reviewCount,streak:S.streak,level:levelFor(S.xp).level};ok=(map[key]||0)>=val;}}
+    else if(t.indexOf('>=')>=0){var m=t.match(/^(\w+)>=(\d+)$/); if(m){var key=m[1],val=+m[2];var map={review_count:S.reviewCount,streak:S.streak,level:levelFor(S.xp).level,combo_max:S.comboMax};ok=(map[key]||0)>=val;}}
+    else if(t==='perfect_run') ok=(S.mistakes===0 && PKG.totals.quiz_total>0 && S.quizAnswered>=PKG.totals.quiz_total && S.quizCorrect===PKG.totals.quiz_total && S.reviewCount>0 && allReviewedGe4());
+    else if(t==='speed_run') ok=((Date.now()-S.sessionStart)<600000 && (Object.keys(S.flips).length+S.quizAnswered)>=(PKG.totals.cards_total+PKG.totals.quiz_total)*0.8);
     if(ok){S.badges.push(b.id);newly.push(b);}
   });
   return newly;
@@ -731,6 +1032,9 @@ function renderHonor(){
   var lv=levelFor(S.xp), nxt=nextLevel(S.xp);
   setText('hbLevelName', lv.title);
   setText('hbLevelNo','Lv.'+lv.level);
+  /* level color on badge icon */
+  var badgeIcon=document.getElementById('hbBadgeIcon');
+  if(badgeIcon&&lv.color)badgeIcon.style.background=lv.color;
   var pct=100; if(nxt){var span=nxt.min_xp-lv.min_xp; pct=clamp((S.xp-lv.min_xp)/span*100);}
   setWidth('hbXpFill', pct);
   setText('hbXpText', S.xp+' XP'+(nxt?(' / '+nxt.min_xp):' · 满级'));
@@ -745,6 +1049,9 @@ function renderHonor(){
   var total=(PKG.totals.cards_total||0)+(PKG.totals.quiz_total||0)+(PKG.totals.review_total||0)+(PKG.totals.feynman_total||0);
   var done=dc+S.quizAnswered+S.reviewCount+S.feynmanDone;
   setWidth('hbProgressFill', total? clamp(done/total*100):0);
+  /* v2 renders */
+  renderAttrs();
+  renderCombo();
 }
 function paintBadge(id, unlocked){
   ['bg-'+id,'hb-badge-'+id].forEach(function(pid){
@@ -756,11 +1063,12 @@ function paintBadge(id, unlocked){
 function renderHall(){
   PKG.badges.forEach(function(b){ paintBadge(b.id, S.badges.indexOf(b.id)>=0); });
 }
-function toast(msg,ic){
+function toast(msg,ic,cls){
   var t=document.getElementById('mfToast');
   if(!t){t=document.createElement('div');t.id='mfToast';t.className='toast';document.body.appendChild(t);}
   t.innerHTML='<span class="t-icon">'+iconSvg(ic||'medal',16)+'</span>'+msg;
-  t.classList.add('show'); clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove('show');},2600);
+  t.className='toast show'+(cls?' '+cls:'');
+  clearTimeout(t._tm); t._tm=setTimeout(function(){t.classList.remove('show');},2800);
 }
 function grantXP(n){ S.xp+=n; }
 function refresh(){ renderHonor(); renderHall(); }
@@ -769,7 +1077,10 @@ function afterAction(){
   var newly=evaluateBadges();
   lsSet(S); refresh();
   var afterLv=levelFor(S.xp).level;
-  if(afterLv>beforeLv) toast('升级！'+levelFor(S.xp).title,'sparkles');
+  if(afterLv>beforeLv){
+    var lvInfo=levelFor(S.xp);
+    toast('升级！'+lvInfo.title+(lvInfo.milestone?' — '+lvInfo.milestone:''),'sparkles','milestone-toast');
+  }
   newly.forEach(function(b){
     var el=document.getElementById('bg-'+b.id);
     paintBadge(b.id,true);
@@ -778,7 +1089,7 @@ function afterAction(){
   });
 }
 
-/* ===== Quiz ===== */
+/* ===== Quiz (enhanced with combo) ===== */
 function checkQuiz(btn){
   var q=btn.closest('.quiz');
   var fb=q.querySelector('.quiz-feedback');
@@ -798,9 +1109,28 @@ function checkQuiz(btn){
                     :iconSvg('x',16)+'<span class="fb-ic">再想想</span>');
   fb.className = 'quiz-feedback '+(ok?'ok':'no');
   fb.hidden=false; ex.hidden=false;
+
+  /* track mistakes for perfect_run */
+  if(!ok) S.mistakes++;
+
+  /* combo logic */
+  if(ok){
+    S.combo++;
+    if(S.combo>S.comboMax)S.comboMax=S.combo;
+  }else{
+    var cfg=PKG.combo||{};
+    if(cfg.break_on_wrong!==false)S.combo=0;
+  }
+
   if(ok && !q.dataset.correctMarked){ q.dataset.correctMarked='1'; S.quizCorrect++; }
   if(q.dataset.answered!=='1'){ q.dataset.answered='1';
-    S.quizAnswered++; grantXP(ok?PKG.xp_rules.quiz_correct:PKG.xp_rules.quiz_wrong);
+    var baseXP=getXP(ok?'quiz_correct':'quiz_wrong');
+    var mult=getComboMult();
+    var finalXP=Math.round(baseXP*mult);
+    S.quizAnswered++;
+    grantXP(finalXP);
+    /* attribute bump */
+    bumpAttr(getAttrForKey(ok?'quiz_correct':'quiz_wrong'), ok?2:1);
     bumpStreak(); afterAction();
   }
 }
@@ -826,12 +1156,15 @@ function rate(btn){
   var r=sm2(ef,n,q,last);
   row.dataset.ef=r.ef; row.dataset.n=r.n; row.dataset.last=r.interval;
   row.querySelector('.rv-next').textContent='+'+r.interval+' 天';
-  // highlight selected rating
   row.querySelectorAll('.rate').forEach(function(b){b.classList.remove('active');});
   btn.classList.add('active');
   if(row.dataset.rated!=='1'){ row.dataset.rated='1';
     if(q>=4) row.dataset.ge4='1';
-    S.reviewCount++; grantXP(PKG.xp_rules.review_rate); bumpStreak(); afterAction();
+    else S.mistakes++;  /* <4 counts as mistake for perfect_run */
+    S.reviewCount++;
+    grantXP(getXP('review_rate'));
+    bumpAttr(getAttrForKey('review_rate'), 1);
+    bumpStreak(); afterAction();
   }
 }
 
@@ -840,7 +1173,9 @@ function onFlip(flipEl){
   flipEl.classList.toggle('flipped');
   var card=flipEl.closest('.card'); if(!card)return;
   var idx=card.id; if(S.flips[idx])return; S.flips[idx]=1;
-  grantXP(PKG.xp_rules.flip_card); bumpStreak(); afterAction();
+  grantXP(getXP('flip_card'));
+  bumpAttr(getAttrForKey('flip_card'), 1);
+  bumpStreak(); afterAction();
 }
 
 /* ===== Feynman module ===== */
@@ -855,7 +1190,10 @@ function onFeynmanCheck(fc){
   fc.classList.add('done');
   var box=fc.querySelector('.fchk-box'); if(box)box.innerHTML=iconSvg('check',14);
   var lab=fc.querySelector('.fchk-label'); if(lab)lab.textContent='已对照核对 ✓';
-  S.feynmanDone++; grantXP(PKG.xp_rules.feynman_done); bumpStreak(); afterAction();
+  S.feynmanDone++;
+  grantXP(getXP('feynman_done'));
+  bumpAttr(getAttrForKey('feynman_done'), 1);
+  bumpStreak(); afterAction();
 }
 
 /* ===== Read-aloud (offline Web Speech API) ===== */
@@ -877,10 +1215,10 @@ function speakFrom(btn, sel){
 
 /* ===== Reset progress ===== */
 function resetProgress(){
-  if(!confirm('确定清除本学习包的全部进度（经验 / 徽章 / 翻转 / 复习 / 费曼）？'))return;
+  if(!confirm('确定清除本学习包的全部进度（经验 / 徽章 / 翻转 / 复习 / 费曼 / 属性 / 连击）？'))return;
   try{ if(window.speechSynthesis)window.speechSynthesis.cancel(); }catch(e){}
   try{localStorage.removeItem(LS_KEY);}catch(e){}
-  S=Object.assign({xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,feynmanDone:0,streak:0,lastDay:null,flips:{}},{});
+  S=Object.assign({xp:0,badges:[],reviewCount:0,quizCorrect:0,quizAnswered:0,feynmanDone:0,streak:0,lastDay:null,flips:{},attrs:{MEM:0,INS:0,RES:0,EXP:0,CUR:0,FOC:0},combo:0,comboMax:0,sessionStart:Date.now(),mistakes:0},{});
   document.querySelectorAll('.review tr[data-ef]').forEach(function(r){
     r.dataset.n='0'; r.dataset.last=r.dataset.first||'1'; delete r.dataset.rated; delete r.dataset.ge4;
     var nx=r.querySelector('.rv-next'); if(nx)nx.textContent='+'+r.dataset.last+' 天';
@@ -898,10 +1236,11 @@ function resetProgress(){
 
 /* ===== init ===== */
 (function init(){
+  /* safeguard: force-hide all explains and feedbacks on load */
+  document.querySelectorAll('.quiz-explain,.quiz-feedback').forEach(function(el){ el.hidden=true; });
   evaluateBadges(); lsSet(S); refresh();
 })();
 """
-
 PAGE = """<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
