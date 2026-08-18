@@ -161,6 +161,19 @@ def _load_city_policy(city):
 def build_analysis(community, city):
     ms = ds.multi_platform_search(community, "", city, 36, include_cross=True)
     beike = next(p for p in ms["platforms"] if p["source"].startswith("贝壳"))
+
+    # 公开检索兜底注入：贝壳 CLI 0.2.x 未开放 sold/market 工具时，用 SUPPLEMENT_PATH 填补历史/成交
+    _supp_path = os.environ.get("SUPPLEMENT_PATH")
+    if _supp_path and os.path.exists(_supp_path):
+        try:
+            _supp = json.loads(open(_supp_path, encoding="utf-8").read())
+            if not beike.get("history") and _supp.get("history"):
+                beike["history"] = _supp["history"]
+            if not beike.get("transactions") and _supp.get("transactions"):
+                beike["transactions"] = _supp["transactions"]
+        except Exception as _e:  # noqa
+            print("⚠️ supplement 注入跳过：", _e)
+
     rb = beike["resblock"]
     hist = beike["history"]
     rt = ms["recent_transactions"]
@@ -302,7 +315,9 @@ def build_analysis(community, city):
 
     add("resblock", f"贝壳·{name} 小区页（官方CLI resblock）",
         rb_url or "#", "小区档案", "官方CLI")
-    add("chengjiao", "贝壳成交行情（chengjiao 实时）", chengjiao_url, "成交", "官方CLI")
+    chengjiao_label = ("贝壳成交行情（chengjiao 实时）" if beike_tx
+                       else "贝壳成交行情（chengjiao；CLI 后端已下架 sold 工具，暂不可得）")
+    add("chengjiao", chengjiao_label, chengjiao_url, "成交", "官方CLI")
     add("ershoufang", "贝壳在售行情（ershoufang 实时）", ershoufang_url, "挂牌", "官方CLI")
     for i, t in enumerate(beike_tx[:2]):
         u = t.get("url")
@@ -348,8 +363,9 @@ def build_analysis(community, city):
     meta = (f"城市：{city} ｜ 目标对象：{name}（小区ID {xiaoqu_id or '—'}）"
             f"［<a href='#cite-{c['resblock']}' class='cite-ref'>{c['resblock']}</a>］<br>"
             f"购房目的/预算：本次调用未提供（默认以「自住+学区保值」视角撰写，预算相关结论为示意）。<br>"
-            f"数据截止：{ms.get('generated_at', '—')} ｜ 来源：贝壳官方 CLI 实时返回"
-            f"（buy market / sold / search / resblock）；交叉源检索式见 §7/§12。<br>"
+            f"数据截止：{ms.get('generated_at', '—')} ｜ 来源：贝壳官方 CLI 实时返回的「挂牌 search + 小区档案 resblock」真实数据；"
+            f"<b>贝壳 CLI 后端已下架 buy sold / buy market 工具（house_sold_search / market_trend_search），真实成交明细与月度均价走势暂不可得</b>；"
+            f"以下价格结论主要基于挂牌/在售数据，不以 58 同城/房天下等 T3 检索式冒充成交。<br>"
             f"仍缺信息：入学年份、首付比例、决策时间（影响结论置信度）。")
 
     # §1 楼盘基本面
@@ -366,22 +382,46 @@ def build_analysis(community, city):
     basic_html = f"<table class='d'>{basic_rows}</table><p class='muted'>基础信息来自贝壳官方 CLI resblock {ref('resblock')}；多平台口径冲突项以贝壳官方为准。</p>"
 
     # §2 交易与价格（含月度时间轴 + 图表 + 最近成交 + 成交详细信息）
+    tx_missing_note = ("" if beike_tx else
+        "<p class='note' style='border-left:4px solid var(--accent);padding-left:10px;'>"
+        "<b>真实成交明细暂不可得</b>：贝壳 CLI 后端已下架 <code>buy sold</code> / <code>buy market</code> 工具，"
+        "无法拉取近期真实成交记录与月度均价走势。下方成交均价、成交量字段显示为“—/暂无”，"
+        "价格判断主要依赖当前在售挂牌与小区档案；如需真实成交，可等贝壳恢复接口，或通过本机已登录 Chrome CDP 抓取链家/贝壳成交页（需另配）。"
+        "</p>")
     price_html = f"""
-<p>基于贝壳官方 CLI（buy market / buy sold / buy search）实时数据，{name} 当前价格现状如下 {ref('resblock')}{ref('chengjiao')}{ref('ershoufang')}：</p>
+<p>基于贝壳官方 CLI（buy search / buy resblock）实时返回的挂牌与小区档案数据；
+<b>buy market / buy sold 工具已被 CLI 后端下架，真实成交明细暂不可得</b>。
+{name} 当前价格现状如下 {ref('resblock')}{ref('chengjiao')}{ref('ershoufang')}：</p>
+{tx_missing_note}
 <ul>
-  <li><b>挂牌均价（在售）</b>：近 6 个月从 {list_first} 万/㎡ 至 {list_last} 万/㎡（最新），区间约 {list_lo}–{list_hi} 万/㎡。在售 {onsale} 套，总价范围 {price_lo}–{price_hi} 万。</li>
-  <li><b>成交均价</b>：近 6 个月在 {trans_lo}–{trans_hi} 万/㎡ 区间波动（最新 {trans_last} 万/㎡）；最新成交均价比挂牌均价低约 {gap_pct}%，一二手价差明显。</li>
+  <li><b>挂牌均价（在售）</b>：近 6 个月走势从 {list_first} 万/㎡ 至 {list_last} 万/㎡（最新）{f'，当前在售单价区间约 {list_lo}–{list_hi} 万/㎡' if list_lo != '—' and list_hi != '—' else ''}。在售 {onsale} 套，总价范围 {price_lo}–{price_hi} 万。</li>
+  <li><b>成交均价</b>：近 6 个月在 {trans_lo}–{trans_hi} 万/㎡ 区间波动（最新 {trans_last} 万/㎡）；{f'最新成交均价比挂牌均价低约 {gap_pct}%，一二手价差明显。' if trans_last != '—' and list_last != '—' else '成交数据暂不可得，无法计算一二手价差。'}</li>
   <li><b>成交量（流动性）</b>：近 6 月分别为 {vol_txt}——<b>{liquidity}</b>。</li>
   <li><b>学区</b>：{school_display or '（CLI 未返回学区字段，需联网核验对口学校，见 §6/§7）'}。</li>
 </ul>
 {_chart_block(timeline_svg, f"图：{name} 月度价格时间轴（蓝=挂牌 / 橙=成交，元/㎡）。"
- + (f"峰 {wan(peak['price'])}（{peak['date']}）/ 谷 {wan(valley['price'])}（{valley['date']}）" if peak and valley else "样本不足 2 个月，未标注峰谷"))}
+ + (f"峰 {wan(peak['price'])}（{peak['date']}）/ 谷 {wan(valley['price'])}（{valley['date']}）" if peak and valley else "成交/走势数据暂不可得，仅展示挂牌样本"))}
 <table class='d'>
 <tr><th>月份</th><th>挂牌均价(万/㎡)</th><th>环比</th><th>成交均价(万/㎡)</th><th>环比</th></tr>
 {price_rows}
 </table>
-<p class='note'>单价口径：成交单价=成交总价/建筑面积反算（官方 CLI 仅给总价+面积），或由平台挂牌直接给出；所有走势点来自官方 CLI 真实返回，非联网检索估算。样本不足 5 套的月份以空心点表示、不实线连接。</p>
+<p class='note'>单价口径：成交单价=成交总价/建筑面积反算（官方 CLI 仅给总价+面积），或由平台挂牌直接给出；当前成交与月度走势数据因 CLI 后端工具下架暂不可得，本模块不编造成交。样本不足 5 套的月份以空心点表示、不实线连接。</p>
 """
+    # 当前在售挂牌明细（贝壳官方 CLI search 真实数据，填补缺失的成交序列）
+    listings_html = ""
+    if beike.get("listings"):
+        _lr = ""
+        for _it in beike["listings"][:10]:
+            _lr += (f"<tr><td>{_it.get('date','')}</td>"
+                    f"<td>{_it.get('title','')}</td>"
+                    f"<td class='num'>{_it.get('totalPrice','')}万</td>"
+                    f"<td class='num'>{_it.get('price',0):.0f}元/㎡</td>"
+                    f"<td><a href='{_it.get('url','#')}' target='_blank' rel='noopener'>详情</a></td></tr>")
+        listings_html = (f"<h3 style='margin-top:18px'>当前在售挂牌（贝壳官方 CLI 真实，{len(beike['listings'])} 套）［{ref('ershoufang')}］</h3>"
+                         "<table class='d'><tr><th>挂牌日期</th><th>户型/面积</th><th>总价</th><th>单价</th><th>详情</th></tr>"
+                         + _lr + "</table>")
+    price_html = price_html + listings_html
+
     recent_html = ds.render_recent_transactions(
         rt, n=10, heading=f"{name} 最近成交（近 10 条，贝壳官方 CLI 真实成交）")
     detail_html = ds.render_transaction_details(
@@ -525,7 +565,7 @@ def build_analysis(community, city):
     # §11 操作建议
     advice_html = f"""
 <ul>
-  <li><b>建议价格带</b>：紧守 ≤ {wan(lat_trans) if lat_trans else '—'} 万/㎡ 单价（当前成交均价附近），避免追高挂牌高点房源；优先选满五唯一 / 近期降价 / 带车位房源省税。</li>
+  <li><b>建议价格带</b>：紧守 ≤ {wan(lat_trans) if lat_trans else (wan(lat_list) if lat_list else '—')} 万/㎡ 单价（参考近期成交/挂牌均价），避免追高挂牌高点房源；优先选满五唯一 / 近期降价 / 带车位房源省税。</li>
   <li><b>谈判抓手</b>：{liquidity}，议价空间大，可据最近成交明细（§2）压价。</li>
   <li><b>触发买入</b>：单价 ≤ 近期成交低位 且 学位核验无占用 + 落户年限达标 + 房户一致。</li>
   <li><b>触发放弃</b>：学位占用无法排除 / 落户年限不足 / 单价追高超出预算 / 政策进一步多校划片扩围。</li>

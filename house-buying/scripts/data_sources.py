@@ -1335,6 +1335,12 @@ def _parse_beike_text_payload(obj, city: str, tag: str):
     empty = ([], [], [], [], {}, "")
     if not isinstance(obj, dict):
         return empty[0], empty[1], empty[2], empty[3], empty[4], "CLI 返回非预期类型"
+    # 明确识别 CLI 后端工具下架/不可用（如 Unknown tool: 'house_sold_search'）
+    if obj.get("ok") is False:
+        err = obj.get("error") or ""
+        if "Unknown tool" in err:
+            return empty[0], empty[1], empty[2], empty[3], empty[4], f"CLI 后端已下架该工具（{err}）"
+        return empty[0], empty[1], empty[2], empty[3], empty[4], f"CLI 返回错误：{err}"
     data = obj.get("data")
     if not isinstance(data, str) or not data.strip():
         return empty[0], empty[1], empty[2], empty[3], empty[4], "CLI 返回无数据文本"
@@ -1462,17 +1468,23 @@ class BeikeCliSource(BaseSource):
                     seen.add((p.date, p.kind))
             history.sort(key=lambda p: p.date or "")
         ok = bool(listings or transactions or history)
+        # 识别官方 CLI 成交/行情工具被后端下架的场景，给出明确、不误导的降级说明
+        deprecated = [n for n in notes if "CLI 后端已下架该工具" in n]
+        deprecated_note = ""
+        if deprecated:
+            deprecated_note = " 注意：" + "；".join(deprecated) + "，真实成交明细与月度均价走势暂不可得。"
         # 全部命令失败 / 无可用数据：退回联网检索兜底（绝不编造）
         if not ok:
             res = self._fetch_websearch(community, district, city, months)
             res.mode = "cli_unavailable"
             res.tier = self.tier
             res.raw_note = (("CLI 调用无可用结果：" + " ".join(notes) + "\n")
-                            if notes else "") + res.raw_note
+                            if notes else "") + deprecated_note + res.raw_note
             return res
         raw_note = (f"官方CLI实时数据：挂牌 {len(listings)} 条，成交 "
                     f"{len(transactions)} 条，走势点 {len(history)} 个。"
-                    + (" ".join(notes) if notes else ""))
+                    + deprecated_note
+                    + (" ".join(n for n in notes if "CLI 后端已下架该工具" not in n) if notes else ""))
         return SourceFetchResult(
             source=self.name, community=community, city=city,
             listings=listings, transactions=transactions, history=history,
