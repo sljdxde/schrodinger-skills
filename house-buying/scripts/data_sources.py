@@ -2666,8 +2666,16 @@ def parse_manual_chengjiao(text: str) -> dict:
     txns: list = []
     errors: list = []
     if not text or not text.strip():
-        return {"transactions": [], "errors": ["空输入"]}
+        return {"transactions": [], "errors": ["空输入"], "source": ""}
     lines = text.strip().splitlines()
+    # 来源标注：文件首部以 `# 来源:` / `# source:` 注释声明数据来源
+    source = ""
+    for ln in lines:
+        s = ln.strip()
+        if s.startswith("#"):
+            m = re.match(r"#\s*(?:来源|source)\s*[:：]\s*(.+)", s, re.I)
+            if m:
+                source = m.group(1).strip()
     # 若是 Markdown 表格，提取数据行
     table_rows = []
     for ln in lines:
@@ -2702,7 +2710,7 @@ def parse_manual_chengjiao(text: str) -> dict:
                 txns.append(parsed)
             elif re.search(r"\d", s) and re.search(r"万|㎡|平|室", s):
                 errors.append("未解析：" + s)
-        return {"transactions": txns, "errors": errors}
+        return {"transactions": txns, "errors": errors, "source": source}
     # 逐行解析（普通文本）
     for ln in lines:
         s = ln.strip()
@@ -2713,7 +2721,7 @@ def parse_manual_chengjiao(text: str) -> dict:
             txns.append(parsed)
         elif re.search(r"\d", s) and re.search(r"万|㎡|平|室", s):
             errors.append("未解析：" + s)
-    return {"transactions": txns, "errors": errors}
+    return {"transactions": txns, "errors": errors, "source": source}
 
 
 def _parse_one_chengjiao(blob: str, explicit_date: str = "") -> Optional[dict]:

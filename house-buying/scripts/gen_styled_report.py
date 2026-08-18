@@ -158,7 +158,7 @@ def _load_city_policy(city):
 # --------------------------------------------------------------------------- #
 # 1) 构建分析数据（全章节；正文 HTML 在所有主题间保持完全相同）
 # --------------------------------------------------------------------------- #
-def build_analysis(community, city, manual_tx=None):
+def build_analysis(community, city, manual_tx=None, manual_source=""):
     ms = ds.multi_platform_search(community, "", city, 36, include_cross=True)
     beike = next(p for p in ms["platforms"] if p["source"].startswith("贝壳"))
 
@@ -179,8 +179,10 @@ def build_analysis(community, city, manual_tx=None):
     rt = ms["recent_transactions"]
     beike_tx = beike.get("transactions", [])
     manual_mode = bool(manual_tx)
+    # 录入来源标注：文件内 `# 来源:` 注释声明，缺省兜底为通用说明
+    src_label = manual_source or "用户录入（贝壳/链家 App / 小程序 / 网络检索转录）"
     if manual_mode:
-        # 用户手动录入的成交（来自贝壳/链家 App、小程序转录），覆盖空 CLI 成交
+        # 用户/网络检索录入的成交，覆盖空 CLI 成交
         beike_tx = manual_tx
 
     name = rb.get("name") or community
@@ -320,8 +322,8 @@ def build_analysis(community, city, manual_tx=None):
     add("resblock", f"贝壳·{name} 小区页（官方CLI resblock）",
         rb_url or "#", "小区档案", "官方CLI")
     if manual_mode:
-        chengjiao_label = "成交行情（用户手动录入，来源：贝壳/链家 App / 小程序）"
-        chengjiao_consistency = "手动录入"
+        chengjiao_label = f"成交行情（录入：{src_label}）"
+        chengjiao_consistency = "录入"
     elif beike_tx:
         chengjiao_label = "贝壳成交行情（chengjiao 实时）"
         chengjiao_consistency = "官方CLI"
@@ -444,12 +446,11 @@ def build_analysis(community, city, manual_tx=None):
     price_html = price_html + listings_html
 
     if manual_mode:
-        recent_heading = f"{name} 最近成交（用户手动录入，{len(beike_tx)} 条）"
-        recent_note = ("数据来源：用户手动录入（来自贝壳/链家 App 或小程序转录），无官方详情链接，"
+        recent_heading = f"{name} 最近成交（录入：{src_label}，{len(beike_tx)} 条）"
+        recent_note = (f"数据来源：{src_label}，非官方接口抓取，无详情链接，"
                        "请自行核验来源与价格。")
-        detail_heading = f"{name} 房屋成交详细信息（用户手动录入）"
-        detail_note = ("数据来源：用户手动录入（来自贝壳/链家 App 或小程序转录），字段以粘贴内容为准，"
-                       "请自行核验。")
+        detail_heading = f"{name} 房屋成交详细信息（录入：{src_label}）"
+        detail_note = (f"数据来源：{src_label}，字段以录入内容为准，请自行核验。")
     else:
         recent_heading = f"{name} 最近成交（近 10 条，贝壳官方 CLI 真实成交）"
         recent_note = None
@@ -700,6 +701,7 @@ def main():
             return
         res = ds.parse_manual_chengjiao(cp.read_text(encoding="utf-8"))
         manual_tx = res["transactions"]
+        manual_source = res.get("source", "")
         if res["errors"]:
             print("⚠️ 成交录入解析警告（不影响已识别记录）：")
             for e in res["errors"][:12]:
@@ -721,7 +723,8 @@ def main():
         if args.theme not in THEMES:
             print(f"✗ 未知主题：{args.theme}，可选：{', '.join(THEMES)}")
             return
-        a = build_analysis(args.community, args.city, manual_tx=manual_tx)
+        a = build_analysis(args.community, args.city, manual_tx=manual_tx,
+                        manual_source=manual_source)
         html = render_report_html(a, theme_key=args.theme)
         fn = f"{args.community}_报告.html"
         path = os.path.join(args.out, fn)
@@ -733,7 +736,8 @@ def main():
         return
 
     # 默认：生成全部候选
-    a = build_analysis(args.community, args.city, manual_tx=manual_tx)
+    a = build_analysis(args.community, args.city, manual_tx=manual_tx,
+                        manual_source=manual_source)
     written = []
     for key in THEMES:
         html = render_report_html(a, theme_key=key)
