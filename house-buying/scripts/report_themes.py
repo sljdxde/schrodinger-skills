@@ -29,6 +29,27 @@ DEFAULT_THEME = "warm"  # 默认皮肤改为 Warm Editorial（暖色调编辑风
 BASE_REPORT_CSS = """
 .cite-ref{font-size:.82em;vertical-align:super;font-weight:600;text-decoration:none}
 .cite-ref:hover{text-decoration:underline}
+/* 通用数据表（data_sources 渲染的 class='d'，6 套主题共用，靠主题变量自适应） */
+table.d{width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;
+  background:var(--surface,#fff);border:1px solid var(--line,#e3e3e3);
+  border-radius:var(--radius,8px);overflow:hidden}
+table.d th{text-align:left;background:var(--surface,#fff);color:var(--muted,#666);
+  font-weight:600;padding:10px 12px;border-bottom:2px solid var(--accent,#c96442)}
+table.d td{padding:10px 12px;border-bottom:1px solid var(--line,#e3e3e3);vertical-align:top}
+table.d tr:last-child td{border-bottom:none}
+table.d td.num,table.d .num{text-align:right;font-variant-numeric:tabular-nums}
+/* 小注（表格/板块下方说明） */
+.note{font-size:12.5px;color:var(--muted,#666);margin:10px 0 0;line-height:1.65}
+/* 图表容器（render_*_chart 经 _chart_block 包裹） */
+.chartbox{margin:18px 0;padding:14px;background:var(--surface,#fff);
+  border:1px solid var(--line,#e3e3e3);border-radius:var(--radius,8px)}
+.chartbox svg{display:block;width:100%;height:auto;margin:0}
+.caption{font-size:12.5px;color:var(--muted,#666);margin-top:10px;text-align:center;line-height:1.5}
+/* 成交明细 / 最近成交模块容器 */
+.tx-detail{margin:14px 0}
+.tx-detail .card{background:var(--surface,#fff);border:1px solid var(--line,#e3e3e3);
+  border-radius:var(--radius,8px);padding:14px 16px;margin:10px 0}
+.recent-tx h3{margin:18px 0 8px;font-size:17px}
 """
 
 # --------------------------------------------------------------------------- #

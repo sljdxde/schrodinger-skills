@@ -2,7 +2,7 @@
 name: house-buying
 name_zh: 学区房助手
 description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations. Also triggered by explicit requests to use the house-buying or 学区房助手 skill, or by natural-language phrases such as 请使用 house-buying 分析、分析学区房、买房值不值得、学区房是否值得买、购房分析、帮我看个房子.
-version: 1.6.8
+version: 1.6.9
 ---
 
 # 学区房助手（House Buying）
@@ -54,6 +54,7 @@ python scripts/update_self.py --apply
 7. 做价格预测：使用 `references/forecasting-framework.md`，先基于近 12-36 个月月度价格时间轴判断动量与波动区间，再输出基准/乐观/悲观三情景，分 6-12 个月、1-3 年、3-10 年给出区间和置信度。
 8. 形成结论：使用 `references/report-template.md`，先给结论，再给证据、风险、可执行建议和继续观察指标。
 9. 报告样式选择（首次生成报告前）：交付 HTML 报告时，**先让用户选视觉样式**，不要默认一种就发。参考 `awesome-claude-design` 的五大美学族系，内置 6 套可选主题（内容完全一致的同一份报告，仅 CSS 不同）：
+   - **【硬性约束】报告只能由脚本生成，禁止手搓 HTML**：最终 HTML 一律由 `python scripts/gen_styled_report.py --theme <key>`（或 `build_report.py --generate --input analysis.json --theme <key>`）产出；agent **不得**自行手写、拼接或从其他模板复制 HTML 报告——手搓产物既无主题化 CSS、也不满足自包含校验（缺 `[N]` 锚点 / 可能含外链 / 非 warm 默认风），一律视为无效交付。脚本跑通后用 present_files 直接展示其产出文件，**不要另写一份 HTML**。
    - `warm`（暖色编辑·Claude 风，默认皮肤）、`editorial`（极简编辑·Linear 风）、`cinematic`（电影暗黑·BMW 风）、`glass`（毛玻璃未来·Apple 风）、`data`（数据密集·PostHog 风）、`olive`（橄榄手记·经典，可选）。
    - **预览候选**：`python scripts/gen_styled_report.py`（生成 `output/<小区>_样式_{key}.html` 全部 5+1 套，展示给用户挑）。
    - **用户选定后**：`python scripts/gen_styled_report.py --theme <key>`（生成 `output/<小区>_报告.html` 最终版，并把偏好写入 `house-buying/.cache/report_theme.txt`）。后续报告默认沿用该偏好，可用 `--theme` 覆盖；通用装配 `python scripts/build_report.py --generate --input analysis.json --theme <key>` 同样支持。
