@@ -2497,7 +2497,8 @@ def _txn_layout_area(t: dict) -> str:
 
 
 def render_recent_transactions(transactions: list, n: int = 10,
-                               heading: str = "最近成交（近 10 条）") -> str:
+                               heading: str = "最近成交（近 10 条）",
+                               source_note: str = None) -> str:
     """生成「最近成交」HTML 表（真实详情 URL、单价/总价/面积/时间）。
 
     transactions 为成交行列表（dict，字段见 _beike_block_to_row / _build_result）：
@@ -2531,14 +2532,16 @@ def render_recent_transactions(transactions: list, n: int = 10,
         rows.append(
             f"<tr><td>{d}</td><td>{la}</td><td>{total_s}</td>"
             f"<td>{price_s}</td><td>{link}</td></tr>")
+    note = (source_note if source_note else
+            '数据来源：贝壳官方 CLI（buy sold）真实成交，详情链接指向 '
+            'ke.com 成交页；联网检索回填的成交需标注来源与访问时间。单价=总价/面积反算 '
+            '或平台直接给出。')
     return ('<div class="recent-tx">\n'
             f'<h3>{heading}</h3>\n<table class="tx-table">\n'
             "<thead><tr><th>成交时间</th><th>户型/面积</th><th>总价</th>"
             "<th>单价(元/㎡)</th><th>详情</th></tr></thead>\n<tbody>\n"
             + "\n".join(rows) + "\n</tbody>\n</table>\n"
-            '<p class="muted">数据来源：贝壳官方 CLI（buy sold）真实成交，详情链接指向 '
-            'ke.com 成交页；联网检索回填的成交需标注来源与访问时间。单价=总价/面积反算 '
-            '或平台直接给出。</p>\n</div>')
+            f'<p class="muted">{note}</p>\n</div>')
 
 
 def _tx_detail_escape(s):
@@ -2563,7 +2566,8 @@ def _tx_group_html(title: str, pairs) -> str:
 
 
 def render_transaction_details(transactions, n: int = 8,
-                               heading: str = "房屋成交详细信息（贝壳官方 CLI 全维度）") -> str:
+                               heading: str = "房屋成交详细信息（贝壳官方 CLI 全维度）",
+                               source_note: str = None) -> str:
     """生成「房屋成交详细信息」模块：逐条成交卡片，全量呈现 CLI 真实维度。
 
     与「最近成交近10条」表互补——该表只给价格/面积/时间概览，本模块展开每条成交的
@@ -2634,12 +2638,147 @@ def render_transaction_details(transactions, n: int = 8,
             f'<span class="tx-date">{date_s}</span>'
             f'<span class="tx-title">{title_s}</span>{link}</div>'
             f'<div class="tx-grid">{grid}</div></div>')
-    return ('<div class="tx-detail">\n<h3>' + heading + '</h3>\n'
-            + "\n".join(cards) + "\n"
-            '<p class="muted">数据来源：贝壳官方 CLI（buy sold）真实成交，详情链接指向 '
+    note = (source_note if source_note else
+            '数据来源：贝壳官方 CLI（buy sold）真实成交，详情链接指向 '
             'ke.com 成交页。议价空间=挂牌价与成交价之差（官方仅给总价+面积，'
             '单价=总价/面积反算）；朝向/楼型/楼层/装修/带看/关注等维度均来自 CLI 真实返回，'
-            '未返回的字段不展示，绝不编造。</p>\n</div>')
+            '未返回的字段不展示，绝不编造。')
+    return ('<div class="tx-detail">\n<h3>' + heading + '</h3>\n'
+            + "\n".join(cards) + "\n"
+            f'<p class="muted">{note}</p>\n</div>')
+
+
+def parse_manual_chengjiao(text: str) -> dict:
+    """解析用户手动粘贴的成交记录（贝壳/链家 App、小程序截图转录）。
+
+    轻量、零依赖：每行一条，字段顺序宽松，支持以下任意组合：
+      · 日期：2025-03-15 / 2025.3 / 2025年3月 / 202503
+      · 面积：89.2㎡ / 89.2平 / 89.2平方米
+      · 总价：300万 / 300w
+      · 单价：33000元/㎡ / 3.3万/㎡（可选，缺则按 总价/面积 反算）
+      · 户型：3室1厅(2卫) / 三室一厅
+      · 朝向/楼层：南 / 中楼层（可选）
+    也支持 Markdown 表格（表头含 日期/时间、面积、总价、单价、户型 之一）。
+    返回 {"transactions":[{...}], "errors":[str]}。解析失败的行进 errors。
+    解析出的记录结构与 CLI 成交一致（kind/date/title/totalPrice/price/area/
+    url/details），可直接喂给 render_recent_transactions / render_transaction_details。
+    """
+    txns: list = []
+    errors: list = []
+    if not text or not text.strip():
+        return {"transactions": [], "errors": ["空输入"]}
+    lines = text.strip().splitlines()
+    # 若是 Markdown 表格，提取数据行
+    table_rows = []
+    for ln in lines:
+        s = ln.strip()
+        if s.startswith("|") and s.endswith("|"):
+            cells = [c.strip() for c in s.strip("|").split("|")]
+            table_rows.append(cells)
+    if len(table_rows) >= 2:
+        header = [h.replace(" ", "") for h in table_rows[0]]
+        for row in table_rows[1:]:
+            if set("".join(row)) <= set("-: "):
+                continue
+            if len(row) != len(header):
+                continue
+            blob = " ".join(row)
+            parsed = _parse_one_chengjiao(blob,
+                                          (row[header.index("日期")] if "日期" in header else "")
+                                          or (row[header.index("时间")] if "时间" in header else ""))
+            if parsed:
+                txns.append(parsed)
+            else:
+                errors.append("表格行未解析：" + " | ".join(row))
+        # 混合输入：表格之外的纯文本行也尝试解析
+        for ln in lines:
+            s = ln.strip()
+            if s.startswith("|"):
+                continue
+            if not s or s.startswith("#"):
+                continue
+            parsed = _parse_one_chengjiao(s, "")
+            if parsed:
+                txns.append(parsed)
+            elif re.search(r"\d", s) and re.search(r"万|㎡|平|室", s):
+                errors.append("未解析：" + s)
+        return {"transactions": txns, "errors": errors}
+    # 逐行解析（普通文本）
+    for ln in lines:
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        parsed = _parse_one_chengjiao(s, "")
+        if parsed:
+            txns.append(parsed)
+        elif re.search(r"\d", s) and re.search(r"万|㎡|平|室", s):
+            errors.append("未解析：" + s)
+    return {"transactions": txns, "errors": errors}
+
+
+def _parse_one_chengjiao(blob: str, explicit_date: str = "") -> Optional[dict]:
+    """解析单条成交文本，返回成交 dict 或 None。"""
+    b = blob
+    # 日期
+    date = ""
+    if explicit_date:
+        dm = re.search(r"(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2}))?", explicit_date)
+        if dm:
+            date = f"{int(dm.group(1)):04d}-{int(dm.group(2)):02d}" + (
+                f"-{int(dm.group(3)):02d}" if dm.group(3) else "")
+    if not date:
+        dm = re.search(r"(\d{4})[-/.年](\d{1,2})(?:[-/.月](\d{1,2}))?", b)
+        if dm:
+            date = f"{int(dm.group(1)):04d}-{int(dm.group(2)):02d}" + (
+                f"-{int(dm.group(3)):02d}" if dm.group(3) else "")
+    if not date:
+        dm = re.search(r"(\d{4})(\d{2})(\d{2})", b)
+        if dm and 2000 <= int(dm.group(1)) <= 2100:
+            date = f"{dm.group(1)}-{dm.group(2)}-{dm.group(3)}"
+    if not date:
+        return None
+    # 面积
+    am = re.search(r"(\d+(?:\.\d+)?)\s*(?:㎡|平方米|平)", b)
+    area = float(am.group(1)) if am else None
+    # 总价（万）
+    tm = re.search(r"(\d+(?:\.\d+)?)\s*(?:万|w|W)", b)
+    total = float(tm.group(1)) if tm else None
+    # 单价（元/㎡）
+    pm = re.search(r"(\d{4,7})\s*(?:元/㎡|元每平|/㎡|元每平米)", b)
+    price = float(pm.group(1)) if pm else None
+    # 户型
+    lm = re.search(r"(\d+室\d+厅(?:\d*卫)?)", b)
+    layout = lm.group(1) if lm else ""
+    # 朝向
+    om = re.search(r"(东南|东北|西南|西北|南北|东西|[东南西北]向?)", b)
+    orient = om.group(1) if om else ""
+    # 楼层
+    fm = re.search(r"(低|中|高)楼层|(\d+)\s*楼|顶层|底层", b)
+    floor = fm.group(0) if fm else ""
+    if total is None:
+        return None  # 没有总价无法成记录
+    if price is None and area:
+        price = round(total * 10000 / area)
+    title_parts = [x for x in [layout, (f"{area:.1f}㎡" if area else ""),
+                               orient, floor] if x]
+    title = " ".join(title_parts) if title_parts else b[:24]
+    details = {
+        "deal_date": date,
+        "title": title,
+        "layout_info": (f"{layout} {area:.1f}㎡" if layout and area
+                        else (f"{area:.1f}㎡" if area else title)),
+        "community": "",
+    }
+    return {
+        "kind": "transaction",
+        "date": date,
+        "title": title,
+        "totalPrice": total,
+        "price": price,
+        "area": area,
+        "url": "",
+        "details": details,
+    }
 
 
 def beike_cli_setup_prompt() -> str:

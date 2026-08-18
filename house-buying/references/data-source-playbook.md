@@ -259,6 +259,8 @@ python scripts/data_sources.py school --school "某某小学" --city 上海 --bu
 3. **浏览器渲染通道（兜底）**：给对应源配置 `browser: true`、`cookie`、`headers`、`request_interval`，脚本先做浏览器化请求，拿不到时尝试本机已安装的 Playwright 渲染公开页面再解析。安装命令：`pip install playwright && playwright install chromium`（可选）。
 4. **联网检索通道（默认兜底）**：未配置 / 官方 CLI 不可用 / 调用失败时，脚本生成"精确到数据源与城市"的检索式，由 AI 代理用 WebSearch / WebFetch 取数后回填 `listings` / `transactions` / `history`。
 
+**成交数据的轻量获取（重要，保持 skill 轻量）**：贝壳 CLI 后端已下架 `buy sold` / `buy market`；纯网页渠道（链家/贝壳成交页验证码墙、透明售房网/房天下 JS 渲染、安居客/58 验证码墙）轻量抓取**均不可行**。浏览器渲染通道（通道 3）**不适用于成交类数据——不要挂 Playwright / CDP 等重方案**。正确做法（零依赖、合规、轻量）：请用户在贝壳/链家 App 或小程序复制近期成交记录粘贴，保存为 `output/chengjiao_<社区>.txt`（每行一条：日期 / 面积 / 总价 / 户型，字段顺序宽松；也支持 Markdown 表格），重跑 `python scripts/gen_styled_report.py --community <社区> --city <城市> --chengjiao output/chengjiao_<社区>.txt`。脚本经 `parse_manual_chengjiao()` 解析并标注「用户手动录入」，无详情链接、提示用户自行核验，绝不编造。此为成交数据唯一推荐的获取路径。
+
 ### 合规红线（法律风险，必读）
 
 取数通道的**首选是官方开放 API，而非个人抓包**。近年司法实践已明确边界：

@@ -158,7 +158,7 @@ def _load_city_policy(city):
 # --------------------------------------------------------------------------- #
 # 1) 构建分析数据（全章节；正文 HTML 在所有主题间保持完全相同）
 # --------------------------------------------------------------------------- #
-def build_analysis(community, city):
+def build_analysis(community, city, manual_tx=None):
     ms = ds.multi_platform_search(community, "", city, 36, include_cross=True)
     beike = next(p for p in ms["platforms"] if p["source"].startswith("贝壳"))
 
@@ -178,6 +178,10 @@ def build_analysis(community, city):
     hist = beike["history"]
     rt = ms["recent_transactions"]
     beike_tx = beike.get("transactions", [])
+    manual_mode = bool(manual_tx)
+    if manual_mode:
+        # 用户手动录入的成交（来自贝壳/链家 App、小程序转录），覆盖空 CLI 成交
+        beike_tx = manual_tx
 
     name = rb.get("name") or community
     xiaoqu_id = rb.get("xiaoqu_id") or ""
@@ -315,9 +319,16 @@ def build_analysis(community, city):
 
     add("resblock", f"贝壳·{name} 小区页（官方CLI resblock）",
         rb_url or "#", "小区档案", "官方CLI")
-    chengjiao_label = ("贝壳成交行情（chengjiao 实时）" if beike_tx
-                       else "贝壳成交行情（chengjiao；CLI 后端已下架 sold 工具，暂不可得）")
-    add("chengjiao", chengjiao_label, chengjiao_url, "成交", "官方CLI")
+    if manual_mode:
+        chengjiao_label = "成交行情（用户手动录入，来源：贝壳/链家 App / 小程序）"
+        chengjiao_consistency = "手动录入"
+    elif beike_tx:
+        chengjiao_label = "贝壳成交行情（chengjiao 实时）"
+        chengjiao_consistency = "官方CLI"
+    else:
+        chengjiao_label = "贝壳成交行情（chengjiao；CLI 后端已下架 sold 工具，暂不可得）"
+        chengjiao_consistency = "官方CLI"
+    add("chengjiao", chengjiao_label, chengjiao_url, "成交", chengjiao_consistency)
     add("ershoufang", "贝壳在售行情（ershoufang 实时）", ershoufang_url, "挂牌", "官方CLI")
     for i, t in enumerate(beike_tx[:2]):
         u = t.get("url")
@@ -384,18 +395,28 @@ def build_analysis(community, city):
     # §2 交易与价格（含月度时间轴 + 图表 + 最近成交 + 成交详细信息）
     tx_missing_note = ("" if beike_tx else
         "<p class='note' style='border-left:4px solid var(--accent);padding-left:10px;'>"
-        "<b>真实成交明细暂不可得</b>：贝壳 CLI 后端已下架 <code>buy sold</code> / <code>buy market</code> 工具，"
-        "无法拉取近期真实成交记录与月度均价走势。下方成交均价、成交量字段显示为“—/暂无”，"
-        "价格判断主要依赖当前在售挂牌与小区档案；如需真实成交，可等贝壳恢复接口，或通过本机已登录 Chrome CDP 抓取链家/贝壳成交页（需另配）。"
+        "<b>真实成交明细暂不可得</b>：贝壳 CLI 后端已下架 <code>buy sold</code> / <code>buy market</code> 工具；"
+        "纯网页渠道轻量抓取也不可行（链家/贝壳成交页验证码墙、透明售房网纯前端渲染、"
+        "房天下 JS 空壳、安居客/58 验证码墙）。如需真实成交用于砍价，请在贝壳/链家 App 或小程序中"
+        "复制近期成交记录粘贴给本助手，重跑时加 <code>--chengjiao 成交.txt</code>，"
+        "将以「用户手动录入」真实呈现（无官方详情链接，请自行核验来源）。"
         "</p>")
+    if manual_mode:
+        tx_status_line = (f"已录入用户手动成交 {len(beike_tx)} 条（来自贝壳/链家 App / 小程序转录），"
+                          f"作为真实成交参考；月度成交均价序列仍因 CLI 工具下架暂不可得。")
+    elif beike_tx:
+        tx_status_line = "buy sold 实时成交（贝壳官方 CLI）。"
+    else:
+        tx_status_line = ("buy market / buy sold 工具已被 CLI 后端下架，真实成交明细暂不可得"
+                          "（纯网页渠道轻量抓取亦不可行，见下方说明）。")
     price_html = f"""
 <p>基于贝壳官方 CLI（buy search / buy resblock）实时返回的挂牌与小区档案数据；
-<b>buy market / buy sold 工具已被 CLI 后端下架，真实成交明细暂不可得</b>。
+<b>{tx_status_line}</b>
 {name} 当前价格现状如下 {ref('resblock')}{ref('chengjiao')}{ref('ershoufang')}：</p>
 {tx_missing_note}
 <ul>
   <li><b>挂牌均价（在售）</b>：近 6 个月走势从 {list_first} 万/㎡ 至 {list_last} 万/㎡（最新）{f'，当前在售单价区间约 {list_lo}–{list_hi} 万/㎡' if list_lo != '—' and list_hi != '—' else ''}。在售 {onsale} 套，总价范围 {price_lo}–{price_hi} 万。</li>
-  <li><b>成交均价</b>：近 6 个月在 {trans_lo}–{trans_hi} 万/㎡ 区间波动（最新 {trans_last} 万/㎡）；{f'最新成交均价比挂牌均价低约 {gap_pct}%，一二手价差明显。' if trans_last != '—' and list_last != '—' else '成交数据暂不可得，无法计算一二手价差。'}</li>
+  <li><b>成交均价</b>：近 6 个月在 {trans_lo}–{trans_hi} 万/㎡ 区间波动（最新 {trans_last} 万/㎡）；{f'最新成交均价比挂牌均价低约 {gap_pct}%，一二手价差明显。' if trans_last != '—' and list_last != '—' else ('已录入用户手动成交 ' + str(len(beike_tx)) + ' 条，见下方「最近成交」列表；月度均价序列仍不可得，无法计算一二手价差。' if manual_mode else '成交数据暂不可得，无法计算一二手价差。')}</li>
   <li><b>成交量（流动性）</b>：近 6 月分别为 {vol_txt}——<b>{liquidity}</b>。</li>
   <li><b>学区</b>：{school_display or '（CLI 未返回学区字段，需联网核验对口学校，见 §6/§7）'}。</li>
 </ul>
@@ -422,10 +443,23 @@ def build_analysis(community, city):
                          + _lr + "</table>")
     price_html = price_html + listings_html
 
+    if manual_mode:
+        recent_heading = f"{name} 最近成交（用户手动录入，{len(beike_tx)} 条）"
+        recent_note = ("数据来源：用户手动录入（来自贝壳/链家 App 或小程序转录），无官方详情链接，"
+                       "请自行核验来源与价格。")
+        detail_heading = f"{name} 房屋成交详细信息（用户手动录入）"
+        detail_note = ("数据来源：用户手动录入（来自贝壳/链家 App 或小程序转录），字段以粘贴内容为准，"
+                       "请自行核验。")
+    else:
+        recent_heading = f"{name} 最近成交（近 10 条，贝壳官方 CLI 真实成交）"
+        recent_note = None
+        detail_heading = f"{name} 房屋成交详细信息（贝壳官方 CLI 全维度）"
+        detail_note = None
     recent_html = ds.render_recent_transactions(
-        rt, n=10, heading=f"{name} 最近成交（近 10 条，贝壳官方 CLI 真实成交）")
+        beike_tx if manual_mode else rt, n=10, heading=recent_heading,
+        source_note=recent_note)
     detail_html = ds.render_transaction_details(
-        beike_tx, n=8, heading=f"{name} 房屋成交详细信息（贝壳官方 CLI 全维度）")
+        beike_tx, n=8, heading=detail_heading, source_note=detail_note)
 
     # §3 市场供需与热度
     heat_html = f"""
@@ -643,6 +677,9 @@ def main():
     ap.add_argument("--from-cache", action="store_true",
                     help="用本地缓存的真实原始数据生成（CLI 临时故障兜底；"
                          "缓存位于 .cache/beike_probe/）")
+    ap.add_argument("--chengjiao", default="",
+                    help="用户手动录入的成交记录文件（.txt，每行一条或 Markdown 表格），"
+                         "来自贝壳/链家 App 或小程序转录；将以「用户手动录入」真实呈现")
     args = ap.parse_args()
 
     if args.list:
@@ -653,6 +690,21 @@ def main():
         return
 
     os.makedirs(args.out, exist_ok=True)
+
+    # 解析用户手动录入的成交（轻量、零依赖；纯网页抓取不可行时的真实成交来源）
+    manual_tx = None
+    if args.chengjiao:
+        cp = Path(args.chengjiao)
+        if not cp.exists():
+            print(f"✗ 成交录入文件不存在：{args.chengjiao}")
+            return
+        res = ds.parse_manual_chengjiao(cp.read_text(encoding="utf-8"))
+        manual_tx = res["transactions"]
+        if res["errors"]:
+            print("⚠️ 成交录入解析警告（不影响已识别记录）：")
+            for e in res["errors"][:12]:
+                print("   -", e)
+        print(f"✓ 已解析用户手动成交 {len(manual_tx)} 条（来自 {args.chengjiao}）")
 
     if args.from_cache:
         missing = [c for c in ("sold", "search", "market", "resblock")
@@ -669,7 +721,7 @@ def main():
         if args.theme not in THEMES:
             print(f"✗ 未知主题：{args.theme}，可选：{', '.join(THEMES)}")
             return
-        a = build_analysis(args.community, args.city)
+        a = build_analysis(args.community, args.city, manual_tx=manual_tx)
         html = render_report_html(a, theme_key=args.theme)
         fn = f"{args.community}_报告.html"
         path = os.path.join(args.out, fn)
@@ -681,7 +733,7 @@ def main():
         return
 
     # 默认：生成全部候选
-    a = build_analysis(args.community, args.city)
+    a = build_analysis(args.community, args.city, manual_tx=manual_tx)
     written = []
     for key in THEMES:
         html = render_report_html(a, theme_key=key)
