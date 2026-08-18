@@ -38,7 +38,10 @@ from __future__ import annotations
 import argparse
 import html as html_lib
 import json
+import os
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -73,6 +76,181 @@ def normalize_month(raw) -> str:
     if m:
         return f"{m.group(1)}-{int(m.group(2)):02d}"
     return s[:7]
+
+
+# --------------------------------------------------------------------------- #
+# 贝壳官方 CLI 接入（LianjiaTech/beike-ai-platform）
+# --------------------------------------------------------------------------- #
+# 贝壳提供官方 CLI 工具 `beike`（需登录获取 API Key 并 `beike auth <KEY> --save`）。
+# 安装：curl -fsSL https://raw.githubusercontent.com/LianjiaTech/beike-ai-platform/master/cli/releases/install.sh | bash
+# 这是 skill 接入「真实平台数据」的首选合规通道：返回结构化 JSON（默认单行），
+# 而非抓取页面，避免反爬风险与编造。未安装 / 未鉴权时自动退回联网检索（绝不编造数据）。
+BEIKE_CLI_BIN = "beike"
+BEIKE_KEY_FILE = Path.home() / ".beike" / "BEIKE_MCP_API_KEY"
+BEIKE_INSTALL_HINT = (
+    "未检测到贝壳官方 CLI 或未鉴权，已退回联网检索模式（不会用 CLI 编造数据）。\n"
+    "  1) 安装：curl -fsSL "
+    "https://raw.githubusercontent.com/LianjiaTech/beike-ai-platform/master/cli/releases/install.sh | bash\n"
+    "  2) 获取 Key：https://building.ke.com/?action=get-key&source=house-buying\n"
+    "  3) 保存：beike auth <YOUR_API_KEY> --save\n"
+    "详情见 references/data-source-playbook.md「贝壳官方 CLI」章节。"
+)
+
+
+def beike_cli_available() -> bool:
+    """本机是否安装了贝壳 CLI 且已保存 API Key。"""
+    if shutil.which(BEIKE_CLI_BIN) is None:
+        return False
+    if os.environ.get("BEIKE_MCP_API_KEY"):
+        return True
+    return BEIKE_KEY_FILE.is_file()
+
+
+def _json_extract_all(text: str) -> list:
+    """从文本中贪心抽取所有顶层 JSON 对象/数组（兼容 CLI 多段 JSON 拼接输出）。
+
+    贝壳 CLI 的 `buy search` 等命令会一次性返回多段 `{"data": ...}` JSON（例如
+    先 房源 子查询、再 新房 子查询），直接 json.loads 整段会因「Extra data」失败。
+    这里用原始解码器顺序抽取，返回所有解析成功的 dict/list。
+    """
+    out: list = []
+    i = 0
+    n = len(text)
+    dec = json.JSONDecoder()
+    while i < n:
+        # 跳过空白
+        while i < n and text[i] in " \r\n\t":
+            i += 1
+        if i >= n:
+            break
+        try:
+            obj, end = dec.raw_decode(text, i)
+            out.append(obj)
+            i = end
+        except (json.JSONDecodeError, ValueError):
+            # 当前位置无法解析：跳过 1 个字符，避免死循环
+            i += 1
+    return out
+
+
+def _run_beike_cli(args: list, timeout: int = 30) -> dict:
+    """执行 `beike <args>`，返回解析后的 JSON；失败抛异常（由调用方兜底）。
+
+    返回「含 data 字段且 data 最长」的那一个顶层对象——`buy search` 等多子查询
+    命令会拼接返回多段 JSON，房源结果段的 data 通常最长、信息最全。
+    """
+    if shutil.which(BEIKE_CLI_BIN) is None:
+        raise RuntimeError("beike CLI 未安装")
+    cmd = [BEIKE_CLI_BIN] + [str(a) for a in args]
+    # 官方 CLI 默认返回友好纯文本；加 --json 才返回结构化 JSON（供程序解析）。
+    # 不加 --json 会导致解析失败、错误退回检索，故始终强制补上（除非已显式指定）。
+    if "--json" not in cmd and "--pretty" not in cmd:
+        cmd.append("--json")
+    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"beike 退出码 {proc.returncode}：{(proc.stderr or '').strip()[:300]}")
+    out = (proc.stdout or "").strip()
+    if not out:
+        raise RuntimeError(f"beike 无输出：{(proc.stderr or '').strip()[:300]}")
+    try:
+        objs = _json_extract_all(out)
+    except Exception as exc:  # 极端兜底
+        raise RuntimeError(f"beike 输出非 JSON（前200字）：{out[:200]}") from exc
+    if not objs:
+        raise RuntimeError(f"beike 输出无可解析 JSON（前200字）：{out[:200]}")
+    data_objs = [o for o in objs if isinstance(o, dict) and isinstance(o.get("data"), str)]
+    if not data_objs:
+        # 退而求其次：返回第一个 dict
+        for o in objs:
+            if isinstance(o, dict):
+                return o
+        raise RuntimeError(f"beike 输出无结构化对象（前200字）：{out[:200]}")
+    # 取 data 最长的对象（房源结果段信息最全）
+    return max(data_objs, key=lambda o: len(o.get("data", "")))
+
+
+def _beike_first(item: dict, keys) -> Optional[str]:
+    for k in keys:
+        v = item.get(k)
+        if v not in (None, "", []):
+            return str(v)
+    return None
+
+
+def _beike_item_to_row(item: dict) -> Optional[dict]:
+    """把一条贝壳 CLI 记录映射成 _build_result 可消费的规范行。
+
+    只抽取真实存在的字段；无法得到单价（元/㎡）则无法进入价格证据链，直接丢弃（不编造）。
+    成交/挂牌记录常只给「总价(万)+面积(㎡)」，按 元/㎡ = 总价*10000/面积 反算单价，
+    确保近期成交记录（house-buying 最看重的价格证据）也能进入证据链。
+    """
+    if not isinstance(item, dict):
+        return None
+    unit = BaseSource._to_float(
+        item.get("unitPrice") or item.get("pricePerSqm")
+        or item.get("unit_price") or item.get("price_per_sqm")
+        or item.get("price")
+    )
+    total = BaseSource._to_float(
+        item.get("totalPrice") or item.get("total_price") or item.get("total"))
+    area = BaseSource._to_float(
+        item.get("area") or item.get("buildArea") or item.get("build_area")
+        or item.get("square"))
+    # 成交/挂牌只给 总价+面积 时，反算单价（万→元/㎡）
+    if unit is None and total is not None and area not in (None, 0):
+        unit = (total * 10000.0) / area
+    if unit is None:
+        return None
+    t = str(item.get("type") or item.get("tradeType") or item.get("status")
+            or item.get("dealType") or "").lower()
+    kind = "transaction" if ("sold" in t or "deal" in t or "trans" in t
+                             or "成交" in t or "已售" in t) else "listing"
+    return {
+        # 进入价格证据链的字段（约定：price=元/㎡，totalPrice=万）
+        "price": unit,
+        "totalPrice": total,
+        "area": area,
+        "kind": kind,
+        "date": item.get("dealDate") or item.get("deal_date") or "",
+        # 明细字段：供真实 URL 引用与展示，不进入价格计算
+        "title": _beike_first(item, ["title", "communityName",
+                                      "estateName", "name"]),
+        "communityName": _beike_first(item, ["communityName", "estateName",
+                                             "community", "title"]),
+        "district": _beike_first(item, ["districtName", "areaName",
+                                        "region", "district"]),
+        "url": _beike_first(item, ["url", "detailUrl", "detail_url",
+                                   "houseUrl", "link"]),
+        "cover": _beike_first(item, ["cover", "image", "imgUrl",
+                                     "photo", "coverUrl"]),
+    }
+
+
+def _parse_beike_cli_payload(obj) -> tuple:
+    """解析贝壳 CLI 返回的 JSON。返回 (rows, note)。
+
+    对未知结构保持防御：返回空列表 + 说明，绝不抛异常、绝不编造。
+    """
+    rows: list = []
+    note = ""
+    if not isinstance(obj, (dict, list)):
+        return rows, "CLI 返回非预期类型，已退回检索"
+    arr = BaseSource._extract_rows(obj) if isinstance(obj, dict) else list(obj)
+    if not arr:
+        # 部分 CLI 把列表放在别的键
+        for k in ("listings", "houses", "housesList", "sellList", "results"):
+            v = obj.get(k) if isinstance(obj, dict) else None
+            if isinstance(v, list) and v:
+                arr = v
+                break
+    for it in arr:
+        row = _beike_item_to_row(it)
+        if row is not None:
+            rows.append(row)
+    if not rows:
+        note = "CLI 返回结构无法解析为房源记录（字段名不匹配），已退回联网检索"
+    return rows, note
 
 
 # --------------------------------------------------------------------------- #
@@ -169,9 +347,10 @@ class SourceFetchResult:
     queries: list = field(default_factory=list)
     raw_note: str = ""
     confidence: str = "low"
-    mode: str = "websearch"  # api / websearch
+    mode: str = "websearch"  # api / websearch / cli / cli_unavailable
     months: int = 36
     tier: str = "T3"  # 数据源分级 T0/T1/T1.5/T2/T3/T4
+    extra: dict = field(default_factory=dict)  # 平台专属载荷（如 CLI 明细列表/查询词）
 
     def to_dict(self) -> dict:
         return {
@@ -187,6 +366,7 @@ class SourceFetchResult:
             "mode": self.mode,
             "months": self.months,
             "tier": self.tier,
+            "extra": self.extra,
         }
 
 # --------------------------------------------------------------------------- #
@@ -624,6 +804,18 @@ class BeikeSource(WebSource):
     provides = "both"
     tier = "T0"
 
+    def fetch(self, community: str, district: str = "",
+              city: Optional[str] = None, months: int = 36) -> SourceFetchResult:
+        # 优先走贝壳官方 CLI（真实结构化数据）；不可用则退回 endpoint/websearch
+        city = city or self.city
+        if beike_cli_available():
+            try:
+                return BeikeCliSource(city=city).fetch(
+                    community, district, city, months)
+            except Exception:
+                pass
+        return super().fetch(community, district, city, months)
+
     def search_queries(self, community: str, district: str, city: str = "杭州",
                        months: int = 36) -> list:
         c = f"{district} " if district else ""
@@ -706,6 +898,590 @@ class WoaiwojiaSource(WebSource):
             raw_note=raw_note,
             confidence="high" if rows else "low",
             mode="api", months=months,
+        )
+
+
+# --------------------------------------------------------------------------- #
+# 贝壳官方 CLI 真实输出解析（适配 beike v0.2.x 半结构化文本）
+# --------------------------------------------------------------------------- #
+# 说明：beike CLI `--json` 返回的不是干净列表 JSON，而是 `{"data": "<长文本>"}`，
+# data 是 XML/Markdown 混合的半结构化文本：每个房源用 `<房源ID>` 标签包裹、内部
+# 嵌一段 JSON 片段；价格/小区信息是中文字符串（如「总价899万，单价52595元/平米」）。
+# 以下解析器从文本抽取真实房源/小区实体，并用真实房源ID构造 ke.com 详情 URL。
+# 防御式：解析不出任何实体返回空，绝不抛异常、绝不编造。
+
+# 主要城市 ke.com 拼音缩写（构造真实详情 URL 用；未覆盖城市不构造 URL）
+CITY_PINYIN = {
+    "北京": "bj", "上海": "sh", "广州": "gz", "深圳": "sz", "成都": "cd",
+    "杭州": "hz", "武汉": "wh", "南京": "nj", "苏州": "su", "重庆": "cq",
+    "天津": "tj", "西安": "xa", "宁波": "nb", "无锡": "wx", "佛山": "fs",
+    "珠海": "zh", "厦门": "xm", "长沙": "cs", "郑州": "zz", "青岛": "qd",
+    "大连": "dl", "沈阳": "sy", "济南": "jn", "合肥": "hf", "昆明": "km",
+    "贵阳": "gy", "南宁": "nn", "海口": "hk", "南昌": "nc", "福州": "fz",
+    "东莞": "dg", "石家庄": "sjz", "哈尔滨": "hrb", "长春": "cc", "太原": "ty",
+    "兰州": "lz", "乌鲁木齐": "wlmq", "呼和浩特": "huh", "银川": "yc",
+    "西宁": "xn", "拉萨": "ls",
+}
+
+
+def _beike_city_py(city: str) -> Optional[str]:
+    return CITY_PINYIN.get((city or "").strip())
+
+
+_NUM = r"(\d+(?:\.\d+)?)"
+
+
+def _beike_extract_blocks(data: str) -> list:
+    """从 data 文本抽取所有 `<标识>\\n{JSON}\\n</标识>` 区块，返回 [(标识, dict)]。"""
+    blocks: list = []
+    for m in re.finditer(r"<([^/>]+)>\s*\n?\s*(\{.*?\})\s*\n?\s*</\1>", data,
+                         re.DOTALL):
+        ident = m.group(1).strip()
+        try:
+            d = json.loads(m.group(2))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(d, dict):
+            blocks.append((ident, d))
+    return blocks
+
+
+def _beike_price_from_text(text: str):
+    """从价格文本提取 (总价万, 单价元/㎡)。
+
+    兼容多种真实写法：
+    - 摘要信息式：「总价520万，单价58000元/平米」
+    - 基本信息式成交：「成交价格315万」/「挂牌价格335万」/ 裸「315万」
+    - 其它：带标签的「成交价/挂牌价 X万」
+    """
+    if not text:
+        return None, None
+    total = None
+    unit = None
+    mt = re.search(r"(?:总价|成交价格|挂牌价格|成交价|挂牌价)?\s*"
+                   + _NUM + r"\s*万", text)
+    if mt:
+        total = float(mt.group(1))
+    mu = re.search(r"单价\s*" + _NUM + r"\s*元/平米", text)
+    if mu:
+        unit = float(mu.group(1))
+    return total, unit
+
+
+def _beike_normalize_date(s: str) -> str:
+    """把真实 CLI 的多种日期写法归一为 YYYY-MM / YYYY-MM-DD。
+
+    - 点分隔成交日期：「2026.04.26」->「2026-04-26」
+    - 短横/连字符：「2026-07-15」「2026/07」
+    - 中文：「2026年7月15日」「2026年7月」
+    无法识别原样返回（绝不编造）。
+    """
+    if not s:
+        return ""
+    s = str(s).strip()
+    m = re.search(r"(\d{4})\.(\d{1,2})\.(\d{1,2})", s)
+    if m:
+        return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+    m = re.search(r"(\d{4})-(\d{1,2})(?:-(\d{1,2}))?", s)
+    if m:
+        base = f"{m.group(1)}-{int(m.group(2)):02d}"
+        return base + (f"-{int(m.group(3)):02d}" if m.group(3) else "")
+    m = re.search(r"(\d{4})年(\d{1,2})月(?:(\d{1,2})日)?", s)
+    if m:
+        base = f"{m.group(1)}-{int(m.group(2)):02d}"
+        return base + (f"-{int(m.group(3)):02d}" if m.group(3) else "")
+    return s
+
+
+def _beike_community_from_title(title) -> Optional[str]:
+    """从房源标题前缀抽小区名：「德信银树湾 2室2厅 89.4㎡」->「德信银树湾」。"""
+    if not title:
+        return None
+    t = str(title).strip()
+    m = re.search(r"^(.+?)\s+\d+室", t)
+    if m:
+        return m.group(1).strip()
+    m2 = re.search(r"^(\S+)", t)
+    return m2.group(1).strip() if m2 else None
+
+
+def _beike_xiaoqu_id_from_text(*texts) -> Optional[str]:
+    """从任意文本里抽小区ID（「小区ID:1811044432792」/「小区ID 1811044432792」）。"""
+    for t in texts:
+        if not t:
+            continue
+        m = re.search(r"小区ID[:：]?\s*([0-9A-Za-z]+)", str(t))
+        if m:
+            return m.group(1)
+    return None
+
+
+def _beike_listing_date_from_text(s: str) -> str:
+    """挂牌/在售记录无成交日期时，从「房源动态」取最近一次调价日（点分隔）。"""
+    if not s:
+        return ""
+    dates = re.findall(r"(\d{4})\.(\d{2})\.(\d{2})", str(s))
+    if dates:
+        y, mo, d = dates[-1]  # 最近一次调价
+        return f"{y}-{mo}-{d}"
+    return ""
+
+
+def _beike_area_from_text(*texts):
+    for t in texts:
+        if not t:
+            continue
+        ma = re.search(r"建筑面积\s*" + _NUM + r"\s*㎡", t)
+        if ma:
+            return float(ma.group(1))
+        ma2 = re.search(_NUM + r"\s*㎡", t)
+        if ma2:
+            return float(ma2.group(1))
+    return None
+
+
+def _beike_block_details(ident, d: dict, city: str, tag: str) -> dict:
+    """抽取单房源块的全部真实维度，供「房屋成交详细信息」模块全量呈现。
+
+    返回规范化字典：所有字段均来自 CLI 真实返回，缺失即为空串/None，绝不编造。
+    键命名与 CLI 字段语义一致，便于渲染层按需取用（sold/search 各异）。
+    """
+    info = (d.get("基本信息") if isinstance(d.get("基本信息"), dict)
+            else (d.get("摘要信息") if isinstance(d.get("摘要信息"), dict) else d))
+    det: dict = {"tag": tag}
+    det["hid"] = str(info.get("房源ID") or d.get("房源ID") or ident)
+    det["xiaoqu_id"] = (info.get("小区ID") or d.get("小区ID")
+                        or _beike_xiaoqu_id_from_text(info.get("小区信息"),
+                                                      d.get("小区信息")) or "")
+    det["community"] = (_beike_community_from_title(info.get("小区信息"))
+                        or info.get("小区名称") or d.get("小区名") or d.get("小区名称")
+                        or _beike_community_from_title(info.get("房源名称")
+                                                       or info.get("房源标题")) or "")
+    det["title"] = (info.get("房源名称") or info.get("房源标题")
+                    or d.get("房源标题") or "")
+    py = _beike_city_py(city)
+    if tag == "sold":
+        det["url"] = f"https://{py}.ke.com/chengjiao/{det['hid']}.html" if py else None
+    else:
+        det["url"] = f"https://{py}.ke.com/ershoufang/{det['hid']}.html" if py else None
+    if tag == "sold":
+        tp, _ = _beike_price_from_text(info.get("成交价格") or "")
+        lp, _ = _beike_price_from_text(info.get("挂牌价格") or "")
+        det["deal_price_wan"] = tp
+        det["list_price_wan"] = lp
+        det["deal_date"] = _beike_normalize_date(info.get("成交日期") or "")
+        det["deal_cycle"] = info.get("成交周期") or ""
+        det["followers"] = info.get("关注人数") or ""
+        det["total_visits"] = info.get("总带看次数") or ""
+        det["orientation"] = info.get("朝向") or ""
+        det["ownership"] = info.get("权属") or ""
+        det["building_type"] = info.get("楼型") or ""
+        det["floor"] = info.get("楼层") or ""
+        det["usage"] = info.get("用途") or ""
+        det["elevator"] = info.get("电梯") or ""
+        det["decoration"] = info.get("装修") or ""
+        det["era"] = info.get("年代") or ""
+    elif tag == "search":
+        det["price_info"] = info.get("价格信息") or ""
+        det["trade_info"] = info.get("交易信息") or ""
+        det["location_traffic"] = info.get("区位交通") or ""
+        det["building_info"] = info.get("单元楼栋信息") or ""
+        det["same_layout_market"] = info.get("同小区同居室成交行情") or ""
+        det["school"] = info.get("学区信息") or ""
+        det["community_info"] = info.get("小区信息") or ""
+        det["layout_info"] = info.get("户型信息") or ""
+        det["highlights"] = info.get("房源亮点") or ""
+        det["dynamics"] = info.get("房源动态") or ""
+        det["status"] = info.get("房源售卖状态") or ""
+        det["floor_info"] = info.get("房源所在楼层信息") or ""
+    return det
+
+
+def _beike_block_to_row(ident, d: dict, city: str, tag: str) -> Optional[dict]:
+    """把单个房源 JSON 块映射成规范行（真实字段 + 真实详情 URL）。
+
+    兼容真实 CLI 的两种块结构：
+    - `sold` 成交：字段嵌套在 d["基本信息"] 下
+      （成交价格(万)/挂牌价格(万)/成交日期(点分隔)/房源名称(含户型面积)/小区ID ...
+       关注人数/总带看次数/成交周期/朝向/权属/楼型/楼层/用途/电梯/装修/年代）
+    - `search` 挂牌：字段嵌套在 d["摘要信息"] 下
+      （价格信息/房源标题/房源ID/小区信息(含小区ID)/户型信息/房源售卖状态/
+       学区信息/交易信息/单元楼栋信息/同小区同居室成交行情/房源亮点/房源动态/
+       房源所在楼层信息/区位交通）
+    - 旧式/兜底：字段直接位于顶层。
+    只抽取真实存在的字段；无法得到出售单价（元/㎡）的出售块直接丢弃（不编造）。
+    成交/挂牌只给「总价(万)+面积(㎡)」时，按 元/㎡ = 总价*10000/面积 反算单价。
+    所有真实维度另存于返回的 details 字典，供「房屋成交详细信息」模块全量呈现。
+    """
+    info = (d.get("基本信息") if isinstance(d.get("基本信息"), dict)
+            else (d.get("摘要信息") if isinstance(d.get("摘要信息"), dict) else d))
+    # 总价：成交价优先(sold)；否则挂牌价(listing)
+    if tag == "sold":
+        total_text = (info.get("成交价格") or info.get("成交价")
+                      or d.get("价格信息") or "")
+    else:
+        total_text = (info.get("挂牌价格") or info.get("成交价格")
+                      or info.get("价格信息") or d.get("价格信息") or "")
+    total, unit = _beike_price_from_text(total_text)
+    # 面积：出售用「建筑面积」或标题内面积
+    area = _beike_area_from_text(
+        info.get("房源名称"), info.get("房源标题"), d.get("房源标题"),
+        info.get("户型信息"), d.get("户型信息"))
+    if unit is None and total is not None and area:
+        unit = total * 10000.0 / area  # 仅总价+面积时反算单价
+    if unit is None:
+        return None  # 无单价无法进价格证据链
+    hid = str(info.get("房源ID") or d.get("房源ID") or ident)
+    title = (info.get("房源名称") or info.get("房源标题")
+             or d.get("房源标题") or d.get("标题"))
+    py = _beike_city_py(city)
+    if tag == "sold":
+        url = (f"https://{py}.ke.com/chengjiao/{hid}.html" if py else None)
+    else:
+        url = (f"https://{py}.ke.com/ershoufang/{hid}.html" if py else None)
+    # 小区名：房源标题前缀 > 小区信息串前缀 > 小区名称字段
+    community = (_beike_community_from_title(title)
+                 or _beike_community_from_title(info.get("小区信息"))
+                 or info.get("小区名称") or d.get("小区名") or d.get("小区名称")
+                 or None)
+    # 小区ID：基本信息/摘要信息里的 小区ID，或 小区信息串里的小区ID:xxxx
+    xiaoqu_id = (info.get("小区ID") or d.get("小区ID")
+                 or _beike_xiaoqu_id_from_text(info.get("小区信息"),
+                                               d.get("小区信息")) or "")
+    # 学区（house-buying 核心关注点）
+    school = info.get("学区信息") or d.get("学区信息") or ""
+    # 日期：成交用 成交日期(点分隔)；挂牌无成交日期，取房源动态最近调价日
+    if tag == "sold":
+        date_raw = info.get("成交日期") or d.get("成交时间") or d.get("dealDate") or ""
+    else:
+        date_raw = (info.get("挂牌时间") or info.get("最近调价")
+                    or _beike_listing_date_from_text(info.get("房源动态", "")) or "")
+    date = _beike_normalize_date(date_raw)
+    details = _beike_block_details(ident, d, city, tag)
+    return {
+        "price": unit,
+        "totalPrice": total,
+        "area": area,
+        "kind": ("transaction" if tag == "sold" else "listing"),
+        "date": date,
+        "title": title,
+        "communityName": community,
+        "xiaoquId": xiaoqu_id,
+        "school": school,
+        "hid": hid,
+        "url": url,
+        "cover": None,
+        "status_text": (info.get("房源售卖状态")
+                        or d.get("房源售卖状态") or ""),
+        "details": details,
+        "raw_block": d,  # 保留原始块，供报告引用小区/学区/楼栋等真实信息
+    }
+
+
+def _beike_resblock_from_block(ident, d: dict, city: str) -> dict:
+    """从 `beike buy resblock` 小区块抽取小区档案（真实字段）。
+
+    真实结构：字段嵌套在 d["摘要信息"] 下，其中 小区信息 是中文串
+    （含 小区ID / 建成年份 / 容积率 / 绿化率 / 物业费 / 户数 / 车位配比），
+    市场行情 串含 在售套数 / 价格范围。官方 CLI 的 resblock 通常不直给「均价」，
+    均价改由 market/sold 聚合获得，故此处不强行编造 avg_listing_price。
+    """
+    info = d.get("摘要信息") if isinstance(d.get("摘要信息"), dict) else d
+    block_info = info.get("小区信息") or d.get("小区信息") or ""
+    market_info = info.get("市场行情") or d.get("市场行情") or ""
+    xiaoqu_id = (info.get("小区ID") or d.get("小区ID")
+                 or _beike_xiaoqu_id_from_text(block_info) or "")
+    name_v = (info.get("小区名称") or d.get("小区名") or d.get("小区名称")
+              or (ident if isinstance(ident, str) and ident not in ("小区", "德信银树湾")
+                  else ""))
+    out: dict = {}
+    # 在售套数 / 价格范围（市场行情串）
+    onsale = re.search(r"在售\s*(\d+)\s*套", market_info + " " + block_info)
+    if onsale:
+        out["onsale_count"] = int(onsale.group(1))
+    pr = re.search(r"价格范围\s*" + _NUM + r"\s*-\s*" + _NUM + r"\s*万",
+                   market_info + " " + block_info)
+    if pr:
+        out["price_range_wan"] = [float(pr.group(1)), float(pr.group(2))]
+    # 建成年份 / 容积率 / 绿化率 / 物业费 / 车位配比 / 户数
+    mb = re.search(r"(\d{4})年建成", block_info)
+    build_year = mb.group(1) if mb else None
+    vol = re.search(r"容积率\s*" + _NUM, block_info)
+    green = re.search(r"绿化率\s*" + _NUM, block_info)
+    fee = re.search(r"物业费\s*" + _NUM + r"\s*元", block_info)
+    car = re.search(r"车位配比\s*([0-9:：.]+)", block_info)
+    hh = re.search(r"(\d+)户", block_info)
+    if name_v:
+        out["name"] = name_v
+    if xiaoqu_id:
+        out["xiaoqu_id"] = xiaoqu_id
+        py = _beike_city_py(city)
+        if py:
+            out["url"] = f"https://{py}.ke.com/xiaoqu/{xiaoqu_id}.html"
+    if build_year:
+        out["build_year"] = build_year
+    if vol:
+        out["volume_rate"] = float(vol.group(1))
+    if green:
+        out["green_rate"] = float(green.group(1))
+    if fee:
+        out["property_fee"] = float(fee.group(1))
+    if car:
+        out["car_ratio"] = car.group(1)
+    if hh:
+        out["households"] = int(hh.group(1))
+    return out
+
+
+def _beike_market_from_text(data: str, city: str, name: str) -> list:
+    """从 `beike buy market` 文本尽力抽取月度均价走势点（PricePoint）。
+
+    兼容两种写法：
+    - 旧式/兜底纯文本：「2026年5月 均价57000元/平米」
+    - 真实 CLI 行情块（见 _beike_parse_market_data）
+    """
+    points: list = []
+    for m in re.finditer(
+            r"(\d{4})[年/-](\d{1,2})[月/-]?[^\d]*?" + _NUM + r"\s*元/平米", data):
+        y, mo, p = m.group(1), int(m.group(2)), float(m.group(3))
+        points.append(PricePoint(
+            community="", city=city, date=f"{y}-{mo:02d}",
+            price_per_sqm=p, source=name, kind="listing",
+            note="贝壳官方CLI均价走势"))
+    return points
+
+
+def _beike_wan_m2_to_float(s: str) -> Optional[float]:
+    """把「3.52万/m2」/「35200元/平米」转成 元/㎡ 浮点；无法识别返回 None。"""
+    if not s:
+        return None
+    m = re.search(r"(" + _NUM + r")\s*万/m2", str(s))
+    if m:
+        return float(m.group(1)) * 10000.0
+    m = re.search(_NUM + r"\s*元/平米", str(s))
+    if m:
+        return float(m.group(1))
+    return None
+
+
+def _beike_parse_market_data(data: str, city: str, name: str) -> list:
+    """解析真实 `beike buy market` 行情块（小区行情数据.各指标.最近6月趋势）。
+
+    真实结构：<价格走势> 内 <小区名行情> 块含多段 JSON——
+    {"小区最新行情": {...}} 与 {"小区行情数据": {"成交均价": {"最近6月趋势":
+    {"2026-02": "3.37万/m2", ...}}, "挂牌均价": {...}, "成交量": {...}}}。
+    抽取成交均价/挂牌均价/成交量三类月度点；同类同月去重，按日期排序。
+    无任何结构化点时退化为 _beike_market_from_text 正则兜底。
+    """
+    points: list = []
+    # 定位行情区域（无标签时回退整段）
+    m = re.search(r"<价格走势>(.*?)</价格走势>", data, re.DOTALL)
+    region = m.group(1) if m else data
+    for obj in _json_extract_all(region):
+        sd = obj.get("小区行情数据") if isinstance(obj, dict) else None
+        if not isinstance(sd, dict):
+            continue
+        metric_map = (("成交均价", "transaction"), ("挂牌均价", "listing"))
+        for metric, kind in metric_map:
+            trend = (sd.get(metric) or {}).get("最近6月趋势")
+            if not isinstance(trend, dict):
+                continue
+            for k, v in trend.items():
+                pp = _beike_wan_m2_to_float(v)
+                if pp is None:
+                    continue
+                nk = _beike_normalize_date(k)
+                if not nk:
+                    continue
+                points.append(PricePoint(
+                    community="", city=city, date=nk, price_per_sqm=pp,
+                    source=name, kind=kind,
+                    note="贝壳官方CLI均价走势"))
+        vol = (sd.get("成交量") or {}).get("最近6月趋势")
+        if isinstance(vol, dict):
+            for k, v in vol.items():
+                vm = re.search(r"(\d+)\s*套", str(v))
+                if not vm:
+                    continue
+                nk = _beike_normalize_date(k)
+                if not nk:
+                    continue
+                points.append(PricePoint(
+                    community="", city=city, date=nk, price_per_sqm=None,
+                    count=int(vm.group(1)), source=name, kind="volume",
+                    note="贝壳官方CLI成交量"))
+    # 去重：(date, kind) 取首个；按 date 升序
+    seen: dict = {}
+    out: list = []
+    for p in points:
+        key = (p.date, p.kind)
+        if key in seen:
+            continue
+        seen[key] = True
+        out.append(p)
+    out.sort(key=lambda p: p.date or "")
+    if out:
+        return out
+    # 兜底：纯文本正则
+    return _beike_market_from_text(data, city, name)
+
+
+def _parse_beike_text_payload(obj, city: str, tag: str):
+    """解析真实 beike CLI 半结构化文本输出。
+
+    返回 (rows, enriched_list, enriched_tx, market_points, resblock_info, note)。
+    防御式：解析不出任何实体返回空结构，不抛异常、绝不编造。
+    """
+    empty = ([], [], [], [], {}, "")
+    if not isinstance(obj, dict):
+        return empty[0], empty[1], empty[2], empty[3], empty[4], "CLI 返回非预期类型"
+    data = obj.get("data")
+    if not isinstance(data, str) or not data.strip():
+        return empty[0], empty[1], empty[2], empty[3], empty[4], "CLI 返回无数据文本"
+    blocks = _beike_extract_blocks(data)
+    # market 走势为行情块（含多段 JSON），独立于 blocks 直接结构化解析
+    if tag == "market":
+        pts = _beike_parse_market_data(data, city, "贝壳(官方CLI)")
+        note = "" if pts else "market 文本未解析出走势点"
+        return [], [], [], pts, {}, note
+    if tag == "resblock":
+        for ident, d in blocks:
+            info = _beike_resblock_from_block(ident, d, city)
+            if info:
+                return [], [], [], [], info, ""
+        return (empty[0], empty[1], empty[2], empty[3], empty[4],
+                "resblock 文本未解析出小区档案")
+    # search / sold：需要 <房源ID> 块；无块时退回旧式干净 JSON 兜底
+    if not blocks:
+        # 兼容旧式干净列表 JSON（若 CLI 未来改版）：走通用解析兜底
+        list_rows, list_note = _parse_beike_cli_payload(obj)
+        if list_rows:
+            el = [r for r in list_rows if r.get("url") or r.get("title")]
+            return list_rows, el, [], [], {}, list_note
+        return (empty[0], empty[1], empty[2], empty[3], empty[4],
+                "CLI 文本未解析出房源/小区实体")
+    # search / sold
+    rows, el, et = [], [], []
+    for ident, d in blocks:
+        row = _beike_block_to_row(ident, d, city, tag)
+        if row is None:
+            continue
+        rows.append(row)
+        if row.get("url") or row.get("title"):
+            (et if row["kind"] == "transaction" else el).append(row)
+    note = "" if rows else "CLI 文本未解析出可计价房源（字段缺失），已退回检索"
+    return rows, el, et, [], {}, note
+
+
+class BeikeCliSource(BaseSource):
+    """贝壳官方 CLI（真实结构化数据通道，T0，多命令聚合）。
+
+    首选合规通道：调用官方 `beike` CLI 拿实时结构化数据，对齐「贝壳买房专家」
+    的命令体系——`buy search`(挂牌) / `buy sold`(近期成交) / `buy market`(均价
+    走势) / `buy resblock`(小区档案)，全部含真实详情 URL。用于强化报告引用的
+    真实性与防伪。各命令独立调用、独立兜底：任一命令失败只少一类数据，不整体异常。
+    未安装 CLI / 未鉴权 / 调用失败时，自动退回联网检索模式（生成精确检索式），
+    绝不编造或假装成真实数据。
+    """
+    name = "贝壳(官方CLI)"
+    kind = "cli"
+    provides = "both"
+    tier = "T0"
+
+    # 多命令聚合：命令模板(含占位符) -> 用途标签
+    _BEIKE_COMMANDS = (
+        (("buy", "search", "-c", "_CITY", "-q", "_Q"), "search"),
+        (("buy", "sold", "-c", "_CITY", "-q", "_Q"), "sold"),
+        (("buy", "market", "-c", "_CITY", "-q", "_Q"), "market"),
+        (("buy", "resblock", "-c", "_CITY", "-q", "_Q"), "resblock"),
+    )
+
+    def search_queries(self, community: str, district: str, city: str = "杭州",
+                       months: int = 36) -> list:
+        c = f"{district} " if district else ""
+        return [
+            f"{city} {c}{community} 贝壳 成交",
+            f"{city} {c}{community} 挂牌价 成交价",
+            f"{city} {community} 近{months}个月 房价 走势图 贝壳",
+        ]
+
+    def fetch(self, community: str, district: str = "",
+              city: Optional[str] = None, months: int = 36) -> SourceFetchResult:
+        city = city or self.city
+        # 未安装 / 未鉴权：明确标记状态 + 给安装提示，退回检索式
+        if not beike_cli_available():
+            res = self._fetch_websearch(community, district, city, months)
+            res.mode = "cli_unavailable"
+            res.tier = self.tier
+            res.raw_note = BEIKE_INSTALL_HINT + "\n" + res.raw_note
+            return res
+        query = f"{district} {community}".strip() if district else community
+        rows_all: list = []
+        notes: list = []
+        enriched_listings: list = []
+        enriched_tx: list = []
+        market_points: list = []
+        resblock_info: dict = {}
+        for cmd_tmpl, tag in self._BEIKE_COMMANDS:
+            args = [city if a == "_CITY" else (query if a == "_Q" else a)
+                    for a in cmd_tmpl]
+            try:
+                obj = _run_beike_cli(args)
+            except Exception as exc:
+                notes.append(f"{tag} 调用失败：{exc}")
+                continue
+            if tag in ("search", "sold"):
+                rows, el, et, _, _, note = _parse_beike_text_payload(obj, city, tag)
+                if note:
+                    notes.append(f"{tag}：{note}")
+                rows_all.extend(rows)
+                enriched_listings.extend(el)
+                enriched_tx.extend(et)
+            elif tag == "market":
+                _, _, _, pts, _, note = _parse_beike_text_payload(obj, city, tag)
+                if pts:
+                    market_points.extend(pts)
+                else:
+                    notes.append(note or "market 返回无法解析为走势点")
+            elif tag == "resblock":
+                _, _, _, _, info, note = _parse_beike_text_payload(obj, city, tag)
+                if info:
+                    resblock_info = info
+                else:
+                    notes.append(note or "resblock 返回无法解析为小区档案")
+        # 聚合 挂牌+成交 -> listings/transactions/history
+        listings, transactions, history = self._build_result(
+            rows_all, community, city, self.name)
+        # 合并均价走势点（按 (date, kind) 去重，market 点优先保留；
+        # 成交均价/挂牌均价/成交量 同类同月各自保留，避免只留首类）
+        if market_points:
+            seen = {(p.date, p.kind) for p in history}
+            for p in market_points:
+                if p.date and (p.date, p.kind) not in seen:
+                    history.append(p)
+                    seen.add((p.date, p.kind))
+            history.sort(key=lambda p: p.date or "")
+        ok = bool(listings or transactions or history)
+        # 全部命令失败 / 无可用数据：退回联网检索兜底（绝不编造）
+        if not ok:
+            res = self._fetch_websearch(community, district, city, months)
+            res.mode = "cli_unavailable"
+            res.tier = self.tier
+            res.raw_note = (("CLI 调用无可用结果：" + " ".join(notes) + "\n")
+                            if notes else "") + res.raw_note
+            return res
+        raw_note = (f"官方CLI实时数据：挂牌 {len(listings)} 条，成交 "
+                    f"{len(transactions)} 条，走势点 {len(history)} 个。"
+                    + (" ".join(notes) if notes else ""))
+        return SourceFetchResult(
+            source=self.name, community=community, city=city,
+            listings=listings, transactions=transactions, history=history,
+            extra={"listings": enriched_listings, "transactions": enriched_tx,
+                   "resblock": resblock_info, "market_points": market_points,
+                   "query": query, "source_mode": "cli"},
+            raw_note=raw_note,
+            confidence="high" if ok else "low",
+            mode="cli", months=months, tier=self.tier,
         )
 
 
@@ -1588,6 +2364,14 @@ th,td{border:1px solid var(--line);padding:7px 10px;vertical-align:top}
   border-radius:6px;padding:1px 8px;font-size:12px;margin-right:6px}
 .foot{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);
   color:var(--sub);font-size:12.5px}
+.recent-tx{margin:14px 0}
+.recent-tx h3{margin:18px 0 8px}
+.tx-table{font-size:13px}
+.tx-table td:nth-child(3),.tx-table td:nth-child(4){text-align:right;
+  font-variant-numeric:tabular-nums}
+.tx-table td a{color:var(--olive);text-decoration:none;font-weight:600}
+.tx-table td a:hover{text-decoration:underline}
+.muted{color:var(--sub);font-size:12.5px;margin:6px 0}
 """
 
 
@@ -1659,6 +2443,210 @@ def render_citations(cites: list) -> str:
         else:
             items.append(f'<li id="cite-{i}">{label}（未提供链接）{meta}</li>')
     return '<ol class="cites">\n' + "\n".join(items) + "\n</ol>"
+
+
+# --------------------------------------------------------------------------- #
+# 最近成交（近 10 条）渲染 + 贝壳 CLI 安装引导
+# --------------------------------------------------------------------------- #
+def _txn_sort_key(t: dict):
+    """成交记录按时间倒序的排序键（缺时间排最后）。
+
+    先统一日期写法（点分隔/中文/短横 -> YYYY-MM / YYYY-MM-DD），再拆数字排序，
+    兼容真实 CLI 的「2026.04.26」与检索回填的「2026-07」。
+    """
+    d = str(t.get("date") or t.get("dealDate") or "").strip()
+    nd = _beike_normalize_date(d)
+    parts = re.findall(r"\d+", nd)
+    if len(parts) >= 3:
+        return (0, int(parts[0]), int(parts[1]), int(parts[2]))
+    if len(parts) == 2:
+        return (0, int(parts[0]), int(parts[1]), 0)
+    if len(parts) == 1:
+        return (0, int(parts[0]), 0, 0)
+    return (1, 0, 0, 0)
+
+
+def _txn_layout_area(t: dict) -> str:
+    """从标题/原始块抽取「户型/面积」描述。"""
+    area = t.get("area")
+    layout = ""
+    blob = t.get("raw_block") or {}
+    title = str(t.get("title") or blob.get("房源标题") or t.get("communityName") or "")
+    lm = re.search(r"(\d+室\d+厅(?:\d*卫)?)", title)
+    if lm:
+        layout = lm.group(1)
+    if area not in (None, "", 0):
+        try:
+            a = float(area)
+            return f"{layout} {a:.1f}㎡".strip() if layout else f"{a:.1f}㎡"
+        except (TypeError, ValueError):
+            pass
+    return layout or (title[:24] if title else "—")
+
+
+def render_recent_transactions(transactions: list, n: int = 10,
+                               heading: str = "最近成交（近 10 条）") -> str:
+    """生成「最近成交」HTML 表（真实详情 URL、单价/总价/面积/时间）。
+
+    transactions 为成交行列表（dict，字段见 _beike_block_to_row / _build_result）：
+    price(元/㎡), totalPrice(万), area(㎡), date, title, url, raw_block...
+    返回自包含 HTML（<div class="recent-tx"> 内含 <table>）。空列表返回提示块。
+    所有详情链接均指向真实 ke.com 成交页（或来源页），严禁编造 URL。
+    """
+    txns = [t for t in (transactions or []) if isinstance(t, dict)
+            and ("trans" in str(t.get("kind") or "trans").lower()
+                 or t.get("kind") is None)]
+    txns.sort(key=_txn_sort_key, reverse=True)
+    txns = txns[: max(1, int(n))]
+    if not txns:
+        return ('<div class="recent-tx empty">\n'
+                '<p class="muted">未获取到可核验的成交记录（官方 CLI 未安装/未返回成交，'
+                '或联网检索未命中）。如需真实成交，请配置贝壳 CLI 后重跑，'
+                '或按检索式联网补充并标注来源。</p>\n</div>')
+    rows = []
+    for t in txns:
+        d = str(t.get("date") or t.get("dealDate") or "—")
+        la = _txn_layout_area(t)
+        total = t.get("totalPrice")
+        total_s = (f"{float(total):.0f}万" if isinstance(total, (int, float))
+                   else (str(total) if total else "—"))
+        price = t.get("price")
+        price_s = (f"{float(price):,.0f}" if isinstance(price, (int, float))
+                   else (str(price) if price else "—"))
+        url = str(t.get("url") or "").strip()
+        link = (f'<a href="{url}" target="_blank" rel="noopener">详情↗</a>'
+                if url else "—")
+        rows.append(
+            f"<tr><td>{d}</td><td>{la}</td><td>{total_s}</td>"
+            f"<td>{price_s}</td><td>{link}</td></tr>")
+    return ('<div class="recent-tx">\n'
+            f'<h3>{heading}</h3>\n<table class="tx-table">\n'
+            "<thead><tr><th>成交时间</th><th>户型/面积</th><th>总价</th>"
+            "<th>单价(元/㎡)</th><th>详情</th></tr></thead>\n<tbody>\n"
+            + "\n".join(rows) + "\n</tbody>\n</table>\n"
+            '<p class="muted">数据来源：贝壳官方 CLI（buy sold）真实成交，详情链接指向 '
+            'ke.com 成交页；联网检索回填的成交需标注来源与访问时间。单价=总价/面积反算 '
+            '或平台直接给出。</p>\n</div>')
+
+
+def _tx_detail_escape(s):
+    """最小化 HTML 转义，避免标题/字段里的特殊字符破坏报告结构。"""
+    if not s:
+        return ""
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;")
+            .replace(">", "&gt;").replace('"', "&quot;"))
+
+
+def _tx_group_html(title: str, pairs) -> str:
+    """把 [(label, value), ...] 渲染成一组字段；仅展示非空项，全空返回空串。"""
+    items = []
+    for lab, val in pairs:
+        val = _tx_detail_escape(val)
+        if not val:
+            continue
+        items.append(f'<div><dt>{lab}</dt><dd>{val}</dd></div>')
+    if not items:
+        return ""
+    return f'<div class="tx-group"><h4>{title}</h4><dl>{"".join(items)}</dl></div>'
+
+
+def render_transaction_details(transactions, n: int = 8,
+                               heading: str = "房屋成交详细信息（贝壳官方 CLI 全维度）") -> str:
+    """生成「房屋成交详细信息」模块：逐条成交卡片，全量呈现 CLI 真实维度。
+
+    与「最近成交近10条」表互补——该表只给价格/面积/时间概览，本模块展开每条成交的
+    价格与议价空间、成交周期与热度、房屋属性、房源特征等全部字段。所有数据来自
+    buy sold 真实返回（details 字典），缺失字段不展示、绝不编造。详情链接指向真实
+    ke.com 成交页。空列表返回提示块（不编造假成交）。
+    """
+    txns = [t for t in (transactions or []) if isinstance(t, dict)
+            and str(t.get("kind") or "trans").lower() == "transaction"
+            and t.get("details")]
+    txns.sort(key=_txn_sort_key, reverse=True)
+    txns = txns[: max(1, int(n))]
+    if not txns:
+        return ('<div class="tx-detail empty">\n'
+                '<p class="muted">未获取到可核验的成交明细（官方 CLI 未安装/未返回成交，'
+                '或联网检索未命中）。本模块不编造假成交；配置贝壳 CLI 后重跑即可补全。</p>\n'
+                '</div>')
+    cards = []
+    for t in txns:
+        det = t.get("details", {})
+        # 议价空间（挂牌价 -> 成交价）
+        neg = ""
+        dp = det.get("deal_price_wan")
+        lp = det.get("list_price_wan")
+        if isinstance(dp, (int, float)) and isinstance(lp, (int, float)) and lp:
+            neg = f"{(lp - dp) / lp * 100:.1f}%"
+        price_s = (f"{float(t['price']):,.0f}" if isinstance(t.get("price"), (int, float))
+                   else (str(t["price"]) if t.get("price") else "—"))
+        total_s = (f"{float(t['totalPrice']):.0f}万" if isinstance(t.get("totalPrice"), (int, float))
+                   else (str(t["totalPrice"]) if t.get("totalPrice") else "—"))
+        date_s = str(det.get("deal_date") or t.get("date") or "—")
+        title_s = _tx_detail_escape(det.get("title") or t.get("title") or "—")
+        url = str(t.get("url") or "").strip()
+        link = (f'<a class="tx-link" href="{url}" target="_blank" rel="noopener">'
+                f'贝壳成交页↗</a>' if url else "")
+        u = det.get("usage") or ""
+        o = det.get("ownership") or ""
+        e = det.get("elevator") or ""
+        c = det.get("decoration") or ""
+        g1 = _tx_group_html("价格与议价", [
+            ("成交价", total_s if total_s != "—" else ""),
+            ("挂牌价", f"{float(lp):.0f}万" if isinstance(lp, (int, float)) else ""),
+            ("议价空间", neg),
+            ("成交单价", f"{price_s} 元/㎡"),
+        ])
+        g2 = _tx_group_html("成交周期与热度", [
+            ("成交周期", det.get("deal_cycle")),
+            ("总带看次数", det.get("total_visits")),
+            ("关注/浏览", det.get("followers")),
+        ])
+        g3 = _tx_group_html("房屋属性", [
+            ("朝向", det.get("orientation")),
+            ("楼型", det.get("building_type")),
+            ("楼层", det.get("floor")),
+            ("用途 / 权属", f"{u} · {o}" if (u or o) else ""),
+            ("电梯 / 装修", f"{e} · {c}" if (e or c) else ""),
+            ("年代", det.get("era")),
+        ])
+        g4 = _tx_group_html("房源特征", [
+            ("户型面积", det.get("layout_info")),
+            ("小区", det.get("community")),
+            ("学区", det.get("school")),
+            ("同户型行情", det.get("same_layout_market")),
+        ])
+        grid = "".join(g for g in (g1, g2, g3, g4) if g)
+        cards.append(
+            f'<div class="tx-card"><div class="tx-card-head">'
+            f'<span class="tx-date">{date_s}</span>'
+            f'<span class="tx-title">{title_s}</span>{link}</div>'
+            f'<div class="tx-grid">{grid}</div></div>')
+    return ('<div class="tx-detail">\n<h3>' + heading + '</h3>\n'
+            + "\n".join(cards) + "\n"
+            '<p class="muted">数据来源：贝壳官方 CLI（buy sold）真实成交，详情链接指向 '
+            'ke.com 成交页。议价空间=挂牌价与成交价之差（官方仅给总价+面积，'
+            '单价=总价/面积反算）；朝向/楼型/楼层/装修/带看/关注等维度均来自 CLI 真实返回，'
+            '未返回的字段不展示，绝不编造。</p>\n</div>')
+
+
+def beike_cli_setup_prompt() -> str:
+    """返回面向用户的贝壳 CLI 安装引导（友好、可复制）。
+
+    安装/鉴权一次性；未安装时由 agent 在首次使用时转述给用户，并明确给出
+    「暂不安装、继续用联网检索」的选项（不阻塞分析）。
+    """
+    return ("【建议】安装贝壳官方 CLI，获取真实成交/挂牌数据（更准、带真实详情链接）\n\n"
+            "1) 安装（官方脚本）：\n"
+            "   curl -fsSL https://raw.githubusercontent.com/"
+            "LianjiaTech/beike-ai-platform/master/cli/releases/install.sh | bash\n\n"
+            "2) 获取 API Key（浏览器登录后生成）：\n"
+            "   https://building.ke.com/?action=get-key&source=house-buying\n\n"
+            "3) 保存 Key 到本机：\n"
+            "   beike auth <你的API_KEY> --save\n\n"
+            "完成后本 skill 会自动走官方实时数据通道；不安装也能继续"
+            "（走联网检索兜底，数据会标注为“检索式回填”）。\n"
+            "→ 如暂不安装，回复「暂不安装 / 跳过」，我将继续用联网检索完成分析。")
 
 
 def school_tier_rank(school: str, city: str = "") -> dict:
@@ -2081,8 +3069,527 @@ def self_test() -> int:
     assert res.tier == "T1", "gov 应为 T1"
     print("✓ 官方单小区 gov 适配器（无配置退回 T1 检索）正确")
 
+    # 11) 贝壳官方 CLI 接入：环境自适应（装了走真实通道，没装安全退回）
+    assert isinstance(beike_cli_available(), bool), "beike_cli_available 应返回 bool"
+    cli_src = BeikeCliSource()
+    r11 = cli_src.fetch("坤和西溪里", "", "杭州", 12)
+    if beike_cli_available():
+        # 本机已装 CLI + Key：验证走真实通道且不抛异常、不编造
+        assert r11.mode in ("cli", "cli_unavailable"), "已装CLI应走cli或安全降级"
+        if r11.mode == "cli_unavailable":
+            assert r11.listings == [] and r11.transactions == [], "降级不应编造"
+            assert r11.queries, "降级应提供检索式"
+        else:
+            assert isinstance(r11.listings, list) and isinstance(r11.transactions, list)
+        print("✓ 贝壳CLI已安装：走真实通道（或安全降级），无异常/无编造")
+    else:
+        assert r11.mode == "cli_unavailable", "无CLI应标记 cli_unavailable"
+        assert r11.queries, "无CLI应提供联网检索式"
+        assert "beike" in r11.raw_note.lower() or "贝壳" in r11.raw_note, "应有安装提示"
+        assert r11.listings == [] and r11.transactions == [], "无CLI不应编造数据"
+        print("✓ 贝壳CLI未安装时安全退回联网检索（无异常/无编造）")
+
+    # 12) 解析器：近似真实结构的 fixture 验证字段映射（仅自测，非真实数据）
+    fixture = {"data": {"list": [
+        {"communityName": "坤和西溪里", "unitPrice": 58000, "totalPrice": 520,
+         "area": 89.6, "type": "listing",
+         "url": "https://hz.ke.com/ershoufang/abc.html",
+         "title": "坤和西溪里 3室2厅"},
+        {"communityName": "坤和西溪里", "unitPrice": 56000, "totalPrice": 500,
+         "area": 89.0, "type": "sold", "dealDate": "2026-07",
+         "url": "https://hz.ke.com/chengjiao/def.html"},
+    ]}}
+    rows12, _ = _parse_beike_cli_payload(fixture)
+    assert len(rows12) == 2, "fixture 应解析出2条"
+    li12, tr12, _ = cli_src._build_result(rows12, "坤和西溪里", "杭州", "贝壳(官方CLI)")
+    assert len(li12) == 1 and len(tr12) == 1, "挂牌/成交应分流"
+    assert li12[0].price_per_sqm == 58000, "单价映射错误"
+    assert tr12[0].kind == "transaction", "成交类型错误"
+    assert rows12[0]["url"].startswith("https://hz.ke.com"), "详情URL应保留"
+    # 未知结构不抛异常
+    bad_rows, bad_note = _parse_beike_cli_payload({"foo": "bar"})
+    assert bad_rows == [] and bad_note, "未知结构应空列表+说明，不抛异常"
+    print("✓ 贝壳CLI payload 解析与挂牌/成交分流正确（fixture）；未知结构安全降级")
+
+    # 13) 多平台统一检索：无 CLI/无 endpoint 时整合且安全兜底
+    ms = multi_platform_search("坤和西溪里", "", "杭州", 12, include_cross=True)
+    assert ms["mode"] == "search", "统一检索模式错误"
+    names13 = {p["source"] for p in ms["platforms"]}
+    assert "贝壳" in names13 and "我爱我家" in names13, "缺少核心双源"
+    assert len(ms["platforms"]) >= 2, "至少含贝壳与我爱我家"
+    for p in ms["platforms"]:
+        assert p["status"] in ("ok_real", "empty_real",
+                               "websearch_fallback", "error"), "状态非法"
+        assert isinstance(p["listings"], list), "listings 应为列表"
+    # 单平台异常兜底逻辑（与统一检索包裹逻辑一致）
+    class _Boom(BaseSource):
+        name = "爆炸源"
+        tier = "T3"
+        def search_queries(self, *a, **k): return ["q"]
+        def fetch(self, *a, **k): raise RuntimeError("boom")
+    boom = _Boom()
+    bentry = {"source": "爆炸源", "status": "ok"}
+    try:
+        boom.fetch("x")
+    except Exception as exc:
+        bentry["status"] = "error"
+        bentry["note"] = f"爆炸源 取数异常：{exc}"
+    assert bentry["status"] == "error" and "boom" in bentry["note"], "异常应被兜底标注"
+    print("✓ 多平台统一检索整合与状态标注正确；单平台异常兜底逻辑正确")
+
+    # 14) 贝壳多命令聚合 + 成交反算单价（对齐「贝壳买房专家」命令体系）
+    # 注意：真实 beike CLI `--json` 返回半结构化文本（data 为 XML/Markdown 混合
+    # 文本，房源用 <房源ID> 包裹内嵌 JSON 片段），故 fixture 采用真实文本结构。
+    def _fake_beike(args):
+        # 模拟官方 CLI：args = ["buy", <cmd>, "-c", city, "-q", query]
+        # 采用与真实 CLI 一致的结构：
+        #   search/sold -> 字段嵌套在 摘要信息/基本信息；market -> 小区行情数据；
+        #   resblock -> 摘要信息（小区信息为中文串，官方 CLI 不直给均价）。
+        cmd = args[1] if len(args) > 1 else ""
+        if cmd == "search":
+            return {"data": (
+                "<贝壳召回知识>\n<房源>\n<111>\n\n"
+                '{"摘要信息":{"价格信息":"总价520万，单价58000元/平米",'
+                '"房源标题":"坤和西溪里 3室2厅 89.6㎡ 520万",'
+                '"房源ID":"111","房源售卖状态":"在售",'
+                '"小区ID":"1811043641191",'
+                '"小区信息":"坤和西溪里(小区ID:1811043641191)，2010年建成，'
+                '容积率1.8，绿化率35%，物业费3元/平米/月，车位配比1:1.5，1440户"'
+                '}}\n\n</111>\n</房源>')}
+        if cmd == "sold":
+            # 成交记录只给 总价(万) + 户型面积(在房源名称里)，无单价 -> 必须反算
+            # 真实 CLI 的 房源ID 即区块标签，基本信息里只有 小区ID
+            return {"data": (
+                "<贝壳召回知识>\n<成交房源>\n<222>\n\n"
+                '{"基本信息":{"成交价格":"500万","成交日期":"2026.07.15",'
+                '"房源名称":"坤和西溪里 2室2厅 89㎡ 500万",'
+                '"挂牌价格":"520万","小区ID":"1811043641191"'
+                '}}\n\n</222>\n</成交房源>')}
+        if cmd == "market":
+            return {"data": (
+                "<价格走势>\n<坤和西溪里行情>\n\n"
+                '{"小区最新行情":{"成交均价":{"2026-07":"5.60万/m2","环比":"0"},'
+                '"挂牌均价":{"2026-07":"5.90万/m2","环比":"-1.90%"}}}\n\n'
+                '{"小区行情数据":{"成交均价":{"最近6月趋势":'
+                '{"2026-05":"5.70万/m2","2026-06":"5.65万/m2","2026-07":"5.60万/m2"}},'
+                '"挂牌均价":{"最近6月趋势":'
+                '{"2026-05":"6.00万/m2","2026-06":"5.95万/m2","2026-07":"5.90万/m2"}},'
+                '"成交量":{"最近6月趋势":'
+                '{"2026-05":"3套","2026-06":"4套","2026-07":"2套"}}}}\n\n'
+                "</坤和西溪里行情>\n</价格走势>")}
+        if cmd == "resblock":
+            return {"data": (
+                "<贝壳召回知识>\n<小区>\n<坤和西溪里>\n\n"
+                '{"摘要信息":{"小区名称":"坤和西溪里","小区ID":"1811043641191",'
+                '"小区信息":"坤和西溪里(小区ID:1811043641191)，2010年建成，'
+                '容积率1.8，绿化率35%，物业费3元/平米/月，车位配比1:1.5，1440户",'
+                '"市场行情":"在售57套，在售价格范围290-815万"'
+                '}}\n\n</坤和西溪里>\n</小区>')}
+        raise RuntimeError("unexpected cmd " + str(args))
+    _old_run = globals().get("_run_beike_cli")
+    globals()["_run_beike_cli"] = _fake_beike
+    try:
+        multi = BeikeCliSource(city="杭州")
+        r14 = multi.fetch("坤和西溪里", "", "杭州", 12)
+        assert r14.mode == "cli", "多命令聚合应标记 cli"
+        assert len(r14.listings) == 1, "应有1条挂牌"
+        assert len(r14.transactions) == 1, "应有1条成交(反算单价)"
+        # 成交反算：500万 / 89㎡ ≈ 56179.78 元/㎡
+        assert abs(r14.transactions[0].price_per_sqm - 500 * 10000 / 89.0) < 1, \
+            f"成交反算单价错误: {r14.transactions[0].price_per_sqm}"
+        assert r14.transactions[0].kind == "transaction"
+        assert len(r14.history) >= 3, f"market 走势点应进 history: {len(r14.history)}"
+        assert {"2026-05", "2026-06", "2026-07"} <= {p.date for p in r14.history}, \
+            "走势月份缺失"
+        rb = r14.extra.get("resblock", {})
+        # 真实 CLI 的 resblock 不直给均价；此处验证它能抽出的真实字段
+        assert rb.get("xiaoqu_id") == "1811043641191", "小区ID缺失"
+        assert "xiaoqu/1811043641191" in rb.get("url", ""), "小区页URL缺失"
+        assert rb.get("name") == "坤和西溪里", "小区名缺失"
+        assert rb.get("build_year") == "2010", "建成年份缺失"
+        assert rb.get("volume_rate") == 1.8 and rb.get("households") == 1440, \
+            "容积率/户数提取错误"
+        assert rb.get("green_rate") == 35.0, "绿化率提取错误"
+        assert rb.get("property_fee") == 3.0, "物业费提取错误"
+        assert rb.get("car_ratio") == "1:1.5", "车位配比提取错误"
+        assert rb.get("onsale_count") == 57, "在售套数提取错误"
+        assert rb.get("price_range_wan") == [290.0, 815.0], "价格范围提取错误"
+        assert "avg_listing_price" not in rb, "官方CLI无均价不应编造"
+        assert r14.extra["listings"][0]["url"] == \
+            "https://hz.ke.com/ershoufang/111.html", "挂牌详情URL错误"
+        assert r14.extra["transactions"][0]["url"] == \
+            "https://hz.ke.com/chengjiao/222.html", "成交详情URL错误"
+        # 部分命令失败：只少一类数据，不整体异常
+        def _fake_beike_partial(args):
+            if args[1] == "market":
+                raise RuntimeError("market 暂不可用")
+            return _fake_beike(args)
+        globals()["_run_beike_cli"] = _fake_beike_partial
+        r14b = multi.fetch("坤和西溪里", "", "杭州", 12)
+        assert r14b.mode == "cli" and len(r14b.listings) == 1, \
+            "部分命令失败应保留其他数据"
+        assert "market 调用失败" in r14b.raw_note, "应记录 market 失败说明"
+        # 全部命令失败：退回 websearch 兜底（不抛异常、不编造）
+        def _fake_beike_boom(args):
+            raise RuntimeError("boom all")
+        globals()["_run_beike_cli"] = _fake_beike_boom
+        r14c = multi.fetch("坤和西溪里", "", "杭州", 12)
+        assert r14c.mode == "cli_unavailable", "全命令失败应退回 websearch"
+        assert r14c.listings == [] and r14c.transactions == [], "兜底不应编造"
+        assert r14c.queries, "兜底应给检索式"
+    finally:
+        globals()["_run_beike_cli"] = _old_run
+    print("✓ 贝壳多命令聚合(search+sold+market+resblock) 文本解析 + 成交反算单价 + 部分/全失败兜底正确")
+
+    # #16 最近成交(近10条) 渲染
+    rt_tx = [
+        {"price": 58000, "totalPrice": 520, "area": 89.6, "date": "2026-05",
+         "title": "银树湾 3室2厅 89.6㎡", "url": "", "kind": "transaction"},
+        {"price": 52595, "totalPrice": 899, "area": 170.9, "date": "2026-07",
+         "title": "银树湾 3室2厅 89.6㎡ 520万",
+         "url": "https://hz.ke.com/chengjiao/111.html", "kind": "transaction"},
+        {"price": 56179, "totalPrice": 500, "area": 89, "date": "2026-07-15",
+         "title": "银树湾 2室1厅 89㎡ 500万",
+         "url": "https://hz.ke.com/chengjiao/222.html", "kind": "transaction"},
+    ]
+    rt_html = render_recent_transactions(rt_tx, n=10)
+    assert rt_html.count("<tr>") == 4, "最近成交表应有 1 表头 + 3 数据行"
+    assert "2026-07-15" in rt_html and "2026-07" in rt_html and "2026-05" in rt_html
+    # 时间倒序：最新(2026-07-15)应排在 2026-07 之前（按完整单元格匹配，避免前缀重叠）
+    assert rt_html.index(">2026-07-15<") < rt_html.index(">2026-07<"), "应按时间倒序"
+    assert "https://hz.ke.com/chengjiao/111.html" in rt_html, "真实详情URL应保留"
+    rt_empty = render_recent_transactions([], n=10)
+    assert "未获取到可核验的成交记录" in rt_empty, "空数据应给提示块"
+    # recent_transactions 截断到 10
+    rt_many = [{"price": i, "totalPrice": i, "date": "2026-%02d" % ((i % 12) + 1),
+                "kind": "transaction"} for i in range(1, 25)]
+    rt_top = render_recent_transactions(rt_many, n=10)
+    assert rt_top.count("<tr>") == 11, "应截断到 10 条(+表头)"
+    print("✓ 最近成交(近10条) 渲染：时间倒序 + 真实URL + 空数据提示 + 截断正确")
+
     print("\nself-test passed" if ok else "self-test failed")
     return 0 if ok else 1
+
+
+# --------------------------------------------------------------------------- #
+# 多平台统一检索（贝壳官方CLI + 我爱我家 + 可选 T3 交叉源）
+# --------------------------------------------------------------------------- #
+def multi_platform_search(community: str, district: str = "", city: str = "杭州",
+                          months: int = 36, include_cross: bool = True) -> dict:
+    """多平台统一检索：贝壳（官方 CLI 优先）+ 我爱我家（+ 可选 T3 交叉源）。
+
+    设计目标（对应 skill 优化需求）：
+    - 真实平台数据优先：贝壳走官方 CLI 拿到实时结构化数据（含真实详情 URL）。
+    - 统一检索：我爱我家作为并列 T0 源，与贝壳在同一结果结构中合并。
+    - 兜底与防伪：任一平台失败都不抛异常，仅在其 status 标注 error / 退回
+      检索式；无真实数据时绝不编造，交由 AI 代理按检索式联网取数回填。
+    """
+    beike_src: BaseSource = (BeikeCliSource(city=city)
+                             if beike_cli_available() else BeikeSource(city=city))
+    spec = [
+        ("贝壳", beike_src),
+        ("我爱我家", WoaiwojiaSource(city=city)),
+    ]
+    if include_cross:
+        spec += [
+            ("诸葛找房", ZhugeSource(city=city)),
+            ("安居客", AnjukeSource(city=city)),
+            ("房天下", FangSource(city=city)),
+            ("58同城", WubaSource(city=city)),
+        ]
+
+    platform_results: list = []
+    merged_listings: list = []
+    merged_transactions: list = []
+    merged_history: list = []
+    for name, src in spec:
+        entry = {
+            "source": name,
+            "community": community,
+            "city": city,
+            "listings": [],
+            "transactions": [],
+            "history": [],
+            "resblock": {},
+            "queries": [],
+            "mode": "unknown",
+            "tier": getattr(src, "tier", "T3"),
+            "confidence": "low",
+            "status": "ok",
+            "note": "",
+        }
+        try:
+            res = src.fetch(community, district, city, months)
+            d = res.to_dict()
+            enriched_listings = (res.extra.get("listings")
+                                 if res.extra.get("listings") else d["listings"])
+            enriched_tx = (res.extra.get("transactions")
+                           if res.extra.get("transactions") else d["transactions"])
+            entry.update({
+                "listings": enriched_listings,
+                "transactions": enriched_tx,
+                "history": d["history"],
+                "resblock": res.extra.get("resblock", {}) if res.extra else {},
+                "queries": d["queries"],
+                "mode": d["mode"],
+                "confidence": d["confidence"],
+                "tier": d["tier"],
+                "note": d["raw_note"],
+            })
+            if d["mode"] == "cli":
+                entry["status"] = ("ok_real"
+                                   if (entry["listings"] or entry["transactions"])
+                                   else "empty_real")
+            elif d["mode"] in ("cli_unavailable", "websearch"):
+                entry["status"] = "websearch_fallback"
+            else:
+                entry["status"] = "ok"
+            merged_listings.extend(entry["listings"])
+            merged_transactions.extend(entry["transactions"])
+            merged_history.extend(entry["history"])
+        except Exception as exc:  # 单平台异常不影响整体，明确标注 error
+            entry["status"] = "error"
+            entry["note"] = f"{name} 取数异常：{exc}"
+            entry["queries"] = src.search_queries(community, district, city, months)
+        platform_results.append(entry)
+
+    recent_tx = [t for t in merged_transactions if isinstance(t, dict)
+                 and "trans" in str(t.get("kind") or "trans").lower()]
+    recent_tx.sort(key=_txn_sort_key, reverse=True)
+    recent_tx = recent_tx[:10]
+    return {
+        "mode": "search",
+        "community": community,
+        "district": district,
+        "city": city,
+        "months": months,
+        "beike_cli_available": beike_cli_available(),
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "platforms": platform_results,
+        "merged_listings": merged_listings,
+        "merged_transactions": merged_transactions,
+        "recent_transactions": recent_tx,
+        "merged_history": merged_history,
+        "note": ("多平台统一检索完成：status=ok_real 为官方CLI实时数据；"
+                 "websearch_fallback 表示未配置官方接口、需由 AI 代理按检索式联网取数；"
+                 "所有价格证据须回填真实 URL 与口径，禁止编造或填默认口径。"),
+    }
+
+
+def cmd_search(args) -> int:
+    city = args.city or "杭州"
+    result = multi_platform_search(
+        args.community, args.district or "", city,
+        int(getattr(args, "months", 36) or 36),
+        include_cross=not getattr(args, "no_cross", False),
+    )
+    _dump_plan(result, args.output)
+    return 0
+
+
+def cmd_beike_check(args) -> int:
+    """首次使用检测：本机是否安装并配置贝壳 CLI。
+
+    已安装配置 → 静默确认（agent 无需提示用户）。
+    未安装 → 打印友好安装引导 + 明确「暂不安装」可选项（不阻塞分析）。
+    """
+    if beike_cli_available():
+        where = (f"Key 位于 {BEIKE_KEY_FILE}" if BEIKE_KEY_FILE.is_file()
+                 else "beike auth 已保存")
+        print("✓ 贝壳 CLI 已安装并配置（" + where + "）。")
+        print("  将直接使用官方实时数据通道，无需提示安装。")
+        return 0
+    print("○ 未检测到贝壳官方 CLI 或未鉴权。")
+    print(beike_cli_setup_prompt())
+    return 0
+
+
+# --------------------------------------------------------------------------- #
+# 学区分析增强：策展学区知识（references/school-data/{city}.json）
+# --------------------------------------------------------------------------- #
+SCHOOL_DATA_DIR = SKILL_DIR / "references" / "school-data"
+
+
+def load_school_data(city: str) -> dict:
+    """读取城市策展学区知识；无则返回 {}。"""
+    try:
+        p = SCHOOL_DATA_DIR / f"{city}.json"
+        if p.is_file():
+            return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return {}
+
+
+def _resolve_schools(sdata: dict, community: str, cli_school: str) -> list:
+    """解析目标小区对口学校名列表（策展映射优先，其次 CLI 字段命中）。"""
+    cmap = sdata.get("community_school_map") or {}
+    for name, schools in cmap.items():
+        if name and name in (community or ""):
+            return list(schools)
+    if cli_school:
+        hits = [s for s in (sdata.get("schools") or {}) if s and s in cli_school]
+        if hits:
+            return hits
+    return []
+
+
+_TIER_SCORE = {"第一梯队": 9, "第二梯队": 7, "第三梯队": 5, "第四梯队": 3}
+
+
+def build_school_analysis(city: str, community: str, cli_school: str) -> dict:
+    """生成 §5/§6/§10 的学区深度分析片段 + 引用规格。
+
+    返回 dict：matched=False 时调用方退回占位逻辑。命中时含：
+      schools, primary_school, duikou,
+      tier_html(§6：对口/确定性 + 梯队表 + 生源代际),
+      premium_html(§5), nonschool_html(§10),
+      cite_specs[(ik,label,url,caliber,consistency), ...],
+      school_tier_score(int|None), school_summary(str)
+    HTML 中以 [[sch:IK]] 作为待替换引用锚点，由调用方注册 cite 后替换。
+    """
+    sdata = load_school_data(city)
+    if not sdata:
+        return {"matched": False}
+    names = _resolve_schools(sdata, community, cli_school)
+    if not names:
+        return {"matched": False}
+    S = sdata.get("schools") or {}
+    resolved = [(nm, S[nm]) for nm in names if nm in S]
+    if not resolved:
+        return {"matched": False}
+    cl = sdata.get("city_level") or {}
+    cite_specs: list = []
+    seen: set = set()
+
+    def reg(ik):
+        src = (sdata.get("sources") or {}).get(ik)
+        if src and ik not in seen:
+            seen.add(ik)
+            cite_specs.append((ik, src.get("name", ik),
+                               src.get("url", "#"), src.get("caliber", ""),
+                               src.get("year", "skill内置")))
+
+    for nm, sc in resolved:
+        for ik in (sc.get("sources") or []):
+            reg(ik)
+    for ev in (cl.get("events_2026") or []):
+        for ik in (ev.get("sources") or []):
+            reg(ik)
+    reg("e18")  # 教育局（学位锁定/政策基线）
+
+    # ---- §6 对口 + 学区确定性 ----
+    primary_name, primary = resolved[0]
+    duikou = [sc.get("duikou_chuzhong") for nm, sc in resolved
+              if sc.get("duikou_chuzhong")]
+    duikou_html = ("<li><b>对口初中</b>：" + "；".join(duikou) + "</li>") if duikou else ""
+    hy = primary.get("hukou_years") or {}
+    hukou_row = ""
+    if hy:
+        hukou_row = (f"<tr><td>落户年限（{primary_name}）</td><td>"
+                     + " ｜ ".join(f"{y}:{v}" for y, v in hy.items())
+                     + f" ［{cl.get('hukou_note','')}］</td></tr>")
+    determinacy = f"""
+<p><b>对口学校（策展知识库，须以当年教育局公告核验）</b>：</p>
+<ul>
+  <li><b>对口小学</b>：{primary.get('group', primary.get('type',''))}（{primary.get('tier','')}）{duikou_html}</li>
+</ul>
+<table class='d'>
+<tr><th>确定性维度</th><th>现状（杭州·{community or '目标'}）</th></tr>
+{hukou_row}
+<tr><td>学位锁定</td><td>{cl.get('seat_lock_text','—')} ［[[sch:e18]]］</td></tr>
+</table>
+<div class="warn"><b>⚠️ 学位占用 / 落户年限（skill 不机读，须用户自查）：</b>买前 3 步：① 浙里办 / 杭州不动产登记 查学位占用（六年一学位）；② 线下核验落户年限是否达标（{cl.get('hukou_note','以当年教育局公告为准')}）；③ 合同加《学位未被占用声明书》+ 赔偿条款。skill 不宣称已核验具体房源。</div>
+"""
+
+    # ---- §6 梯队评级表 ----
+    tier_rows = ""
+    for nm, sc in resolved:
+        srcs = "、".join(f"[[sch:{ik}]]" for ik in (sc.get("sources") or []))
+        tier_rows += (f"<tr><td>{nm}</td><td><b>{sc.get('tier','')}</b></td>"
+                      f"<td>{sc.get('evidence', sc.get('group',''))}</td>"
+                      f"<td>{srcs or '（待核验）'}</td></tr>")
+    tier_table = f"""
+<table class='d'>
+<tr><th>学校</th><th>梯队</th><th>关键依据</th><th>来源</th></tr>
+{tier_rows}
+</table>
+<p class='note'>梯队评级依据公开证据（集团化关系 / 可核验升学表现 / 学位紧张度）；民间榜单标「非官方」，不得仅凭自媒体口碑定梯队。证据不足须写「未评级」。</p>
+"""
+
+    # ---- §6 生源代际传导（cohort）----
+    exam_rows = ""
+    for nm, sc in resolved:
+        ex = sc.get("exam") or {}
+        for yr, d in ex.items():
+            if isinstance(d, dict) and ("重高率" in d or "前三率" in d):
+                exam_rows += (f"<tr><td>{nm}</td><td>{yr}</td>"
+                              f"<td>{d.get('前三率','—')}</td>"
+                              f"<td>{d.get('重高率','—')}</td>"
+                              f"<td>{d.get('优高率','—')}</td>"
+                              f"<td>{d.get('caliber', d.get('note',''))}</td></tr>")
+    cohort_html = ""
+    if exam_rows:
+        cohort_html = f"""
+<p><b>近 3-5 年升学表现（口径对齐 + 来源锚点）</b>：</p>
+<table class='d'>
+<tr><th>学校</th><th>年份</th><th>前三率(%)</th><th>重高率(%)</th><th>优高率(%)</th><th>口径/备注</th></tr>
+{exam_rows}
+</table>
+"""
+        cohort_2027 = primary.get("cohort_2027")
+        if not cohort_2027 and len(resolved) > 1:
+            cohort_2027 = resolved[1][1].get("cohort_2027")
+        if cohort_2027:
+            cohort_html += f"""
+<p><b>生源代际传导（cohort）</b>：{primary_name} 近年中考数据反映 ~2013–2019 入学 cohort 的九年培养结果；当前在学 cohort 将承接近年师资与生源。按「出生→小学→初中→中考」约 15 年滞后推演，<b>2027 中考重高率三情景</b>：乐观 ~{cohort_2027.get('乐观','—')} ｜ 基准 ~{cohort_2027.get('基准','—')} ｜ 悲观 ~{cohort_2027.get('悲观','—')}。{cohort_2027.get('note','')}</p>
+<p class='note'>置信度中-低：政策（多校划片/教师轮岗/民转公停招）与人口（少子化）均为外生变量，10 年预测天然低置信，须显式提示「2026 为政策落地元年」。详细方法见 references/school-cohort-analysis.md。</p>
+"""
+        else:
+            cohort_html += "<p class='note'>未收录该校近年升学率时间序列，无法做代际传导推演；请按 references/school-cohort-analysis.md 联网补齐近 3-5 年中考数据后填入。</p>"
+
+    tier_html = determinacy + tier_table + cohort_html
+
+    # ---- §5 学区溢价 ----
+    premium_html = f"""
+<p><b>学区溢价（区间估算，置信度低-中）</b>：{cl.get('premium_note','本 CLI 无精确可比盘，不输出精确百分比；仅以挂牌−成交口径差作下限参考。')}</p>
+<table class='d'>
+<tr><th>对象</th><th>学校属性</th><th>近年成交/挂牌单价</th><th>相对差异</th></tr>
+<tr><td>{community or '目标学区房'}</td><td>{'、'.join(nm for nm,_ in resolved)}（{primary.get('tier','')}）</td><td>贝壳成交序列（见 §2）</td><td>—</td></tr>
+<tr><td>同板块非顶级学区次新</td><td>弱学区/普通公办</td><td>需 §7 联网补充</td><td>约 −10%~−20%（区间估算）</td></tr>
+</table>
+<p class='note'>溢价拆分铁律：须用同面积段成交价、对齐楼龄/户型/装修后比较，不把产品力溢价误算为学区溢价（见 references/school-premium-comparison.md）。CLI 缺可比盘，此处为区间估算而非精确测算，置信度低-中。</p>
+"""
+
+    # ---- §10 学区 vs 非学区 专章 ----
+    events = cl.get("events_2026") or []
+    ev_html = ""
+    if events:
+        ev = events[0]
+        ev_srcs = "、".join(f"[[sch:{ik}]]" for ik in (ev.get("sources") or []))
+        ev_html = (f"<b>重大事件（{ev.get('date','')}）</b>：{ev.get('event','')} —— "
+                   f"{ev.get('impact','')} ［{ev_srcs}］。")
+    nonschool_html = f"""
+<p><b>差异比较</b>：{community or '目标'} 对口 {'、'.join(nm for nm,_ in resolved)}（{primary.get('tier','')}），相对同板块非学区次新，单价高出部分主要来自学校确定性/入学门槛/口碑，而非居住价值本身；区间估算溢价约 10–20%（见 §5，置信度低-中）。</p>
+<p><b>后续走势（三情景）</b>：① <b>溢价可持续/收窄/反转</b>：当前政策基调（多校划片+教师轮岗+落户年限回落+民转公停招）指向<b>溢价趋势性收窄</b>。② {ev_html} ③ <b>驱动变量</b>：少子化（出生人口约 6 年传导到小学入学）、教育均衡化、近 12–36 个月量价动量。④ <b>结论</b>：学区房相对非学区的相对价值中长期趋于收敛，购买决策应更看重自住舒适度 + 转售流动性，而非「赌学区暴涨」。</p>
+"""
+
+    scores = [_TIER_SCORE.get(sc.get("tier", ""), 0) for nm, sc in resolved]
+    school_tier_score = max(scores) if scores and any(scores) else None
+    school_summary = "、".join(f"{nm}（{sc.get('tier','')}）" for nm, sc in resolved)
+
+    return {
+        "matched": True,
+        "schools": names,
+        "primary_school": primary_name,
+        "duikou": duikou,
+        "tier_html": tier_html,
+        "premium_html": premium_html,
+        "nonschool_html": nonschool_html,
+        "cite_specs": cite_specs,
+        "school_tier_score": school_tier_score,
+        "school_summary": school_summary,
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -2154,6 +3661,22 @@ def main() -> int:
     pgov.add_argument("--city", default="杭州")
     pgov.add_argument("--months", type=int, default=36)
     pgov.set_defaults(func=cmd_gov)
+
+    psearch = sub.add_parser(
+        "search", help="多平台统一检索：贝壳(官方CLI优先)+我爱我家(+可选T3交叉)，每平台带状态与兜底")
+    psearch.add_argument("--community", required=True)
+    psearch.add_argument("--district", default="")
+    psearch.add_argument("--city", default="杭州", help="目标城市，例如 上海 / 北京 / 杭州")
+    psearch.add_argument("--months", type=int, default=36)
+    psearch.add_argument("--no-cross", action="store_true",
+                         help="不包含 T3 交叉验证源（诸葛找房/安居客/房天下/58同城）")
+    psearch.add_argument("--output", default="")
+    psearch.set_defaults(func=cmd_search)
+
+    pcheck = sub.add_parser(
+        "beike-check", help="检测本机是否安装并配置贝壳 CLI（首次使用引导；"
+        "未安装打印安装引导并提示可跳过）")
+    pcheck.set_defaults(func=cmd_beike_check)
 
     p.add_argument("--self-test", action="store_true", help="运行自检")
     args = p.parse_args()

@@ -252,11 +252,12 @@ python scripts/data_sources.py school --school "某某小学" --city 上海 --bu
 
 ## 十、反爬取数通道
 
-贝壳、我爱我家等网站有 UA 校验、Cookie/登录态、JS 渲染、接口签名等常见反爬。本 skill 提供三条通道，不破解验证码、不做高频批量抓取、只采集公开页面数据：
+贝壳、我爱我家等网站有 UA 校验、Cookie/登录态、JS 渲染、接口签名等常见反爬。本 skill 提供四条通道，不破解验证码、不做高频批量抓取、只采集公开页面数据：
 
-1. **API 通道（优先）**：从浏览器 DevTools 或抓包拿到公开接口的 `endpoint` 与 `token`/`cookie`，写入 `scripts/sources.json`（参考 `scripts/sources.example.json`）。脚本会用浏览器化请求头直连。
-2. **浏览器渲染通道（兜底）**：给对应源配置 `browser: true`、`cookie`、`headers`、`request_interval`，脚本先做浏览器化请求，拿不到时尝试本机已安装的 Playwright 渲染公开页面再解析。安装命令：`pip install playwright && playwright install chromium`（可选）。
-3. **联网检索通道（默认兜底）**：未配置时，脚本生成"精确到数据源与城市"的检索式，由 AI 代理用 WebSearch / WebFetch 取数后回填 `listings` / `transactions` / `history`。
+1. **贝壳官方 CLI 通道（个人合规，T0 首选）**：调用贝壳官方 `beike` CLI（LianjiaTech/beike-ai-platform），返回结构化 JSON，不抓页面、不破验签，是接入「真实平台数据」最稳的合规通道。详见「贝壳官方 CLI」专章。
+2. **API 通道（优先）**：从浏览器 DevTools 或抓包拿到公开接口的 `endpoint` 与 `token`/`cookie`，写入 `scripts/sources.json`（参考 `scripts/sources.example.json`）。脚本会用浏览器化请求头直连。
+3. **浏览器渲染通道（兜底）**：给对应源配置 `browser: true`、`cookie`、`headers`、`request_interval`，脚本先做浏览器化请求，拿不到时尝试本机已安装的 Playwright 渲染公开页面再解析。安装命令：`pip install playwright && playwright install chromium`（可选）。
+4. **联网检索通道（默认兜底）**：未配置 / 官方 CLI 不可用 / 调用失败时，脚本生成"精确到数据源与城市"的检索式，由 AI 代理用 WebSearch / WebFetch 取数后回填 `listings` / `transactions` / `history`。
 
 ### 合规红线（法律风险，必读）
 
@@ -268,6 +269,52 @@ python scripts/data_sources.py school --school "某某小学" --city 上海 --bu
 - **政务 App（浙里办/随申办/京通等）含个人隐私查询**（学位占用、不动产），仅作检索提示与用户授权后的本人查询，**不擅自突破登录墙**。
 
 > 合规边界：只处理公开页面数据；不绕过登录墙获取非公开数据、不破解验证码与验签算法、不伪造身份规避平台封禁、不短时间高频抓取。数据用途和频率需符合平台服务条款与《反不正当竞争法》等当地法规。
+
+### 贝壳官方 CLI（个人合规通道，T0 首选）
+
+贝壳官方提供 CLI 工具 `beike`（仓库 `LianjiaTech/beike-ai-platform`），经官方鉴权返回结构化数据，**不抓页面、不破验签**，是接入「真实平台数据」的首选合规通道。本 skill 的 `BeikeCliSource` 已对齐「贝壳买房专家」的命令体系做多命令聚合。
+
+**安装与鉴权（一次性）**
+
+```bash
+# 1) 安装 CLI（官方安装脚本）
+curl -fsSL https://raw.githubusercontent.com/LianjiaTech/beike-ai-platform/master/cli/releases/install.sh | bash
+# 2) 获取 API Key（浏览器登录后生成）
+#    https://building.ke.com/?action=get-key&source=house-buying
+# 3) 保存 Key 到本机（默认写入 ~/.beike/BEIKE_MCP_API_KEY）
+beike auth <YOUR_API_KEY> --save
+```
+
+**命令体系（对齐「贝壳买房专家」）**
+
+| 命令 | 用途 | 进入报告的位置 |
+| --- | --- | --- |
+| `beike buy search -c <城市拼音> -q <小区>` | 当前挂牌 | `listings` + 详情 URL |
+| `beike buy sold -c <城市拼音> -q <小区>` | 近期成交 | `transactions`（无单价自动反算；全维度存 `details`） |
+| `beike buy market -c <城市拼音> -q <小区>` | 均价走势 | `history`（月度 PricePoint） |
+| `beike buy resblock -c <城市拼音> -q <小区>` | 小区档案 | `extra.resblock`（含真实 xiaoqu URL） |
+
+> 调用时脚本**强制追加 `--json`** 拿到结构化输出（默认是友好纯文本）。`-c` 传**城市名**（如 `杭州`，不是拼音；实测 `-c hz` 返回 0 结果）；`-q` 传自然语言查询（如「银树湾近一年成交」）。`CITY_PINYIN` 仅用于拼 ke.com 详情 URL，与 `-c` 无关。
+
+**输出格式与解析要点（真实探测结论，v0.2.x）**
+
+- `--json` 返回 `{"data": "<长文本>"}`；但 `buy search` 等多子查询命令会**一次性拼接返回多段 JSON**（房源段 + 新房段…），直接整体 `json.loads` 会报「Extra data」——解析时取「data 字段最长」的那一段（房源段信息最全）。
+- 房源/小区块用 `<标识>\n{JSON}\n</标识>` 包裹，但**所有字段嵌套在 `基本信息` 或 `摘要信息` 下**，且不同命令结构不同，解析必须按命令区分：
+  - **`sold` 成交**：`{"基本信息":{成交价格(万)/成交日期(点分隔 2026.04.26)/房源名称(含「N室N厅 X㎡」)/小区ID/挂牌价格/朝向/楼层…}}`。**无单价** → 由 `成交价格×10000 / 面积` 反算；房源 ID = **区块标签**（`<103149593520>`），不在 JSON 内。
+  - **`search` / `resblock`**：`{"摘要信息":{价格信息(总价+单价)/房源标题/房源ID/小区信息(含小区ID的中文串)/户型信息/房源售卖状态/学区信息/小区名称/市场行情}}`。
+- 价格是中国字符串：`总价899万，单价52595元/平米` 或 `成交价格315万`；成交单价需反算。房源 ID 拼出**真实 ke.com 详情 URL**：`https://{城市拼音}.ke.com/ershoufang/{房源ID}.html`（成交为 `/chengjiao/`）；小区档案拼 `https://{城市拼音}.ke.com/xiaoqu/{小区ID}.html`。报告引用必须指向真实 URL，严禁伪造。
+- **`market` 均价走势**：`<价格走势><小区名行情>\n{小区最新行情}\n{小区行情数据:{成交均价/挂牌均价/成交量:{最近6月趋势:{"2026-02":"3.37万/m2",...}}}}\n</小区名行情>`（区块内含**多段 JSON**）。均价用「万/m2」写法（需 ×10000→元/㎡），成交量用「N套」；按 `(date, kind)` 去重，成交均价/挂牌均价/成交量三类各自保留。
+- **日期格式为点分隔**（`2026.04.26`），解析时归一为 `YYYY-MM-DD`；`search` 挂牌无成交日期，取 `房源动态` 里最近一次调价日。
+- **`sold` 成交维度全量捕获**：除价格/面积/日期外，`_beike_block_to_row` 一并抽取 关注人数/总带看次数/成交周期/朝向/权属/楼型/楼层/用途/电梯/装修/年代，连同价格信息、交易信息、单元楼栋信息、房源亮点、房源动态、同户型行情等，全部存入每行 `details` 字典，供 `render_transaction_details` 生成「房屋成交详细信息」逐条卡片（缺字段不展示、绝不编造）。
+- **学区**在 `search` 块的 `摘要信息.学区信息`（如「对口杭州市文澜实验学校」），是 house-buying 核心关注点，需带入报告。
+- `resblock` 官方 CLI **不直给「均价」**——均价改由 `market`/`sold` 聚合；`摘要信息.市场行情` 含「在售 N 套、价格范围 X-Y 万」，可抽在售套数与价格区间。
+
+**多命令聚合与兜底（防伪纪律）**
+
+- 四条命令**独立调用、独立兜底**：任一命令失败只少一类数据，不整体异常（失败原因记入证据台账 `raw_note`）。
+- 全部命令失败 / 无可用数据 → 自动退回联网检索模式（`mode="cli_unavailable"`，给出精确检索式），**绝不编造或假装成 CLI 真实数据**。
+- 解析不出字段 → 该字段留空并在 `raw_note` 标注「已退回检索」，不补默认值。
+- 详情页、VR、图片链接一律用上游真实 ID 生成；`isError=true` 视为服务不可用，明确告知用户而非编造。
 
 配置要点：
 

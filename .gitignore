@@ -10,3 +10,15 @@ skill-report.html
 house-buying/scripts/sources.json
 */sources.json
 
+# 构建缓存与生成物（报告 HTML 为一次性产物，不进版本库）
+house-buying/.cache/
+house-buying/output/
+
+# macOS / 个人数据抓取临时产物（非 skill 源码，禁止提交）
+.DS_Store
+*.log
+*.zip
+test_output.csv
+hz_house_data2/
+hz_house_mac/
+
