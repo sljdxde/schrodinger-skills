@@ -2522,10 +2522,10 @@ def render_recent_transactions(transactions: list, n: int = 10,
         la = _txn_layout_area(t)
         total = t.get("totalPrice")
         total_s = (f"{float(total):.0f}万" if isinstance(total, (int, float))
-                   else (str(total) if total else "—"))
+                   else (str(total) if total else "未披露"))
         price = t.get("price")
         price_s = (f"{float(price):,.0f}" if isinstance(price, (int, float))
-                   else (str(price) if price else "—"))
+                   else (str(price) if price else "未披露"))
         url = str(t.get("url") or "").strip()
         link = (f'<a href="{url}" target="_blank" rel="noopener">详情↗</a>'
                 if url else "—")
@@ -2595,9 +2595,9 @@ def render_transaction_details(transactions, n: int = 8,
         if isinstance(dp, (int, float)) and isinstance(lp, (int, float)) and lp:
             neg = f"{(lp - dp) / lp * 100:.1f}%"
         price_s = (f"{float(t['price']):,.0f}" if isinstance(t.get("price"), (int, float))
-                   else (str(t["price"]) if t.get("price") else "—"))
+                   else (str(t["price"]) if t.get("price") else "未披露"))
         total_s = (f"{float(t['totalPrice']):.0f}万" if isinstance(t.get("totalPrice"), (int, float))
-                   else (str(t["totalPrice"]) if t.get("totalPrice") else "—"))
+                   else (str(t["totalPrice"]) if t.get("totalPrice") else "未披露"))
         date_s = str(det.get("deal_date") or t.get("date") or "—")
         title_s = _tx_detail_escape(det.get("title") or t.get("title") or "—")
         url = str(t.get("url") or "").strip()
@@ -2763,9 +2763,9 @@ def _parse_one_chengjiao(blob: str, explicit_date: str = "") -> Optional[dict]:
     # 楼层
     fm = re.search(r"(低|中|高)楼层|(\d+)\s*楼|顶层|底层", b)
     floor = fm.group(0) if fm else ""
-    if total is None:
-        return None  # 没有总价无法成记录
-    if price is None and area:
+    if total is None and area is None:
+        return None  # 既无总价也无面积，无法成记录
+    if total is not None and price is None and area:
         price = round(total * 10000 / area)
     title_parts = [x for x in [layout, (f"{area:.1f}㎡" if area else ""),
                                orient, floor] if x]
