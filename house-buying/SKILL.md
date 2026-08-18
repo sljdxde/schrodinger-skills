@@ -2,7 +2,7 @@
 name: house-buying
 name_zh: 学区房助手
 description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations. Also triggered by explicit requests to use the house-buying or 学区房助手 skill, or by natural-language phrases such as 请使用 house-buying 分析、分析学区房、买房值不值得、学区房是否值得买、购房分析、帮我看个房子.
-version: 1.6.7
+version: 1.6.8
 ---
 
 # 学区房助手（House Buying）
@@ -46,6 +46,7 @@ python scripts/update_self.py --apply
 3. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
 4. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。**先做透第一维度「房价」**（挂牌/成交月度时间轴 + 环比/同比/N月涨跌幅 + 带看/房源量），再按用户诉求逐层展开成交量/供需比/土地出让/学区政策/人口流动/信贷环境（见 `references/dimension-network.md`，脚本 `python scripts/data_sources.py dimensions` 可查各维度字段与来源）。**核心双源：贝壳系（贝壳/链家）+ 我爱我家，关键数据（成交价/挂牌价/小区档案）尽量双平台交叉核对**；杭州叠加杭房数研/小鸡选房高频源；诸葛找房/安居客/房天下/58同城仅作交叉验证。
    - **贝壳优先走官方 CLI（T0 真实通道）**：脚本会自动检测本机是否安装官方 `beike` CLI 且已 `auth` 保存 Key（`beike_cli_available()`）。已安装则 `BeikeCliSource` 多命令聚合拉取真实结构化数据（`buy search` 挂牌 / `buy sold` 成交 / `buy market` 均价走势 / `buy resblock` 小区档案），全部带真实 ke.com 详情 URL；未安装 / 未鉴权时自动退回联网检索（绝不编造）。安装与命令体系见 `data-source-playbook.md`「贝壳官方 CLI」章节。成交维度的全量字段（关注人数/总带看/成交周期/朝向/权属/楼型/楼层/用途/电梯/装修/年代等）由 `_beike_block_to_row` 一并捕获进 `details` 字典，供「房屋成交详细信息」模块使用。
+  - **首次 CLI 缺失时主动询问（不静默降级）**：取数前先 `python scripts/data_sources.py beike-check` 探测状态。若未安装 / 未鉴权，代理须用**显式问询卡片（AskUserQuestion 风格，禁止 `input()`）**向用户确认「是否现在安装贝壳官方 CLI」，并说明权衡：安装 → 走 T0 真实通道，报告含真实成交 / 挂牌 / 小区档案；暂不安装 → 自动退回 `cli_unavailable` 联网检索兜底（报告贝壳维度以检索式 / 占位呈现，不编造，但深度下降）。用户选「暂不安装」则正常继续（绝不报错）；选「安装」则按 `beike_cli_setup_prompt()` 引导装好并 `auth` 后再取数。该询问**仅在 CLI 缺失且本次会话首次触发**，已装 CLI 时跳过。
    - **多平台统一检索入口**：用 `python scripts/data_sources.py search --community <小区> --city <城市> [--district <片区>] [--no-cross]` 一次性跑「贝壳(官方CLI优先)+我爱我家(+可选 T3 交叉源)」，返回每平台 status（ok_real / empty_real / websearch_fallback / error）与合并清单；任一平台失败不影响整体，仅标注并退回检索式。该结果是后续报告组装的真实数据底座。
    - 用 `python scripts/data_sources.py sources --city <城市>` 调出该城预置的政府公开源、政务 APP 与本地小程序（`scripts/city_sources.json` 已内置全国省会 + 自治区首府 + 直辖市 + 计划单列市 + 强地级市约 45 城）。按 `references/school-district-workflow.md` 用 `scripts/data_sources.py` 编排取数，网页源遇到反爬时按 `data-source-playbook.md` 的反爬通道处理（配置 endpoint/token/cookie、浏览器化请求或本机 Playwright 渲染公开页面，不破解验证码、不做高频批量抓取）。**学区房须先读取政策与学区源**：`python scripts/data_sources.py policy --city <城市>` 读取 2026 政策基线（多校划片/教师轮岗/户籍脱钩/学位锁定/预警），`python scripts/data_sources.py sources --city <城市>` 调出 `school_district`（区教育局招生专栏 + 对口地段表检索兜底）与 `enrollment_alert`（学区预警红黄牌）源；已公开单小区数据的城市（宁波/苏州/无锡/佛山/珠海等）可用 `python scripts/data_sources.py gov --community <小区> --city <城市>` 直拉 T1 官方成交。**所有采集到的数据点（价格/成交/物业/建成/车位/学区等）必须带真实 URL 引用 + 发布时间 + 数据口径 + 一致性标注，禁止无来源数据。**
 5. 计算学区溢价：涉及学区房时，按 `references/school-premium-comparison.md` 对比目标学区房与周边非学区房，量化教育溢价；并在报告结尾按 `references/report-template.md` 的「学区 vs 非学区差异比较与后续走势」专章，给出差异比较与后续走势判断。
