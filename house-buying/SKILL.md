@@ -2,7 +2,7 @@
 name: house-buying
 name_zh: 学区房助手
 description: Use when evaluating Chinese residential property purchases, school-district homes, target communities, transaction prices, school outcomes, student-source quality, community demographics, housing-price forecasts, or buy/hold/watch recommendations. Also triggered by explicit requests to use the house-buying or 学区房助手 skill, or by natural-language phrases such as 请使用 house-buying 分析、分析学区房、买房值不值得、学区房是否值得买、购房分析、帮我看个房子.
-version: 1.7.0
+version: 1.7.1
 ---
 
 # 学区房助手（House Buying）
@@ -44,7 +44,10 @@ python scripts/update_self.py --apply
 1. 自动自检更新：加载本 skill 后第一步**必须**执行 `python scripts/update_self.py --apply`（脚本按 git/非 git 自动选策略，失败静默降级）；若返回 updated，重新读取当前 `SKILL.md` 与 references 后再继续。完成全部分析、给出最终回复前，运行 `python scripts/update_self.py --report`，若输出更新失败警告则原样转告用户（含原因+手动步骤）。
 2. **前置强制检查：贝壳 CLI 状态探测（必须在需求采集前执行，禁止跳过）**：加载本 skill 后、向用户提问任何信息之前，**必须**先运行 `python scripts/data_sources.py beike-check` 探测 CLI。根据输出分两种情况：
    - **✓ 已安装并配置**：记录 `cli_available=true`，直接进入下一步。
-   - **○ 未安装 / 未鉴权**：**必须**先用 **AskUserQuestion 风格卡片（禁止 `input()`）** 向用户确认「是否现在安装贝壳官方 CLI」，并说明权衡：安装 → 走 T0 真实通道，报告含真实成交 / 挂牌 / 小区档案；暂不安装 → 自动退回 `cli_unavailable` 联网检索兜底（报告贝壳维度以检索式 / 占位呈现，不编造、深度下降，但**绝不报错**）。用户选「暂不安装」则记录 `cli_available=false` 并正常继续；选「安装」则按 `data-source-playbook.md`「贝壳官方 CLI」章节引导装好并 `auth` 后再取数。该询问**仅在 CLI 缺失且本次会话首次触发**；已装 CLI 时直接跳过。
+   - **○ 未安装 / 未鉴权**：**必须**先用 **AskUserQuestion 风格卡片（禁止 `input()`）** 向用户确认「是否现在安装贝壳官方 CLI」，并说明两种分支的明确行为：
+     - **用户选「暂不安装 / 跳过」**：记录 `cli_available=false`，**立即**继续走 `cli_unavailable` 联网检索兜底（报告贝壳维度以检索式 / 占位呈现，不编造、深度下降，但**绝不报错**）。
+     - **用户选「安装」**：agent **必须阻塞等待**，输出 `beike login` 登录链接（或 `https://building.ke.com/?action=get-key&source=house-buying`）与 `beike auth <KEY> --save` 保存命令，然后**停止一切后续取数、分析、报告生成步骤**，不再并行跑任何联网检索或背景收集。等用户下一条消息明确回复「已安装并 auth」后，重新运行 `beike-check` 确认通过，再进入后续需求采集与取数。在用户确认之前，不得以“先并行跑着”为由提前生成报告。
+   该询问**仅在 CLI 缺失且本次会话首次触发**；已装 CLI 时直接跳过。
 3. 交互式需求采集：在确认 CLI 状态之后，再按 `references/intake-questionnaire.md` 判断信息是否足够。缺城市、目标对象、购房目的、预算、首付比例或孩子入学年份时，必须先追问，不要直接联网跑完整报告。
 4. 建证据台账：按“事实/数据、来源、时间、适用范围、置信度、备注”记录关键证据。当前数据必须联网核验；不能联网时说明验证受限。
 5. 采集数据：按 `references/data-source-playbook.md` 执行，覆盖成交、挂牌、库存、政策、城市基本面和可比楼盘。**先做透第一维度「房价」**（挂牌/成交月度时间轴 + 环比/同比/N月涨跌幅 + 带看/房源量），再按用户诉求逐层展开成交量/供需比/土地出让/学区政策/人口流动/信贷环境（见 `references/dimension-network.md`，脚本 `python scripts/data_sources.py dimensions` 可查各维度字段与来源）。**核心双源：贝壳系（贝壳/链家）+ 我爱我家，关键数据（成交价/挂牌价/小区档案）尽量双平台交叉核对**；杭州叠加杭房数研/小鸡选房高频源；诸葛找房/安居客/房天下/58同城仅作交叉验证。

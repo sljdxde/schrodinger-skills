@@ -2633,20 +2633,22 @@ def render_transaction_details(transactions, n: int = 8,
 def beike_cli_setup_prompt() -> str:
     """返回面向用户的贝壳 CLI 安装引导（友好、可复制）。
 
-    安装/鉴权一次性；未安装时由 agent 在首次使用时转述给用户，并明确给出
-    「暂不安装、继续用联网检索」的选项（不阻塞分析）。
+    安装/鉴权一次性；未安装时由 agent 在首次使用时转述给用户。
+    关键 UX：若用户选择「安装」，agent 必须阻塞等待用户完成安装+auth 并回复确认，
+    期间不得并行跑联网检索或生成报告；若用户选择「暂不安装」，才继续走联网检索兜底。
     """
     return ("【建议】安装贝壳官方 CLI，获取真实成交/挂牌数据（更准、带真实详情链接）\n\n"
-            "1) 安装（官方脚本）：\n"
+            "1) 安装 CLI（官方脚本）：\n"
             "   curl -fsSL https://raw.githubusercontent.com/"
             "LianjiaTech/beike-ai-platform/master/cli/releases/install.sh | bash\n\n"
-            "2) 获取 API Key（浏览器登录后生成）：\n"
-            "   https://building.ke.com/?action=get-key&source=house-buying\n\n"
+            "2) 浏览器登录并获取 API Key：\n"
+            "   运行 beike login，按提示在浏览器登录后拿到 Bearer Key；\n"
+            "   或直接访问 https://building.ke.com/?action=get-key&source=house-buying\n\n"
             "3) 保存 Key 到本机：\n"
             "   beike auth <你的API_KEY> --save\n\n"
-            "完成后本 skill 会自动走官方实时数据通道；不安装也能继续"
-            "（走联网检索兜底，数据会标注为“检索式回填”）。\n"
-            "→ 如暂不安装，回复「暂不安装 / 跳过」，我将继续用联网检索完成分析。")
+            "【重要】如果你选择安装，请完成上面 3 步后回复「已安装并 auth」，\n"
+            "我才会继续用真实 CLI 数据完成分析。在你确认之前，我会暂停，不会用联网检索兜底跑。\n"
+            "→ 如果你不想现在安装，直接回复「暂不安装 / 跳过」，我将立即用联网检索继续分析（数据会标注为“检索式回填”，不报错）。")
 
 
 def school_tier_rank(school: str, city: str = "") -> dict:
