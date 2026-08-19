@@ -1,0 +1,4 @@
+interface:
+  display_name: "里程碑门控"
+  short_description: "复杂任务的里程碑拆分、阶段交付确认与纠偏重做"
+  default_prompt: "Use $milestone-gate to help the user with the declared task."

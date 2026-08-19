@@ -7,7 +7,7 @@
 #### 实用的 AI Skills 合集，开箱即用
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-7-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-8-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -32,6 +32,7 @@
 | [Memory-Forge](./memory-forge) | 把任意学习材料锻造成好懂好记的知识卡/故事/脑图/自测，并给出艾宾浩斯复习计划 | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD-Download](./mtd-download) | 基于 curl 的多线程/分块并行下载大文件，自动探测断点续传支持，带进度与速度显示 | [SKILL.md](./mtd-download/SKILL.md) |
 | [Skill-Architect](./skill-architect) | 通过第一性原理 10 维度决策树访谈，把模糊需求或个人经验设计成可安装的 AI Skill，编译成包并做质量评估 | [SKILL.md](./skill-architect/SKILL.md) |
+| [Milestone-Gate](./milestone-gate) | 复杂任务的里程碑门控：开局拆里程碑与验收标准，每阶段交付物让你确认，不达标回退重做，避免「只看到结果、最后全重来」 | [SKILL.md](./milestone-gate/SKILL.md) |
 | [Personal-Knowledge-Base](./personal-knowledge-base) | Codex + Obsidian + `ob` CLI 的本地个人知识库组合包，包含 `ob-llm-wiki` 与 `ob` 两个 skill | [README.md](./personal-knowledge-base/README.md) |
 
 ---
@@ -234,6 +235,28 @@ Agent 会先访谈、产出蓝图，再编译成包并评估。也可直接跑�
 ```bash
 python scripts/compile_skill.py --blueprint examples/sample-blueprint.json --out ./skills
 ```
+
+---
+
+### [Milestone-Gate](./milestone-gate)
+
+复杂任务的里程碑门控流程。开局把目标拆成带「交付物 + 验收标准」的有序里程碑，每完成一段先给你看中间交付物，你确认达标才往下走；不达标只退回当前里程碑重做（保留已达标的前序），把「最后一把赌结果」变成「每段都可纠偏」，从而省下 token 与时间。
+
+**核心能力：**
+- 里程碑分解：将复杂任务拆成可核验的交付物序列，开局即让用户看到全貌与验收标准
+- 验收标准：每个里程碑都有明确达标判据，模糊的「差不多」不算达标
+- 阶段交付与确认：每个里程碑完成后通过预览/卡片呈现中间交付物，并请求用户确认
+- 纠偏重做：不达标退回当前里程碑重做，已达标的前序保留，绝不推翻重来
+- 进度可视化：用任务清单持续展示进度，随时掌握状态
+- 危险前置：在不可逆/高成本/外部副作用步骤前主动暂停，与既有安全规则协同
+
+**使用方式：**
+
+对 Agent 说：
+```
+用 milestone-gate 帮我做 X，分步确认
+```
+或直接描述复杂任务并说「先规划」「分步做」，Agent 会自动施加里程碑门控；也可显式调用。
 
 ---
 

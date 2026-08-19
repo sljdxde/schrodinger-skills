@@ -7,7 +7,7 @@
 #### Practical AI Skills, ready to use
 
 [![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](./LICENSE)
-[![Skills](https://img.shields.io/badge/Skills-7-10B981?style=for-the-badge)](#-skills)
+[![Skills](https://img.shields.io/badge/Skills-8-10B981?style=for-the-badge)](#-skills)
 [![AgentSkills](https://img.shields.io/badge/AgentSkills-Standard-8B5CF6?style=for-the-badge)](https://agentskills.io)
 
 ![Claude Code](https://img.shields.io/badge/Claude_Code-Skill-D97706?style=flat-square&logo=anthropic&logoColor=white)
@@ -34,6 +34,7 @@ Installation is simple — just one sentence to your Agent. No path or configura
 | [Memory-Forge](./memory-forge) | Forge any study material into memorable cards, stories, mind-maps, quizzes, and an Ebbinghaus/SM-2 review schedule | [SKILL.md](./memory-forge/SKILL.md) |
 | [MTD-Download](./mtd-download) | Multi-threaded / chunked download for large files via curl, auto-detects Range support, with live progress and speed | [SKILL.md](./mtd-download/SKILL.md) |
 | [Skill-Architect](./skill-architect) | Turns vague needs or personal/domain experience into installable AI Skills through first-principles 10-facet decision-tree interviews, blueprint compilation, and quality evaluation | [SKILL.md](./skill-architect/SKILL.md) |
+| [Milestone-Gate](./milestone-gate) | Milestone-gated execution for complex tasks: break work into milestones with acceptance criteria, present each deliverable for confirmation, and re-run the previous milestone on failure — so you never bet everything on the final result | [SKILL.md](./milestone-gate/SKILL.md) |
 | [Personal-Knowledge-Base](./personal-knowledge-base) | A Codex + Obsidian + `ob` CLI bundle for local personal knowledge management, including `ob-llm-wiki` and `ob` | [README.md](./personal-knowledge-base/README.md) |
 
 ---
@@ -235,6 +236,28 @@ The Agent interviews you, produces a blueprint, compiles a package, and evaluate
 ```bash
 python scripts/compile_skill.py --blueprint examples/sample-blueprint.json --out ./skills
 ```
+
+---
+
+### [Milestone-Gate](./milestone-gate)
+
+A milestone-gating workflow for complex tasks. At the start it breaks the goal into an ordered list of milestones, each with a deliverable and acceptance criteria. After each milestone it shows you the intermediate deliverable for confirmation; if it fails the bar, it re-runs only that milestone (keeping the already-passed ones) instead of redoing everything — turning "betting on the final result" into "correctable at every step", which saves tokens and time.
+
+**Key Features:**
+- Milestone decomposition: split complex tasks into a verifiable deliverable sequence with visible acceptance criteria up front
+- Acceptance criteria: every milestone has explicit pass/fail checks — "good enough" is not a pass
+- Stage delivery & confirmation: present each milestone's deliverable via preview/cards and ask for confirmation
+- Correction loop: on failure, re-run only the current milestone while preserving completed ones
+- Progress visibility: a task checklist shows status at all times
+- Hazard front-loading: pause before irreversible/costly/external-side-effect steps, working with existing safety rules
+
+**Usage:**
+
+Tell your Agent:
+```
+Use milestone-gate to do X, confirm at each step
+```
+Or describe a complex task and say "plan first" / "step by step" — the Agent applies milestone-gating automatically; you can also invoke it explicitly.
 
 ---
 
